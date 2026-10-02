@@ -10,10 +10,18 @@ declare global {
 export function initKakao(): boolean {
   if (typeof window === 'undefined') return false;
 
-  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY || process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
+  // 카카오 지도 및 카카오톡 공유 공통 SDK 키로 NEXT_PUBLIC_KAKAO_MAP_KEY 통일 적용
+  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+
+  const isValidKey = (key?: string) => {
+    return !!key && 
+      key !== 'your-kakao-map-key' && 
+      key !== 'your-kakao-javascript-key' && 
+      key !== 'demo_kakao_key_replace_with_yours';
+  };
 
   if (window.Kakao) {
-    if (!window.Kakao.isInitialized() && kakaoKey && kakaoKey !== 'your-kakao-javascript-key' && kakaoKey !== 'demo_kakao_key_replace_with_yours') {
+    if (!window.Kakao.isInitialized() && isValidKey(kakaoKey)) {
       try {
         window.Kakao.init(kakaoKey);
         return true;
@@ -30,8 +38,14 @@ export function initKakao(): boolean {
   script.integrity = 'sha384-TiCUE00h649CAMonG018J2mAssRse_g30edZNi92OBghGwpczuo20MW4zkMxYMcN';
   script.crossOrigin = 'anonymous';
   script.onload = () => {
-    if (window.Kakao && kakaoKey && kakaoKey !== 'your-kakao-javascript-key' && kakaoKey !== 'demo_kakao_key_replace_with_yours') {
-      window.Kakao.init(kakaoKey);
+    if (window.Kakao && isValidKey(kakaoKey)) {
+      try {
+        if (!window.Kakao.isInitialized()) {
+          window.Kakao.init(kakaoKey);
+        }
+      } catch (err) {
+        console.warn('Kakao script onload init error:', err);
+      }
     }
   };
   document.head.appendChild(script);
