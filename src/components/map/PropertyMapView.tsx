@@ -73,8 +73,8 @@ export const PropertyMapView: React.FC<PropertyMapViewProps> = ({
 
   // Kakao Map Script Dynamic Loader
   useEffect(() => {
-    const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
-    if (!kakaoKey || kakaoKey === 'your-kakao-javascript-key' || kakaoKey === 'demo_kakao_key_replace_with_yours') {
+    const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+    if (!kakaoKey || kakaoKey === 'your-kakao-map-key' || kakaoKey === 'demo_kakao_key_replace_with_yours') {
       return;
     }
 

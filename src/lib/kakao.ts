@@ -10,7 +10,7 @@ declare global {
 export function initKakao(): boolean {
   if (typeof window === 'undefined') return false;
 
-  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY || process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
 
   if (window.Kakao) {
     if (!window.Kakao.isInitialized() && kakaoKey && kakaoKey !== 'your-kakao-javascript-key' && kakaoKey !== 'demo_kakao_key_replace_with_yours') {
