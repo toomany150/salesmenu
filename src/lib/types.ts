@@ -55,6 +55,60 @@ export const STATUS_LABELS: Record<PropertyStatus, { label: string; color: strin
   CANCELLED: { label: '취소', color: 'bg-rose-100 text-rose-800 border-rose-300' },
 };
 
+// 아파트 옵션 카테고리 및 항목 정의
+export const APARTMENT_AIRCON_ROOMS = ['거실', '안방', '방1', '방2', '방3'] as const;
+
+export interface ApartmentOptionGroup {
+  category: string;
+  items: string[];
+}
+
+export const APARTMENT_OPTION_CATEGORIES: ApartmentOptionGroup[] = [
+  {
+    category: '냉난방 / 공조 / 환기',
+    items: [
+      '개별 난방 제어기',
+      '공기순환기',
+      '전열교환기',
+      '실링펜',
+    ],
+  },
+  {
+    category: '주방 가전 / 빌트인',
+    items: [
+      '인덕션',
+      '하이라이트',
+      '가스쿡탑',
+      '식기세척기',
+      '오븐',
+      '빌트인 냉장고',
+      '김치냉장고',
+      '음식물처리기',
+    ],
+  },
+  {
+    category: '인테리어 / 조명 / 창호',
+    items: [
+      '우물천정',
+      '간접조명',
+      '중문',
+      '발코니확장',
+      '이중창',
+      '탄성코드',
+      '줄눈',
+    ],
+  },
+  {
+    category: '수납 / 가구 / 현관',
+    items: [
+      '붙박이장',
+      '드레스룸 시스템장',
+      '신발장',
+      '현관창고',
+    ],
+  },
+];
+
 // 7가지 매물 스펙 세부 모델 인터페이스
 export interface ApartmentData {
   complexName: string;
@@ -70,10 +124,12 @@ export interface ApartmentData {
   maintenanceFee?: number;
   heatingType?: string;
   systemAircon?: boolean;
+  systemAirconRooms?: string[]; // ['거실', '안방', '방1', '방2', '방3']
   roomLivingOption?: string;
   heatExchanger?: boolean;
   induction?: boolean;
   otherOptions?: string;
+  optionsList?: string[];
 }
 
 export interface HouseData {

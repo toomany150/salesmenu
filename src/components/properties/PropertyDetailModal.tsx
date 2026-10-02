@@ -310,27 +310,59 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                {property.apartmentDetail.systemAircon && (
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-sm font-medium">✓ 시스템에어컨</span>
-                )}
-                {property.apartmentDetail.heatExchanger && (
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-sm font-medium">✓ 전열교환기</span>
-                )}
-                {property.apartmentDetail.induction && (
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-sm font-medium">✓ 인덕션</span>
-                )}
-                {property.apartmentDetail.roomLivingOption && (
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded-sm">
-                    {property.apartmentDetail.roomLivingOption}
-                  </span>
-                )}
-                {property.apartmentDetail.otherOptions && (
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded-sm">
-                    {property.apartmentDetail.otherOptions}
-                  </span>
-                )}
-              </div>
+              {/* 설치 옵션 뱃지 리스트 */}
+              {(() => {
+                const optionBadges: string[] = [];
+                if (property.apartmentDetail.otherOptions) {
+                  property.apartmentDetail.otherOptions.split(',').forEach((opt) => {
+                    const trimmed = opt.trim();
+                    if (trimmed && !optionBadges.includes(trimmed)) {
+                      optionBadges.push(trimmed);
+                    }
+                  });
+                }
+                // 기존 데이터 하위 호환
+                if (property.apartmentDetail.systemAircon && !optionBadges.some(b => b.includes('에어콘') || b.includes('에어컨'))) {
+                  optionBadges.unshift('시스템에어콘');
+                }
+                if (property.apartmentDetail.heatExchanger && !optionBadges.includes('전열교환기')) {
+                  optionBadges.push('전열교환기');
+                }
+                if (property.apartmentDetail.induction && !optionBadges.some(b => b.includes('인덕션'))) {
+                  optionBadges.push('인덕션');
+                }
+                if (property.apartmentDetail.roomLivingOption && !optionBadges.includes(property.apartmentDetail.roomLivingOption)) {
+                  optionBadges.push(property.apartmentDetail.roomLivingOption);
+                }
+
+                if (optionBadges.length === 0) return null;
+
+                return (
+                  <div className="mt-3 pt-3 border-t border-blue-200/60">
+                    <span className="text-[11px] font-bold text-blue-900 block mb-1.5">
+                      설치 옵션 ({optionBadges.length}개)
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 text-xs">
+                      {optionBadges.map((badge, idx) => {
+                        const isAircon = badge.includes('에어콘') || badge.includes('에어컨');
+                        return (
+                          <span
+                            key={idx}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold shadow-2xs ${
+                              isAircon
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-slate-800 border border-blue-200'
+                            }`}
+                          >
+                            <span className={isAircon ? 'text-blue-200' : 'text-emerald-600'}>✓</span>
+                            <span>{badge}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
