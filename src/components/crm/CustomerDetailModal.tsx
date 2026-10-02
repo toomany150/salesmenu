@@ -80,11 +80,15 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">통신사:</span>
-                <span className="px-2 py-0.5 text-xs font-bold bg-white text-slate-800 rounded-md border border-slate-300 shadow-2xs">
-                  {customer.carrier}
-                </span>
-                <span className="text-xs text-slate-500 ml-2">연락처:</span>
+                {customer.carrier && (
+                  <>
+                    <span className="text-xs text-slate-500">통신사:</span>
+                    <span className="px-2 py-0.5 text-xs font-bold bg-white text-slate-800 rounded-md border border-slate-300 shadow-2xs">
+                      {customer.carrier}
+                    </span>
+                  </>
+                )}
+                <span className="text-xs text-slate-500 ml-1">연락처:</span>
                 <span className="font-mono text-sm font-bold text-slate-900">{customer.phone}</span>
               </div>
               {customer.memo && (

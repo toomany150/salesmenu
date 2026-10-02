@@ -89,20 +89,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, carrier, phone, type, group, memo, demand } = body;
 
-    if (!name || !phone || !carrier || !type) {
+    if (!name || !phone || !type) {
       return NextResponse.json(
-        { error: '이름, 통신사, 전화번호, 고객구분은 필수 항목입니다.' },
+        { error: '이름, 전화번호, 고객구분은 필수 항목입니다.' },
         { status: 400 }
       );
     }
 
+    // 매도/임대인은 통신사 선택 가능, 매수/임차인은 통신사 불필요
+    const isSearching = type === 'BUYER' || type === 'LESSEE';
+    const finalCarrier = isSearching ? null : (carrier || null);
+
     // group 결정 (SELLER/LESSOR -> RECEIVED, BUYER/LESSEE -> SEARCHING)
-    const finalGroup = group || (type === 'SELLER' || type === 'LESSOR' ? 'RECEIVED' : 'SEARCHING');
+    const finalGroup = group || (!isSearching ? 'RECEIVED' : 'SEARCHING');
 
     const customer = await prisma.customer.create({
       data: {
         name,
-        carrier,
+        carrier: finalCarrier,
         phone,
         type,
         group: finalGroup,

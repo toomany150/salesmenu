@@ -99,9 +99,11 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                         <span className="font-extrabold text-sm text-slate-900 group-hover:text-blue-600 transition-colors">
                           {customer.name}
                         </span>
-                        <span className="px-2 py-0.5 text-[11px] font-bold bg-slate-100 text-slate-700 rounded-md border border-slate-200">
-                          {customer.carrier}
-                        </span>
+                        {customer.carrier && (
+                          <span className="px-2 py-0.5 text-[11px] font-bold bg-slate-100 text-slate-700 rounded-md border border-slate-200">
+                            {customer.carrier}
+                          </span>
+                        )}
                       </div>
                       <p className="font-mono text-xs font-semibold text-slate-600 mt-1">
                         {customer.phone}

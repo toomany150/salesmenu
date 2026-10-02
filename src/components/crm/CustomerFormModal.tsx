@@ -73,7 +73,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
     const payload: any = {
       name: name.trim(),
-      carrier,
+      carrier: isSearching ? undefined : carrier,
       phone: phone.trim(),
       type,
       group,
@@ -209,7 +209,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             </div>
 
             {/* 2. 고객 기본 정보 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className={`grid grid-cols-1 ${!isSearching ? 'sm:grid-cols-2' : ''} gap-3`}>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">고객명 *</label>
                 <input
@@ -222,22 +222,24 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  통신사 (필수 택 1) *
-                </label>
-                <select
-                  value={carrier}
-                  onChange={(e) => setCarrier(e.target.value as MobileCarrier)}
-                  className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800"
-                >
-                  {CARRIER_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!isSearching && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    통신사 (매도/임대인 택 1)
+                  </label>
+                  <select
+                    value={carrier}
+                    onChange={(e) => setCarrier(e.target.value as MobileCarrier)}
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800"
+                  >
+                    {CARRIER_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div>

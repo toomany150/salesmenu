@@ -18,8 +18,8 @@ datasource db {
 model Customer {
   id        String   @id @default(cuid())
   name      String   // 고객명 (예: 홍길동)
-  // 통신사: SK, SK알뜰폰, LG, LG알뜰폰, KT, KT알뜰폰
-  carrier   String   
+  // 통신사: SK, SK알뜰폰, LG, LG알뜰폰, KT, KT알뜰폰 (매도/임대인 선택입력, 매수/임차인은 불필요)
+  carrier   String?   
   phone     String   // 전화번호 (예: 010-1234-5678)
   // 고객구분: SELLER(매도), BUYER(매수), LESSOR(임대), LESSEE(임차)
   type      String   
@@ -91,6 +91,10 @@ model Property {
   // 소재지 주소
   address             String    // 도로명/지번 주소
   detailAddress       String?   // 동/호수 또는 층수 (선택)
+  
+  // 지도 위치 좌표 (위도/경도)
+  latitude            Float?    // 위도 (예: 37.4998)
+  longitude           Float?    // 경도 (예: 127.0384)
   
   // 방향 및 기준
   direction           String?   // 남향, 동향, 남동향, 북향 등

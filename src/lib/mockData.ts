@@ -37,7 +37,7 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
   {
     id: 'cust-4',
     name: '정민수',
-    carrier: 'SK알뜰폰',
+    // 매수인은 통신사 정보 불필요
     phone: '010-9012-4567',
     type: 'BUYER',
     group: 'SEARCHING',
@@ -64,7 +64,7 @@ export const INITIAL_CUSTOMERS: CustomerItem[] = [
   {
     id: 'cust-5',
     name: '최은경',
-    carrier: 'LG알뜰폰',
+    // 임차인은 통신사 정보 불필요
     phone: '010-7766-3322',
     type: 'LESSEE',
     group: 'SEARCHING',
@@ -102,6 +102,8 @@ export const INITIAL_PROPERTIES: PropertyItem[] = [
     transactionType: '매매',
     address: '서울특별시 강남구 역삼로 310',
     detailAddress: '104동 1502호',
+    latitude: 37.4994,
+    longitude: 127.0421,
     direction: '남향',
     directionCriteria: '거실기준',
     availableDate: '2026-11-30',
@@ -152,6 +154,8 @@ export const INITIAL_PROPERTIES: PropertyItem[] = [
     transactionType: '월세',
     address: '서울특별시 서초구 서초대로 350',
     detailAddress: '1층 102호',
+    latitude: 37.4932,
+    longitude: 127.0145,
     direction: '동향',
     directionCriteria: '주출입구기준',
     availableDate: '2026-11-01',
@@ -215,6 +219,8 @@ export const INITIAL_PROPERTIES: PropertyItem[] = [
     transactionType: '월세',
     address: '서울특별시 강남구 테헤란로 142',
     detailAddress: '7층 전체',
+    latitude: 37.4998,
+    longitude: 127.0345,
     direction: '남동향',
     directionCriteria: '주출입구기준',
     availableDate: '2026-10-15',

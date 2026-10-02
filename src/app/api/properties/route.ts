@@ -60,6 +60,8 @@ export async function GET(request: NextRequest) {
             transactionType: p.transactionType,
             address: p.address,
             detailAddress: p.detailAddress,
+            latitude: p.latitude,
+            longitude: p.longitude,
             direction: p.direction,
             directionCriteria: p.directionCriteria,
             availableDate: p.availableDate ? new Date(p.availableDate) : null,
@@ -72,11 +74,36 @@ export async function GET(request: NextRequest) {
             approvalDate: p.approvalDate ? new Date(p.approvalDate) : null,
             buildingRegisterUse: p.buildingRegisterUse,
             customerId: p.customerId,
-            apartmentDetail: p.apartmentDetail ? { create: p.apartmentDetail } : undefined,
-            houseDetail: p.houseDetail ? { create: p.houseDetail } : undefined,
-            storeDetail: p.storeDetail ? { create: p.storeDetail } : undefined,
-            officeDetail: p.officeDetail ? { create: p.officeDetail } : undefined,
-            factoryWarehouseDetail: p.factoryWarehouseDetail ? { create: p.factoryWarehouseDetail } : undefined,
+            apartmentDetail: p.apartmentDetail ? { 
+              create: {
+                ...p.apartmentDetail,
+                approvalDate: p.apartmentDetail.approvalDate ? new Date(p.apartmentDetail.approvalDate) : null,
+              } 
+            } : undefined,
+            houseDetail: p.houseDetail ? { 
+              create: {
+                ...p.houseDetail,
+                approvalDate: p.houseDetail.approvalDate ? new Date(p.houseDetail.approvalDate) : null,
+              } 
+            } : undefined,
+            storeDetail: p.storeDetail ? { 
+              create: {
+                ...p.storeDetail,
+                approvalDate: p.storeDetail.approvalDate ? new Date(p.storeDetail.approvalDate) : null,
+              } 
+            } : undefined,
+            officeDetail: p.officeDetail ? { 
+              create: {
+                ...p.officeDetail,
+                approvalDate: p.officeDetail.approvalDate ? new Date(p.officeDetail.approvalDate) : null,
+              } 
+            } : undefined,
+            factoryWarehouseDetail: p.factoryWarehouseDetail ? { 
+              create: {
+                ...p.factoryWarehouseDetail,
+                approvalDate: p.factoryWarehouseDetail.approvalDate ? new Date(p.factoryWarehouseDetail.approvalDate) : null,
+              } 
+            } : undefined,
             landDetail: p.landDetail ? { create: p.landDetail } : undefined,
           },
         });
@@ -115,6 +142,8 @@ export async function POST(request: NextRequest) {
       status = 'AVAILABLE',
       address,
       detailAddress,
+      latitude,
+      longitude,
       direction,
       directionCriteria,
       availableDate,
@@ -163,6 +192,8 @@ export async function POST(request: NextRequest) {
         transactionType,
         address,
         detailAddress,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
         direction,
         directionCriteria,
         availableDate: availableDate ? new Date(availableDate) : null,

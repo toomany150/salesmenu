@@ -25,6 +25,7 @@ import {
 } from '@/lib/types';
 import { PublicDataFetcher } from './PublicDataFetcher';
 import { ChecklistPanel } from '../checklists/ChecklistPanel';
+import { getCoordinatesFromAddress } from '@/lib/geo';
 
 // Subforms
 import { ApartmentForm } from './forms/ApartmentForm';
@@ -163,6 +164,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     setSubmitting(true);
     setErrorMsg(null);
 
+    const coords = getCoordinatesFromAddress(address.trim());
+
     const payload: any = {
       propertyNumber: propertyNumber.trim(),
       receiptDate,
@@ -170,6 +173,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       transactionType,
       address: address.trim(),
       detailAddress: detailAddress.trim() || undefined,
+      latitude: coords.lat,
+      longitude: coords.lng,
       direction,
       directionCriteria,
       availableDate: availableDate || undefined,

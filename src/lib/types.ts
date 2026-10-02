@@ -220,6 +220,8 @@ export interface PropertyItem {
   transactionType: TransactionType;
   address: string;
   detailAddress?: string;
+  latitude?: number;
+  longitude?: number;
   direction?: string;
   directionCriteria?: string;
   availableDate?: string;
@@ -236,7 +238,7 @@ export interface PropertyItem {
     id: string;
     name: string;
     phone: string;
-    carrier: MobileCarrier;
+    carrier?: MobileCarrier;
     type: CustomerType;
   };
   apartmentDetail?: ApartmentData;
@@ -270,11 +272,11 @@ export interface CustomerDemandItem {
   updatedAt: string;
 }
 
-// 고객 인터페이스
+// 고객 인터페이스 (매수자/임차인은 통신사 정보 불필요)
 export interface CustomerItem {
   id: string;
   name: string;
-  carrier: MobileCarrier;
+  carrier?: MobileCarrier;
   phone: string;
   type: CustomerType;
   group: CustomerGroup;

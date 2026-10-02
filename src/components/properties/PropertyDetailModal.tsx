@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
 import { shareViaKakao, generateSmsLink } from '@/lib/kakao';
+import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
 
 interface PropertyDetailModalProps {
   property: PropertyItem | null;
@@ -112,12 +113,34 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           {/* Main Title & Price Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-blue-50/70 via-sky-50/40 to-slate-50 border border-blue-200/70">
             <div>
-              <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
-                <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span className="font-medium text-slate-800">{property.address}</span>
-                {property.detailAddress && (
-                  <span className="text-slate-600 font-semibold">{property.detailAddress}</span>
-                )}
+              <div className="flex flex-wrap items-center gap-2 text-slate-500 text-xs mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span className="font-semibold text-slate-800">{property.address}</span>
+                  {property.detailAddress && (
+                    <span className="text-slate-600">{property.detailAddress}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 ml-0 sm:ml-2">
+                  <a
+                    href={getKakaoMapUrl(property.address, property.latitude, property.longitude)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#FEE500] text-[#191919] hover:bg-[#FADA0A] transition-colors shadow-2xs"
+                  >
+                    <span>🟡 카카오지도</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                  <a
+                    href={getNaverMapUrl(property.address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#03C75A] text-white hover:bg-[#02b350] transition-colors shadow-2xs"
+                  >
+                    <span>🟢 네이버지도</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
               </div>
               <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
                 {property.apartmentDetail?.complexName || 
@@ -147,9 +170,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               {property.customer ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-900">{property.customer.name}</span>
-                  <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-sm">
-                    {property.customer.carrier}
-                  </span>
+                  {property.customer.carrier && (
+                    <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-sm">
+                      {property.customer.carrier}
+                    </span>
+                  )}
                   <span className="text-xs font-mono text-slate-700">{property.customer.phone}</span>
                 </div>
               ) : (
