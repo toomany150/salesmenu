@@ -128,10 +128,37 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         mapInstanceRef.current = map;
         markerRef.current = marker;
         infoWindowRef.current = infoWindow;
+
+        // Essential: relayout calls to force Kakao to calculate container dimensions and fetch tiles inside modal
+        const forceRelayout = () => {
+          if (map) {
+            map.relayout();
+            map.setCenter(centerPos);
+          }
+        };
+
+        setTimeout(forceRelayout, 50);
+        setTimeout(forceRelayout, 200);
+        setTimeout(forceRelayout, 600);
       }
     } catch (err) {
       console.warn('Kakao map init warning:', err);
     }
+
+    // ResizeObserver to automatically relayout when modal opens or resizes
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && mapContainerRef.current) {
+      ro = new ResizeObserver(() => {
+        if (mapInstanceRef.current && window.kakao?.maps) {
+          mapInstanceRef.current.relayout();
+        }
+      });
+      ro.observe(mapContainerRef.current);
+    }
+
+    return () => {
+      ro?.disconnect();
+    };
   }, [kakaoLoaded]);
 
   // 3. Search and relocate map when address changes
@@ -153,8 +180,9 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
       }
 
       if (mapInstanceRef.current && window.kakao?.maps) {
+        mapInstanceRef.current.relayout();
         const moveLatLon = new window.kakao.maps.LatLng(lat, lng);
-        mapInstanceRef.current.panTo(moveLatLon);
+        mapInstanceRef.current.setCenter(moveLatLon);
 
         if (markerRef.current) {
           markerRef.current.setPosition(moveLatLon);
@@ -202,6 +230,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
   // Zoom helpers
   const handleZoom = (delta: number) => {
     if (mapInstanceRef.current && window.kakao?.maps) {
+      mapInstanceRef.current.relayout();
       const currentLevel = mapInstanceRef.current.getLevel();
       mapInstanceRef.current.setLevel(currentLevel + delta);
     }
@@ -209,6 +238,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
 
   const handleCenter = () => {
     if (mapInstanceRef.current && window.kakao?.maps) {
+      mapInstanceRef.current.relayout();
       const moveLatLon = new window.kakao.maps.LatLng(currentCoords.lat, currentCoords.lng);
       mapInstanceRef.current.setCenter(moveLatLon);
     }
@@ -288,12 +318,19 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         </div>
       </div>
 
-      {/* 2. Map Canvas (Kakao Map or Real-time Interactive Open Map Fallback) */}
+      {/* 2. Map Canvas (Dedicated Kakao Map Container + Fallback) */}
       <div 
-        ref={mapContainerRef} 
         className={`w-full ${height} relative bg-slate-200 overflow-hidden`}
+        style={{ minHeight: '260px' }}
       >
-        {/* If Kakao Map is NOT loaded yet: Show Real Interactive Map Canvas instantly! (Never hangs on spinner) */}
+        {/* Dedicated container strictly for Kakao Map */}
+        <div 
+          ref={mapContainerRef} 
+          className="w-full h-full"
+          style={{ width: '100%', height: '100%', minHeight: '260px' }}
+        />
+
+        {/* If Kakao Map is NOT loaded yet: Show Real Interactive Map Canvas instantly! */}
         {!kakaoLoaded && (
           <div className="absolute inset-0 z-0">
             {/* Real Interactive Map using OpenStreetMap Korea tiles */}
