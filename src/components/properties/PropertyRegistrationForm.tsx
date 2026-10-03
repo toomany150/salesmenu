@@ -29,6 +29,7 @@ import { ChecklistPanel } from '../checklists/ChecklistPanel';
 import { getCoordinatesFromAddress } from '@/lib/geo';
 import { KakaoAddressMap } from '../map/KakaoAddressMap';
 import { PropertyImageUploader } from './PropertyImageUploader';
+import { useAuth } from '../auth/AuthContext';
 
 // Subforms
 import { ApartmentForm } from './forms/ApartmentForm';
@@ -55,12 +56,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   initialData,
   mode = 'CREATE',
 }) => {
+  const { currentUser, availableAgents } = useAuth();
   const isEditMode = mode === 'EDIT' || !!initialData;
 
   // Common Form States
   const [propertyType, setPropertyType] = useState<PropertyType>('APARTMENT');
   const [propertyNumber, setPropertyNumber] = useState('');
   const [receiptDate, setReceiptDate] = useState('');
+  const [managerName, setManagerName] = useState<string>('사무실');
   const [transactionType, setTransactionType] = useState<TransactionType>('매매');
   const [roadAddress, setRoadAddress] = useState('');
   const [jibunAddress, setJibunAddress] = useState('');
@@ -150,6 +153,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setMonthlyRent(initialData.monthlyRent !== undefined && initialData.monthlyRent !== null ? String(initialData.monthlyRent) : '');
         setIsNoMaintenanceFee(!!initialData.isNoMaintenanceFee);
         setConsultationNotes(initialData.consultationNotes || '');
+        setManagerName(initialData.managerName || (currentUser?.role === 'AGENT' ? currentUser.name : '사무실'));
 
         // Customer
         if (initialData.customer) {
@@ -398,6 +402,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       buildingRegisterUse,
       customerId: finalCustomerId,
       customerInput,
+      managerName: managerName || '사무실',
+      createdById: isEditMode ? initialData?.createdById : currentUser?.id,
+      creatorName: isEditMode ? initialData?.creatorName : currentUser?.name,
+      currentUser,
       // 7가지 서브 데이터
       apartmentDetail: propertyType === 'APARTMENT' ? apartmentData : undefined,
       houseDetail: propertyType === 'HOUSE' ? houseData : undefined,
@@ -713,7 +721,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         <option value="">고객 미지정 (직접 접수)</option>
                         {customers.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.name} ({c.type === 'SELLER' ? '매도' : c.type === 'LESSOR' ? '임대' : c.type} / {c.carrier ? `[${c.carrier}] ` : ''}{c.phone})
+                            {c.name} ({c.type === 'SELLER' ? '매도' : c.type === 'LESSOR' ? '임대' : '기타'} - {c.phone})
                           </option>
                         ))}
                       </select>
@@ -721,31 +729,19 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   )}
                 </div>
 
-                {/* 5. 기본 매물 및 거래 정보 */}
-                <div className="bg-white p-5 rounded-2xl border-2 border-slate-200/90 shadow-xs space-y-5">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-slate-800 text-white shadow-2xs">
-                        <Building className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900">
-                          기본 매물 번호 및 거래·가격 정보
-                        </h4>
-                        <span className="text-xs text-slate-500">
-                          매물번호, 거래유형, 가격 조건 및 입주일정 설정
-                        </span>
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
-                      거래필수
-                    </span>
+                {/* 5. 관리 정보 (매물번호, 접수일자, 담당 권한자) */}
+                <div className="bg-white p-5 rounded-2xl border-2 border-indigo-100/80 shadow-xs space-y-4">
+                  <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                    <span className="w-2 h-5 bg-indigo-600 rounded-full inline-block" />
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      5. 관리 정보 (매물 고유번호 / 접수일자 / 담당 권한자)
+                    </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                        매물번호 (수동 직접 입력 고유번호) *
+                        매물번호 (고유번호) *
                       </label>
                       <input
                         type="text"
@@ -764,10 +760,50 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         type="date"
                         value={receiptDate}
                         onChange={(e) => setReceiptDate(e.target.value)}
-                        className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                        className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-800"
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                        담당 권한자 (관리 주체) *
+                      </label>
+                      <div className="space-y-1.5">
+                        <select
+                          value={managerName}
+                          onChange={(e) => setManagerName(e.target.value)}
+                          className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+                        >
+                          <option value="사무실">🏢 사무실 (공용/워크인)</option>
+                          {availableAgents.map((agent) => (
+                            <option key={agent} value={agent}>👤 {agent}</option>
+                          ))}
+                        </select>
+                        {currentUser && (
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setManagerName('사무실')}
+                              className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
+                                managerName === '사무실' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              🏢 사무실 공용
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setManagerName(currentUser.name)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
+                                managerName === currentUser.name ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                            >
+                              👤 본인 ({currentUser.name})
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                </div>
 
                   {/* 거래유형 (상가점포는 전세 제외하고 매매 / 월세만 노출) */}
                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
@@ -983,7 +1019,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                </div>
 
                 {/* 6. 7가지 매물 세부 폼 (동적 렌더링 - 주택 폼에 에어컨/풀옵션 보강됨) */}
                 <div>

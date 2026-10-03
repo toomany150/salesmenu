@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Building2 } from 'lucide-react';
 import { CustomerItem, PropertyItem } from '@/lib/types';
 import { INITIAL_CUSTOMERS, INITIAL_PROPERTIES } from '@/lib/mockData';
@@ -11,11 +11,16 @@ import { PropertyRegistrationForm } from '../properties/PropertyRegistrationForm
 import { CustomerFormModal } from '../crm/CustomerFormModal';
 import { PropertyDetailModal } from '../properties/PropertyDetailModal';
 import { CustomerDetailModal } from '../crm/CustomerDetailModal';
+import { AuthProvider, useAuth } from '../auth/AuthContext';
+import { LoginModal } from '../auth/LoginModal';
+import { AdminLogModal } from '../auth/AdminLogModal';
 import { initKakao } from '@/lib/kakao';
 
 type MainViewTab = 'RECEIVED_GROUP' | 'SEARCHING_GROUP' | 'ALL_PROPERTIES';
 
-export const MainDashboard: React.FC = () => {
+const DashboardContent: React.FC = () => {
+  const { currentUser } = useAuth();
+
   // Main view state:
   // RECEIVED_GROUP: [물건 접수] 매도인 / 임대인
   // SEARCHING_GROUP: [물건 찾음] 매수인 / 임차인
@@ -34,33 +39,46 @@ export const MainDashboard: React.FC = () => {
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
 
+  // Auth & Admin Modals
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isAdminLogsOpen, setIsAdminLogsOpen] = useState(false);
+
   // Init Kakao SDK on mount
   useEffect(() => {
     initKakao();
-    fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const headers: HeadersInit = {};
+      if (currentUser) {
+        headers['x-user-role'] = currentUser.role;
+        headers['x-user-id'] = currentUser.id;
+        headers['x-user-name'] = currentUser.name;
+      }
       const [custRes, propRes] = await Promise.all([
-        fetch('/api/customers'),
-        fetch('/api/properties'),
+        fetch('/api/customers', { headers }),
+        fetch('/api/properties', { headers }),
       ]);
       if (custRes.ok) {
         const cData = await custRes.json();
-        if (Array.isArray(cData) && cData.length > 0) setCustomers(cData);
+        if (Array.isArray(cData)) setCustomers(cData);
       }
       if (propRes.ok) {
         const pData = await propRes.json();
-        if (Array.isArray(pData) && pData.length > 0) setProperties(pData);
+        if (Array.isArray(pData)) setProperties(pData);
       }
     } catch (err) {
       console.warn('DB fetch error, using initial mock data:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
@@ -104,6 +122,8 @@ export const MainDashboard: React.FC = () => {
         searchingCustomerCount={searchingCustomers.length}
         onOpenNewProperty={handleOpenNewProperty}
         onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
+        onOpenAdminLogs={() => setIsAdminLogsOpen(true)}
+        onOpenLogin={() => setIsLoginOpen(true)}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
@@ -348,15 +368,20 @@ export const MainDashboard: React.FC = () => {
         defaultGroup={activeTab === 'SEARCHING_GROUP' ? 'SEARCHING' : 'RECEIVED'}
       />
 
-      {/* 3) 매물 상세 모달 (문자 발송 링크 + 카톡 공유 API + 전화걸기 + 대장 정보 + 수정하기) */}
+      {/* 3) 매물 상세 모달 (문자 발송 링크 + 카톡 공유 API + 전화걸기 + 대장 정보 + 수정하기 + 삭제) */}
       <PropertyDetailModal
         property={selectedProperty}
         isOpen={!!selectedProperty}
         onClose={() => setSelectedProperty(null)}
         onEditProperty={handleOpenEditProperty}
+        onPropertyDeleted={(deletedId) => {
+          setProperties((prev) => prev.filter((p) => p.id !== deletedId));
+          setSelectedProperty(null);
+          fetchData();
+        }}
       />
 
-      {/* 4) 고객 상세 모달 (전화걸기 href="tel:..." + 접수매물/탐색조건) */}
+      {/* 4) 고객 상세 모달 (전화걸기 href="tel:..." + 접수매물/탐색조건 + 삭제) */}
       <CustomerDetailModal
         customer={selectedCustomer}
         isOpen={!!selectedCustomer}
@@ -365,8 +390,33 @@ export const MainDashboard: React.FC = () => {
           setSelectedCustomer(null);
           setSelectedProperty(prop);
         }}
+        onCustomerDeleted={(deletedId) => {
+          setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
+          setSelectedCustomer(null);
+          fetchData();
+        }}
+      />
+
+      {/* 5) 개별 ID/비밀번호 로그인 모달 */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+      />
+
+      {/* 6) 관리자 보안 감사 로그 & 소속공인중개사 계정 관리 콘솔 */}
+      <AdminLogModal
+        isOpen={isAdminLogsOpen}
+        onClose={() => setIsAdminLogsOpen(false)}
       />
 
     </div>
+  );
+};
+
+export const MainDashboard: React.FC = () => {
+  return (
+    <AuthProvider>
+      <DashboardContent />
+    </AuthProvider>
   );
 };

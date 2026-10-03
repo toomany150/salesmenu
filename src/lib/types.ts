@@ -442,6 +442,10 @@ export interface PropertyItem {
   officeDetail?: OfficeData;
   factoryWarehouseDetail?: FactoryWarehouseData;
   landDetail?: LandData;
+  // 담당 권한자 및 등록자 정보
+  managerName?: string; // '사무실' 또는 소속공인중개사 이름
+  createdById?: string;
+  creatorName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -476,10 +480,44 @@ export interface CustomerItem {
   type: CustomerType;
   group: CustomerGroup;
   memo?: string;
+  // 담당 권한자 및 등록자 정보
+  managerName?: string; // '사무실' 또는 소속공인중개사 이름
+  createdById?: string;
+  creatorName?: string;
   createdAt: string;
   updatedAt: string;
   properties?: PropertyItem[];
   demands?: CustomerDemandItem[];
+}
+
+// 사용자(소속공인중개사 및 대표/관리자) 역할 및 인터페이스
+export type UserRole = 'ADMIN' | 'AGENT';
+
+export interface UserItem {
+  id: string;
+  username: string;
+  password?: string;
+  name: string;
+  role: UserRole;
+  phone?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 접속 및 작업 감사 로그 인터페이스
+export interface AccessLogItem {
+  id: string;
+  userId?: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  details?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
 }
 
 // 공공데이터 API 응답 규격

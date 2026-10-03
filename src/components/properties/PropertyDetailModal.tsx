@@ -19,17 +19,23 @@ import {
   ChevronRight,
   Camera,
   ZoomIn,
-  ImageIcon
+  ImageIcon,
+  Lock,
+  Trash2,
+  Building2
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
 import { shareViaKakao, generateSmsLink } from '@/lib/kakao';
 import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
+import { useAuth } from '../auth/AuthContext';
+import { maskPhoneNumber, canViewCustomerContact, canDeleteItem, canEditItem } from '@/lib/auth';
 
 interface PropertyDetailModalProps {
   property: PropertyItem | null;
   isOpen: boolean;
   onClose: () => void;
   onEditProperty?: (property: PropertyItem) => void;
+  onPropertyDeleted?: (propertyId: string) => void;
 }
 
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
@@ -37,11 +43,52 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   isOpen,
   onClose,
   onEditProperty,
+  onPropertyDeleted,
 }) => {
+  const { currentUser } = useAuth();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isPhotoLightboxOpen, setIsPhotoLightboxOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!isOpen || !property) return null;
+
+  const canEdit = canEditItem(currentUser, property);
+  const canDelete = canDeleteItem(currentUser);
+  const canViewContact = canViewCustomerContact(currentUser, property);
+  const managerName = property.managerName || '사무실';
+
+  const handleDeleteProperty = async () => {
+    if (!canDelete) {
+      alert('매물 삭제 권한은 프로그램 관리자(대표)에게만 있습니다.');
+      return;
+    }
+    if (!confirm(`정말로 매물 #${property.propertyNumber} (${property.address})을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/properties?id=${property.id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': currentUser?.name || '관리자',
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '매물 삭제에 실패했습니다.');
+      }
+      alert('매물이 정상적으로 삭제되었습니다.');
+      if (onPropertyDeleted) onPropertyDeleted(property.id);
+      onClose();
+    } catch (err: any) {
+      alert(err.message || '매물 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const images = property.images && property.images.length > 0 ? property.images : [];
   const currentPhotoIndex = activePhotoIndex < images.length ? activePhotoIndex : 0;
@@ -89,7 +136,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         
         {/* Modal Top Bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/90">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white shadow-xs">
               {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
             </span>
@@ -99,10 +146,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             <span className="font-mono text-xs font-bold text-slate-500">
               #{property.propertyNumber}
             </span>
+
+            {/* 담당 권한자 뱃지 */}
+            <span className="px-2 py-0.5 text-xs font-bold bg-slate-200 text-slate-800 rounded-md">
+              {managerName === '사무실' ? '🏢 담당: 사무실' : `👤 담당: ${managerName}`}
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {onEditProperty && (
+            {/* 수정 버튼: 관리자 또는 본인 등록 매물만 가능 */}
+            {canEdit && onEditProperty && (
               <button
                 onClick={() => onEditProperty(property)}
                 title="매물 정보 수정"
@@ -112,6 +165,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <span>수정</span>
               </button>
             )}
+
+            {/* 삭제 버튼: 오직 관리자(대표)만 가능 */}
+            {canDelete && (
+              <button
+                onClick={handleDeleteProperty}
+                disabled={isDeleting}
+                title="매물 영구 삭제 (관리자 전용)"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:text-white hover:bg-rose-600 bg-rose-50 border border-rose-200 rounded-lg transition-colors shadow-2xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? '삭제 중...' : '매물 삭제'}</span>
+              </button>
+            )}
+
             <button
               onClick={handlePrint}
               title="매물 브리핑 출력"
@@ -194,18 +261,26 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
           {/* Quick Share Action Row: [📞 전화걸기] [💬 문자로 전송] [🟡 카톡 공유] */}
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <User className="w-4 h-4 text-slate-500" />
               <span className="text-xs text-slate-600">접수 고객(의뢰인):</span>
               {property.customer ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-slate-900">{property.customer.name}</span>
                   {property.customer.carrier && (
                     <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-sm">
                       {property.customer.carrier}
                     </span>
                   )}
-                  <span className="text-xs font-mono text-slate-700">{property.customer.phone}</span>
+                  <span className="text-xs font-mono font-bold text-slate-800">
+                    {canViewContact ? property.customer.phone : maskPhoneNumber(property.customer.phone)}
+                  </span>
+                  {!canViewContact && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded">
+                      <Lock className="w-3 h-3 text-amber-600" />
+                      연락처 비공개
+                    </span>
+                  )}
                 </div>
               ) : (
                 <span className="text-xs text-slate-400">직접 접수 (연결 고객 없음)</span>
@@ -213,7 +288,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {property.customer?.phone && (
+              {property.customer?.phone && canViewContact && (
                 <a
                   href={`tel:${property.customer.phone}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all active:scale-95"

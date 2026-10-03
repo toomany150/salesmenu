@@ -12,6 +12,48 @@ datasource db {
 }
 
 // ==========================================
+// 0. 사용자 및 접속 로그 (인증 & 권한)
+// ==========================================
+
+model User {
+  id          String      @id @default(cuid())
+  username    String      @unique // 로그인 ID (예: admin, agent1 등)
+  password    String      // 비밀번호
+  name        String      // 실명 (예: 대표 공인중개사, 김소공 실장 등)
+  role        String      @default("AGENT") // ADMIN (대표/개발자) 또는 AGENT (소속공인중개사)
+  phone       String?     // 연락처
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  properties  Property[]
+  customers   Customer[]
+  logs        AccessLog[]
+
+  @@index([role])
+  @@index([username])
+}
+
+model AccessLog {
+  id          String      @id @default(cuid())
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName    String      // 접속자 이름 (예: 김소공 실장)
+  userRole    String      // ADMIN 또는 AGENT
+  action      String      // LOGIN, LOGOUT, CREATE_PROPERTY, UPDATE_PROPERTY, DELETE_PROPERTY, CREATE_CUSTOMER, UPDATE_CUSTOMER, DELETE_CUSTOMER, VIEW_CONTACT
+  targetType  String?     // PROPERTY, CUSTOMER, AUTH
+  targetId    String?     // 대상 ID 또는 매물번호
+  details     String?     // 상세 설명
+  ipAddress   String?     // 접속 IP
+  userAgent   String?     // 브라우저 정보
+  createdAt   DateTime    @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ==========================================
 // 1. 고객 관리 (CRM)
 // ==========================================
 
@@ -26,6 +68,13 @@ model Customer {
   // 메인 그룹 구분: RECEIVED([물건 접수] 매도인/임대인), SEARCHING([물건 찾음] 매수인/임차인)
   group     String   @default("RECEIVED")
   memo      String?  // 특이사항 및 상담 메모
+
+  // 담당 권한자 및 등록자 정보
+  managerName String   @default("사무실") // "사무실" 또는 소속공인중개사 이름
+  createdById String?
+  creatorName String?
+  user        User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -37,6 +86,7 @@ model Customer {
   @@index([phone])
   @@index([group])
   @@index([type])
+  @@index([managerName])
 }
 
 // [물건 찾음] 매수인 / 임차인 희망 조건
@@ -133,6 +183,12 @@ model Property {
   factoryWarehouseDetail FactoryWarehouseDetail?
   landDetail             LandDetail?
 
+  // 담당 권한자 및 등록자 정보
+  managerName         String    @default("사무실") // "사무실" 또는 소속공인중개사 이름
+  createdById         String?
+  creatorName         String?
+  user                User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -140,6 +196,7 @@ model Property {
   @@index([propertyType])
   @@index([transactionType])
   @@index([status])
+  @@index([managerName])
 }
 
 // ==========================================

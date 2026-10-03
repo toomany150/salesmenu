@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   UserPlus, 
   Phone, 
-  Target 
+  Target,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
 import { 
   MobileCarrier, 
@@ -15,6 +17,7 @@ import {
   TransactionType,
   PROPERTY_TYPE_LABELS 
 } from '@/lib/types';
+import { useAuth } from '@/components/auth/AuthContext';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -29,11 +32,22 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onSuccess,
   defaultGroup = 'RECEIVED',
 }) => {
+  const { currentUser, availableAgents } = useAuth();
   const [name, setName] = useState('');
   const [carrier, setCarrier] = useState<MobileCarrier>('SK');
   const [phone, setPhone] = useState('');
   const [type, setType] = useState<CustomerType>(defaultGroup === 'RECEIVED' ? 'SELLER' : 'BUYER');
   const [memo, setMemo] = useState('');
+  const [managerName, setManagerName] = useState<string>('사무실');
+
+  // Set default manager to current user name when modal opens
+  useEffect(() => {
+    if (currentUser?.name) {
+      setManagerName(currentUser.name);
+    } else {
+      setManagerName('사무실');
+    }
+  }, [currentUser, isOpen]);
 
   // 매수 / 임차인 희망조건 상태
   const [targetPropertyType, setTargetPropertyType] = useState<PropertyType>('APARTMENT');
@@ -74,6 +88,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       type,
       group,
       memo: memo.trim() || undefined,
+      managerName: managerName || '사무실',
+      createdById: currentUser?.id,
+      creatorName: currentUser?.name,
+      currentUser,
     };
 
     if (isSearching) {
@@ -248,6 +266,55 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 required
                 className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
               />
+            </div>
+
+            {/* 담당 권한자 (관리 주체) */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                  고객 담당 권한자 (관리 주체) *
+                </label>
+                <span className="text-[11px] text-slate-500">
+                  {managerName === '사무실' ? '사무실 전체 공용 (워크인)' : `${managerName} 전담`}
+                </span>
+              </div>
+              <select
+                value={managerName}
+                onChange={(e) => setManagerName(e.target.value)}
+                className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+              >
+                <option value="사무실">🏢 사무실 (공용/워크인)</option>
+                {availableAgents.map((agent) => (
+                  <option key={agent} value={agent}>👤 {agent}</option>
+                ))}
+              </select>
+              {currentUser && (
+                <div className="flex items-center gap-1.5 text-xs pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setManagerName('사무실')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-bold border transition-colors ${
+                      managerName === '사무실'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    🏢 사무실 공용
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManagerName(currentUser.name)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-bold border transition-colors ${
+                      managerName === currentUser.name
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    👤 본인 ({currentUser.name})
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>

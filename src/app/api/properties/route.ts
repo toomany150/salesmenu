@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { INITIAL_PROPERTIES } from '@/lib/mockData';
+import { recordAccessLog } from '@/lib/auth';
 
 function formatPropertyOutput(p: any) {
   if (!p) return p;
@@ -184,6 +185,10 @@ export async function POST(request: NextRequest) {
       factoryWarehouseDetail,
       landDetail,
       customerInput,
+      managerName,
+      createdById,
+      creatorName,
+      currentUser,
     } = body;
 
     if (!propertyNumber || !propertyType || !transactionType || !address) {
@@ -232,6 +237,9 @@ export async function POST(request: NextRequest) {
               carrier: custCarrier,
               type: custType,
               group: 'RECEIVED',
+              managerName: managerName || '사무실',
+              createdById: createdById || null,
+              creatorName: creatorName || null,
               memo: `매물 #${propertyNumber} (${address}) 접수 고객으로 자동 등록됨`,
             },
           });
@@ -245,6 +253,9 @@ export async function POST(request: NextRequest) {
             carrier: custCarrier,
             type: custType,
             group: 'RECEIVED',
+            managerName: managerName || '사무실',
+            createdById: createdById || null,
+            creatorName: creatorName || null,
             memo: `매물 #${propertyNumber} (${address}) 접수 고객으로 자동 등록됨`,
           },
         });
@@ -280,6 +291,9 @@ export async function POST(request: NextRequest) {
         approvalDate: approvalDate ? new Date(approvalDate) : null,
         buildingRegisterUse,
         customerId: finalCustomerId,
+        managerName: managerName || '사무실',
+        createdById: createdById || null,
+        creatorName: creatorName || null,
         // 종류별 관계 생성
         apartmentDetail:
           propertyType === 'APARTMENT' && apartmentDetail
@@ -503,6 +517,24 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const ipAddress = 
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      '127.0.0.1';
+    const userAgent = request.headers.get('user-agent') || 'Unknown';
+
+    await recordAccessLog({
+      userId: createdById,
+      userName: creatorName || managerName || '익명',
+      userRole: currentUser?.role || 'AGENT',
+      action: 'CREATE_PROPERTY',
+      targetType: 'PROPERTY',
+      targetId: newProperty.propertyNumber,
+      details: `매물 #${newProperty.propertyNumber} (${newProperty.address}) 등록 완료 [담당: ${newProperty.managerName}]`,
+      ipAddress,
+      userAgent,
+    });
+
     return NextResponse.json(formatPropertyOutput(newProperty), { status: 201 });
   } catch (error: any) {
     console.error('Error creating property:', error);
@@ -550,6 +582,8 @@ export async function PUT(request: NextRequest) {
       officeDetail,
       factoryWarehouseDetail,
       landDetail,
+      managerName,
+      currentUser,
     } = body;
 
     if (!id && !propertyNumber) {
@@ -568,6 +602,18 @@ export async function PUT(request: NextRequest) {
         { error: '수정할 매물을 찾을 수 없습니다.' },
         { status: 404 }
       );
+    }
+
+    // 소속공인중개사 권한 확인: 본인이 작성/담당한 매물만 수정 가능 (대표 관리자는 전체 수정 가능)
+    if (currentUser && currentUser.role !== 'ADMIN') {
+      const isCreator = existingProp.createdById && existingProp.createdById === currentUser.id;
+      const isManager = existingProp.managerName && existingProp.managerName === currentUser.name;
+      if (!isCreator && !isManager) {
+        return NextResponse.json(
+          { error: '해당 매물의 수정 권한이 없습니다. (작성자 또는 대표 관리자만 수정 가능합니다)' },
+          { status: 403 }
+        );
+      }
     }
 
     const targetId = existingProp.id;
@@ -637,6 +683,7 @@ export async function PUT(request: NextRequest) {
         approvalDate: approvalDate !== undefined ? (approvalDate ? new Date(approvalDate) : null) : undefined,
         buildingRegisterUse: buildingRegisterUse !== undefined ? buildingRegisterUse : undefined,
         customerId: finalCustomerId,
+        managerName: managerName !== undefined ? managerName : undefined,
 
         // 서브 데이터 업서트
         apartmentDetail:
@@ -1058,6 +1105,24 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    const ipAddress = 
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      '127.0.0.1';
+    const userAgent = request.headers.get('user-agent') || 'Unknown';
+
+    await recordAccessLog({
+      userId: currentUser?.id,
+      userName: currentUser?.name || updatedProperty.managerName || '익명',
+      userRole: currentUser?.role || 'AGENT',
+      action: 'UPDATE_PROPERTY',
+      targetType: 'PROPERTY',
+      targetId: updatedProperty.propertyNumber,
+      details: `매물 #${updatedProperty.propertyNumber} (${updatedProperty.address}) 정보 수정 완료`,
+      ipAddress,
+      userAgent,
+    });
+
     return NextResponse.json(formatPropertyOutput(updatedProperty));
   } catch (error: any) {
     console.error('Error updating property:', error);
@@ -1067,4 +1132,60 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+
+// 매물 삭제 (DELETE) - 오직 관리자(대표)만 가능!
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const userRole = request.headers.get('x-user-role') || searchParams.get('role');
+    const userId = request.headers.get('x-user-id') || searchParams.get('userId');
+    const userName = request.headers.get('x-user-name') || searchParams.get('userName') || '관리자';
+
+    if (userRole !== 'ADMIN') {
+      return NextResponse.json(
+        { error: '매물 삭제 권한은 프로그램 관리자(대표)에게만 있습니다. 소속공인중개사는 삭제할 수 없습니다.' },
+        { status: 403 }
+      );
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: '삭제할 매물 ID가 필요합니다.' }, { status: 400 });
+    }
+
+    const prop = await prisma.property.findUnique({ where: { id } });
+    if (!prop) {
+      return NextResponse.json({ error: '매물을 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    await prisma.property.delete({ where: { id } });
+
+    const ipAddress = 
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      '127.0.0.1';
+    const userAgent = request.headers.get('user-agent') || 'Unknown';
+
+    await recordAccessLog({
+      userId: userId || undefined,
+      userName,
+      userRole: 'ADMIN',
+      action: 'DELETE_PROPERTY',
+      targetType: 'PROPERTY',
+      targetId: prop.propertyNumber,
+      details: `매물 #${prop.propertyNumber} (${prop.address}) 삭제 완료`,
+      ipAddress,
+      userAgent,
+    });
+
+    return NextResponse.json({ success: true, message: '매물이 삭제되었습니다.' });
+  } catch (error: any) {
+    console.error('Error deleting property:', error);
+    return NextResponse.json(
+      { error: error.message || '매물 삭제 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
 

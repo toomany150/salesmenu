@@ -46,6 +46,9 @@ export interface PropertyFilterCriteria {
   hasParking?: boolean;
   // Matched Customer ID
   matchedCustomerId?: string;
+  // Status & Manager
+  status?: string; // 'ALL' | 'AVAILABLE' | 'CONTRACTED' | 'HOLD'
+  managerName?: string;
 }
 
 interface PropertyFilterPanelProps {
@@ -67,6 +70,8 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [propertyType, setPropertyType] = useState<string>('ALL');
   const [transactionType, setTransactionType] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [managerFilter, setManagerFilter] = useState<string>('ALL');
 
   // Price ranges (만원)
   const [minPrice, setMinPrice] = useState<string>('');
@@ -91,6 +96,17 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
 
   // Matched Customer
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+
+  // Available managers list
+  const allManagers = useMemo(() => {
+    const set = new Set<string>();
+    set.add('사무실');
+    properties.forEach((p) => {
+      if (p.managerName && p.managerName.trim()) set.add(p.managerName.trim());
+    });
+    ['김소공 실장', '이소공 실장', '박소공 실장', '최소공 실장', '정소공 실장'].forEach((a) => set.add(a));
+    return Array.from(set);
+  }, [properties]);
 
   // Searching customers list ([물건 찾음] 고객 목록)
   const searchingCustomers = useMemo(() => {
@@ -238,6 +254,17 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
         if (!parking) return false;
       }
 
+      // 8. 상태 필터 (거래중 / 판매완료 / 보류)
+      if (statusFilter !== 'ALL') {
+        if (p.status !== statusFilter) return false;
+      }
+
+      // 9. 담당 권한자 필터
+      if (managerFilter !== 'ALL') {
+        const mgr = p.managerName || '사무실';
+        if (mgr !== managerFilter) return false;
+      }
+
       return true;
     });
   }, [
@@ -245,6 +272,8 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
     searchQuery,
     propertyType,
     transactionType,
+    statusFilter,
+    managerFilter,
     minPrice,
     maxPrice,
     minDeposit,
@@ -280,14 +309,18 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
       hasElevator,
       hasParking,
       matchedCustomerId: selectedCustomerId || undefined,
+      status: statusFilter,
+      managerName: managerFilter,
     });
-  }, [filtered]);
+  }, [filtered, statusFilter, managerFilter]);
 
   // Reset all filters
   const handleReset = () => {
     setSearchQuery('');
     setPropertyType('ALL');
     setTransactionType('ALL');
+    setStatusFilter('ALL');
+    setManagerFilter('ALL');
     setMinPrice('');
     setMaxPrice('');
     setMinDeposit('');
@@ -310,6 +343,8 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
     if (searchQuery.trim()) count++;
     if (propertyType !== 'ALL') count++;
     if (transactionType !== 'ALL') count++;
+    if (statusFilter !== 'ALL') count++;
+    if (managerFilter !== 'ALL') count++;
     if (minPrice || maxPrice) count++;
     if (minDeposit || maxDeposit) count++;
     if (minMonthlyRent || maxMonthlyRent) count++;
@@ -474,6 +509,49 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
                 {t === 'ALL' ? '전체' : t}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* 2-2. Status Filter & Manager Filter Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-100 text-xs">
+          {/* 거래 상태 필터: 거래중 / 판매완료 / 보류 */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-slate-600 font-bold mr-1">거래 상태:</span>
+            {[
+              { id: 'ALL', label: '전체' },
+              { id: 'AVAILABLE', label: '⚡ 거래중 (진행)', activeClass: 'bg-emerald-600 text-white shadow-2xs' },
+              { id: 'CONTRACTED', label: '✓ 판매완료 (계약)', activeClass: 'bg-blue-600 text-white shadow-2xs' },
+              { id: 'HOLD', label: '⏸️ 보류', activeClass: 'bg-amber-600 text-white shadow-2xs' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setStatusFilter(st.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  statusFilter === st.id
+                    ? (st.activeClass || 'bg-slate-900 text-white shadow-2xs')
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 권한자 / 담당자 필터: 전체, 사무실, 김소공 실장, ... */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-slate-600 font-bold">담당 권한자:</span>
+            <select
+              value={managerFilter}
+              onChange={(e) => setManagerFilter(e.target.value)}
+              className="text-xs px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+            >
+              <option value="ALL">전체 권한자 ({properties.length}건)</option>
+              <option value="사무실">🏢 사무실 (공용/워크인)</option>
+              {allManagers.filter((m) => m !== '사무실').map((mgr) => (
+                <option key={mgr} value={mgr}>👤 {mgr}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
