@@ -177,14 +177,14 @@ const DashboardContent: React.FC = () => {
             }`}
           >
             <span className={`text-xs font-semibold block ${activeTab === 'ALL_PROPERTIES' ? 'text-slate-300' : 'text-slate-500'}`}>
-              7대 매물장 전체조회
+              매물장검색
             </span>
             <div className="flex items-baseline justify-between mt-1">
               <span className={`text-2xl font-black ${activeTab === 'ALL_PROPERTIES' ? 'text-white' : 'text-slate-900'}`}>
                 {properties.length}
               </span>
               <span className={`text-xs font-semibold ${activeTab === 'ALL_PROPERTIES' ? 'text-blue-300' : 'text-slate-600'}`}>
-                유형별 필터 →
+                실시간 조건 검색 →
               </span>
             </div>
           </div>
@@ -234,7 +234,7 @@ const DashboardContent: React.FC = () => {
               </span>
             </button>
 
-            {/* Tab 3: 통합 매물장 (7가지 매물) */}
+            {/* Tab 3: 매물장검색 */}
             <button
               onClick={() => setActiveTab('ALL_PROPERTIES')}
               className={`flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
@@ -244,7 +244,7 @@ const DashboardContent: React.FC = () => {
               }`}
             >
               <Building2 className="w-4 h-4" />
-              <span>통합 매물장 (7대 유형)</span>
+              <span>매물장검색</span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                 activeTab === 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
               }`}>
@@ -316,24 +316,6 @@ const DashboardContent: React.FC = () => {
 
         {activeTab === 'ALL_PROPERTIES' && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-slate-900/5 via-slate-800/5 to-transparent p-4 rounded-xl border border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-blue-600" />
-                  스마트 매물장 (아파트·주택·상가·사무실·공장창고·토지)
-                </h3>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  각 매물별로 [📞 전화걸기], [💬 문자로 전송], [🟡 카톡 공유] 버튼이 바로 제공됩니다.
-                </p>
-              </div>
-              <button
-                onClick={handleOpenNewProperty}
-                className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
-              >
-                ＋ 새 매물 등록
-              </button>
-            </div>
-
             <PropertyList
               properties={properties}
               customers={customers}

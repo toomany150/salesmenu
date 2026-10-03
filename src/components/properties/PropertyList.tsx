@@ -68,6 +68,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
         properties={properties}
         customers={customers}
         onFilterChange={(newFiltered) => setFiltered(newFiltered)}
+        onOpenNewProperty={onOpenNewProperty}
       />
 
       {/* 2. 보기 모드 전환 및 결과 요약 바 */}

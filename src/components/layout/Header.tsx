@@ -1,22 +1,24 @@
 // src/components/layout/Header.tsx
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Building2, 
   Users, 
   PlusCircle, 
   ShieldCheck, 
   LogOut, 
-  LogIn, 
-  UserCircle2 
+  UserCircle2,
+  Lock,
+  User,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 
 interface HeaderProps {
-  propertyCount: number;
-  receivedCustomerCount: number;
-  searchingCustomerCount: number;
+  propertyCount?: number;
+  receivedCustomerCount?: number;
+  searchingCustomerCount?: number;
   onOpenNewProperty: () => void;
   onOpenNewCustomer: () => void;
   onOpenAdminLogs?: () => void;
@@ -24,63 +26,127 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  propertyCount,
-  receivedCustomerCount,
-  searchingCustomerCount,
   onOpenNewProperty,
   onOpenNewCustomer,
   onOpenAdminLogs,
-  onOpenLogin,
 }) => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, login, logout } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN';
+
+  // Inline Agent Login form state
+  const [agentId, setAgentId] = useState('');
+  const [agentPassword, setAgentPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  const handleAgentLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agentId.trim() || !agentPassword.trim()) {
+      setLoginError('아이디와 비밀번호를 입력해주세요.');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setLoginError('');
+
+    try {
+      const res = await login(agentId.trim(), agentPassword.trim());
+      if (res.success) {
+        setAgentId('');
+        setAgentPassword('');
+        setLoginError('');
+      } else {
+        setLoginError(res.error || '로그인 실패');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || '오류 발생');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo & Office Brand */}
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between h-16 gap-3">
+          
+          {/* 1. Logo & Office Brand + admin 버튼 */}
+          <div className="flex items-center space-x-3 shrink-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
               <Building2 className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight">
-                  참좋은 공인중개사사무소
-                </span>
-                <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-50 text-blue-700 rounded-full border border-blue-200">
-                  매물장 & CRM PRO
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 hidden sm:block">
-                소속공인중개사별 권한 분리 · 접속 감사로그 추적 · 7대 매물 원스톱 중개지원
-              </p>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight">
+                참좋은 공인중개사사무소
+              </span>
+              
+              {/* admin 란 (관리자 접속 및 관리) */}
+              <button
+                type="button"
+                onClick={onOpenAdminLogs}
+                title="관리자(Admin) 접속 및 계정·보안로그 관리 (초기비번: 1234)"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
+                <span>admin</span>
+              </button>
             </div>
           </div>
 
-          {/* Real-time Counts & Status */}
-          <div className="hidden xl:flex items-center space-x-2 text-xs">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-slate-600 font-medium">관리 매물:</span>
-              <span className="font-bold text-slate-900 text-sm">{propertyCount}건</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50/70 border border-blue-200/70">
-              <span className="text-blue-700 font-medium">[접수] 매도·임대:</span>
-              <span className="font-bold text-blue-900 text-sm">{receivedCustomerCount}명</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50/70 border border-indigo-200/70">
-              <span className="text-indigo-700 font-medium">[찾음] 매수·임차:</span>
-              <span className="font-bold text-indigo-900 text-sm">{searchingCustomerCount}명</span>
-            </div>
-          </div>
+          {/* 2. 소공(소속공인중개사) 아이디/비밀번호 입력칸 & 로그인 세션 */}
+          <div className="flex items-center justify-end flex-1 gap-2 flex-wrap sm:flex-nowrap">
+            {!currentUser ? (
+              <form onSubmit={handleAgentLogin} className="flex items-center gap-1.5 bg-slate-50/90 p-1 rounded-xl border border-slate-200">
+                <div className="relative">
+                  <User className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={agentId}
+                    onChange={(e) => {
+                      setAgentId(e.target.value);
+                      if (loginError) setLoginError('');
+                    }}
+                    placeholder="소공 아이디"
+                    className="w-24 sm:w-28 pl-6 pr-2 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 placeholder:text-slate-400"
+                    required
+                  />
+                </div>
 
-          {/* Action Buttons & User Profile */}
-          <div className="flex items-center space-x-2">
-            
-            {/* User Session Info */}
-            {currentUser ? (
+                <div className="relative">
+                  <Lock className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={agentPassword}
+                    onChange={(e) => {
+                      setAgentPassword(e.target.value);
+                      if (loginError) setLoginError('');
+                    }}
+                    placeholder="비밀번호"
+                    className="w-20 sm:w-24 pl-6 pr-2 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 placeholder:text-slate-400"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="px-3 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors shadow-2xs shrink-0 cursor-pointer"
+                >
+                  {isLoggingIn ? '접속중' : '로그인'}
+                </button>
+
+                {loginError && (
+                  <span 
+                    title={loginError}
+                    className="flex items-center gap-0.5 text-[11px] font-bold text-rose-600 px-1 shrink-0"
+                  >
+                    <AlertCircle className="w-3 h-3" />
+                    <span className="hidden md:inline">{loginError}</span>
+                  </span>
+                )}
+              </form>
+            ) : (
+              /* 로그인 완료된 상태 */
               <div className="flex items-center gap-2 bg-slate-100/90 pl-3 pr-1.5 py-1 rounded-xl border border-slate-200 text-xs">
                 <div className="flex items-center gap-1.5">
                   <UserCircle2 className={`w-4 h-4 ${isAdmin ? 'text-purple-600' : 'text-blue-600'}`} />
@@ -88,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
                     isAdmin ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
                   }`}>
-                    {isAdmin ? '👑 대표' : '소공'}
+                    {isAdmin ? '👑 대표' : '👤 소공'}
                   </span>
                 </div>
 
@@ -96,50 +162,45 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={onOpenAdminLogs}
                     title="접속 로그 및 중개사 계정 관리"
-                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-2xs transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-2xs transition-colors"
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-                    <span className="hidden md:inline">보안 관리</span>
+                    <span className="hidden md:inline">관리</span>
                   </button>
                 )}
 
                 <button
                   onClick={logout}
                   title="로그아웃"
-                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors"
+                  className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ) : (
-              <button
-                onClick={onOpenLogin}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-2xs"
-              >
-                <LogIn className="w-3.5 h-3.5 text-blue-600" />
-                <span>로그인</span>
-              </button>
             )}
 
-            {/* Quick Action Buttons */}
-            <button
-              onClick={onOpenNewProperty}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm shadow-blue-500/20 active:scale-95"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">새 매물 등록</span>
-              <span className="sm:hidden">매물</span>
-            </button>
-            <button
-              onClick={onOpenNewCustomer}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-2xs"
-            >
-              <Users className="w-3.5 h-3.5 text-blue-600" />
-              <span className="hidden sm:inline">고객 등록</span>
-              <span className="sm:hidden">고객</span>
-            </button>
+            {/* Quick Action Buttons (새 매물 등록, 고객 등록) */}
+            <div className="flex items-center space-x-1.5 shrink-0">
+              <button
+                onClick={onOpenNewProperty}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm shadow-blue-500/20 active:scale-95 cursor-pointer"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">새 매물 등록</span>
+                <span className="sm:hidden">매물</span>
+              </button>
+              <button
+                onClick={onOpenNewCustomer}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-2xs cursor-pointer"
+              >
+                <Users className="w-3.5 h-3.5 text-blue-600" />
+                <span className="hidden sm:inline">고객 등록</span>
+                <span className="sm:hidden">고객</span>
+              </button>
+            </div>
 
           </div>
+
         </div>
       </div>
     </header>

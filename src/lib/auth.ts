@@ -7,7 +7,7 @@ export const DEFAULT_USERS: Array<Omit<UserItem, 'createdAt' | 'updatedAt'> & { 
   {
     id: 'usr-admin',
     username: 'admin',
-    password: '159753tma#',
+    password: '1234',
     name: '대표 공인중개사 (관리자)',
     role: 'ADMIN',
     phone: '010-1234-5678',
