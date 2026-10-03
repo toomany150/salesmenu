@@ -3,6 +3,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { INITIAL_PROPERTIES } from '@/lib/mockData';
 
+function formatPropertyOutput(p: any) {
+  if (!p) return p;
+  let parsedImages: string[] = [];
+  if (p.images) {
+    try {
+      const parsed = JSON.parse(p.images);
+      parsedImages = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      parsedImages = [];
+    }
+  }
+  return {
+    ...p,
+    images: parsedImages,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -124,7 +141,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(properties);
+    return NextResponse.json(properties.map(formatPropertyOutput));
   } catch (error: any) {
     console.error('Error fetching properties:', error);
     return NextResponse.json(INITIAL_PROPERTIES);
@@ -141,7 +158,10 @@ export async function POST(request: NextRequest) {
       transactionType,
       status = 'AVAILABLE',
       address,
+      roadAddress,
+      jibunAddress,
       detailAddress,
+      images,
       latitude,
       longitude,
       direction,
@@ -163,6 +183,7 @@ export async function POST(request: NextRequest) {
       officeDetail,
       factoryWarehouseDetail,
       landDetail,
+      customerInput,
     } = body;
 
     if (!propertyNumber || !propertyType || !transactionType || !address) {
@@ -183,6 +204,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 접수 고객 직접 입력 시 고객 DB 자동 등록/연동
+    let finalCustomerId = customerId || null;
+    if (!finalCustomerId && customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {
+      const custName = customerInput.name?.trim() || '접수 의뢰고객';
+      const custPhone = customerInput.phone?.trim() || '010-0000-0000';
+      const custCarrier = customerInput.carrier?.trim() || null;
+      const custType = transactionType === '매매' ? 'SELLER' : 'LESSOR';
+
+      if (customerInput.phone?.trim()) {
+        const existingCust = await prisma.customer.findFirst({
+          where: { phone: customerInput.phone.trim() },
+        });
+        if (existingCust) {
+          if (custCarrier && !existingCust.carrier) {
+            await prisma.customer.update({
+              where: { id: existingCust.id },
+              data: { carrier: custCarrier },
+            });
+          }
+          finalCustomerId = existingCust.id;
+        } else {
+          const newCust = await prisma.customer.create({
+            data: {
+              name: custName,
+              phone: custPhone,
+              carrier: custCarrier,
+              type: custType,
+              group: 'RECEIVED',
+              memo: `매물 #${propertyNumber} (${address}) 접수 고객으로 자동 등록됨`,
+            },
+          });
+          finalCustomerId = newCust.id;
+        }
+      } else {
+        const newCust = await prisma.customer.create({
+          data: {
+            name: custName,
+            phone: custPhone,
+            carrier: custCarrier,
+            type: custType,
+            group: 'RECEIVED',
+            memo: `매물 #${propertyNumber} (${address}) 접수 고객으로 자동 등록됨`,
+          },
+        });
+        finalCustomerId = newCust.id;
+      }
+    }
+
     const newProperty = await prisma.property.create({
       data: {
         propertyNumber,
@@ -191,6 +260,9 @@ export async function POST(request: NextRequest) {
         status,
         transactionType,
         address,
+        roadAddress: roadAddress || null,
+        jibunAddress: jibunAddress || null,
+        images: images ? (Array.isArray(images) ? JSON.stringify(images) : images) : null,
         detailAddress,
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
@@ -205,7 +277,7 @@ export async function POST(request: NextRequest) {
         totalFloorArea: totalFloorArea ? parseFloat(totalFloorArea) : null,
         approvalDate: approvalDate ? new Date(approvalDate) : null,
         buildingRegisterUse,
-        customerId: customerId || null,
+        customerId: finalCustomerId,
         // 종류별 관계 생성
         apartmentDetail:
           propertyType === 'APARTMENT' && apartmentDetail
@@ -393,7 +465,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(newProperty, { status: 201 });
+    return NextResponse.json(formatPropertyOutput(newProperty), { status: 201 });
   } catch (error: any) {
     console.error('Error creating property:', error);
     return NextResponse.json(
@@ -402,3 +474,485 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// 매물 수정 (PUT)
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      id,
+      propertyNumber,
+      receiptDate,
+      propertyType,
+      transactionType,
+      status,
+      address,
+      roadAddress,
+      jibunAddress,
+      detailAddress,
+      images,
+      latitude,
+      longitude,
+      direction,
+      directionCriteria,
+      availableDate,
+      price,
+      deposit,
+      monthlyRent,
+      consultationNotes,
+      landArea,
+      totalFloorArea,
+      approvalDate,
+      buildingRegisterUse,
+      customerId,
+      customerInput,
+      apartmentDetail,
+      houseDetail,
+      storeDetail,
+      officeDetail,
+      factoryWarehouseDetail,
+      landDetail,
+    } = body;
+
+    if (!id && !propertyNumber) {
+      return NextResponse.json(
+        { error: '수정할 매물의 ID 또는 매물번호가 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    const existingProp = id
+      ? await prisma.property.findUnique({ where: { id } })
+      : await prisma.property.findUnique({ where: { propertyNumber } });
+
+    if (!existingProp) {
+      return NextResponse.json(
+        { error: '수정할 매물을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    const targetId = existingProp.id;
+
+    // 접수 고객 직접 입력 시 처리
+    let finalCustomerId = customerId !== undefined ? customerId : existingProp.customerId;
+    if (customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {
+      const custName = customerInput.name?.trim() || '접수 의뢰고객';
+      const custPhone = customerInput.phone?.trim() || '010-0000-0000';
+      const custCarrier = customerInput.carrier?.trim() || null;
+      const custType = transactionType === '매매' ? 'SELLER' : 'LESSOR';
+
+      if (customerInput.phone?.trim()) {
+        const existingCust = await prisma.customer.findFirst({
+          where: { phone: customerInput.phone.trim() },
+        });
+        if (existingCust) {
+          if (custCarrier && !existingCust.carrier) {
+            await prisma.customer.update({
+              where: { id: existingCust.id },
+              data: { carrier: custCarrier },
+            });
+          }
+          finalCustomerId = existingCust.id;
+        } else {
+          const newCust = await prisma.customer.create({
+            data: {
+              name: custName,
+              phone: custPhone,
+              carrier: custCarrier,
+              type: custType,
+              group: 'RECEIVED',
+              memo: `매물 #${propertyNumber || existingProp.propertyNumber} 접수 고객으로 등록됨`,
+            },
+          });
+          finalCustomerId = newCust.id;
+        }
+      }
+    }
+
+    const updatedProperty = await prisma.property.update({
+      where: { id: targetId },
+      data: {
+        propertyNumber: propertyNumber || undefined,
+        receiptDate: receiptDate ? new Date(receiptDate) : undefined,
+        propertyType: propertyType || undefined,
+        status: status || undefined,
+        transactionType: transactionType || undefined,
+        address: address || undefined,
+        roadAddress: roadAddress !== undefined ? roadAddress : undefined,
+        jibunAddress: jibunAddress !== undefined ? jibunAddress : undefined,
+        images: images !== undefined ? (Array.isArray(images) ? JSON.stringify(images) : images) : undefined,
+        detailAddress: detailAddress !== undefined ? detailAddress : undefined,
+        latitude: latitude !== undefined ? (latitude ? parseFloat(latitude) : null) : undefined,
+        longitude: longitude !== undefined ? (longitude ? parseFloat(longitude) : null) : undefined,
+        direction: direction !== undefined ? direction : undefined,
+        directionCriteria: directionCriteria !== undefined ? directionCriteria : undefined,
+        availableDate: availableDate !== undefined ? (availableDate ? new Date(availableDate) : null) : undefined,
+        price: price !== undefined ? (price ? parseFloat(price) : null) : undefined,
+        deposit: deposit !== undefined ? (deposit ? parseFloat(deposit) : null) : undefined,
+        monthlyRent: monthlyRent !== undefined ? (monthlyRent ? parseFloat(monthlyRent) : null) : undefined,
+        consultationNotes: consultationNotes !== undefined ? consultationNotes : undefined,
+        landArea: landArea !== undefined ? (landArea ? parseFloat(landArea) : null) : undefined,
+        totalFloorArea: totalFloorArea !== undefined ? (totalFloorArea ? parseFloat(totalFloorArea) : null) : undefined,
+        approvalDate: approvalDate !== undefined ? (approvalDate ? new Date(approvalDate) : null) : undefined,
+        buildingRegisterUse: buildingRegisterUse !== undefined ? buildingRegisterUse : undefined,
+        customerId: finalCustomerId,
+
+        // 서브 데이터 업서트
+        apartmentDetail:
+          propertyType === 'APARTMENT' && apartmentDetail
+            ? {
+                upsert: {
+                  create: {
+                    complexName: apartmentDetail.complexName || address || existingProp.address,
+                    buildingNo: apartmentDetail.buildingNo,
+                    unitNo: apartmentDetail.unitNo,
+                    supplyArea: apartmentDetail.supplyArea ? parseFloat(apartmentDetail.supplyArea) : null,
+                    pyeongType: apartmentDetail.pyeongType,
+                    exclusiveArea: apartmentDetail.exclusiveArea ? parseFloat(apartmentDetail.exclusiveArea) : null,
+                    roomCount: apartmentDetail.roomCount ? parseInt(apartmentDetail.roomCount, 10) : null,
+                    bathroomCount: apartmentDetail.bathroomCount ? parseInt(apartmentDetail.bathroomCount, 10) : null,
+                    approvalDate: apartmentDetail.approvalDate ? new Date(apartmentDetail.approvalDate) : null,
+                    elevatorCount: apartmentDetail.elevatorCount ? parseInt(apartmentDetail.elevatorCount, 10) : null,
+                    maintenanceFee: apartmentDetail.maintenanceFee ? parseFloat(apartmentDetail.maintenanceFee) : null,
+                    heatingType: apartmentDetail.heatingType,
+                    systemAircon: !!apartmentDetail.systemAircon,
+                    roomLivingOption: apartmentDetail.roomLivingOption,
+                    heatExchanger: !!apartmentDetail.heatExchanger,
+                    induction: !!apartmentDetail.induction,
+                    otherOptions: apartmentDetail.otherOptions,
+                  },
+                  update: {
+                    complexName: apartmentDetail.complexName || address || existingProp.address,
+                    buildingNo: apartmentDetail.buildingNo,
+                    unitNo: apartmentDetail.unitNo,
+                    supplyArea: apartmentDetail.supplyArea ? parseFloat(apartmentDetail.supplyArea) : null,
+                    pyeongType: apartmentDetail.pyeongType,
+                    exclusiveArea: apartmentDetail.exclusiveArea ? parseFloat(apartmentDetail.exclusiveArea) : null,
+                    roomCount: apartmentDetail.roomCount ? parseInt(apartmentDetail.roomCount, 10) : null,
+                    bathroomCount: apartmentDetail.bathroomCount ? parseInt(apartmentDetail.bathroomCount, 10) : null,
+                    approvalDate: apartmentDetail.approvalDate ? new Date(apartmentDetail.approvalDate) : null,
+                    elevatorCount: apartmentDetail.elevatorCount ? parseInt(apartmentDetail.elevatorCount, 10) : null,
+                    maintenanceFee: apartmentDetail.maintenanceFee ? parseFloat(apartmentDetail.maintenanceFee) : null,
+                    heatingType: apartmentDetail.heatingType,
+                    systemAircon: !!apartmentDetail.systemAircon,
+                    roomLivingOption: apartmentDetail.roomLivingOption,
+                    heatExchanger: !!apartmentDetail.heatExchanger,
+                    induction: !!apartmentDetail.induction,
+                    otherOptions: apartmentDetail.otherOptions,
+                  },
+                },
+              }
+            : undefined,
+
+        houseDetail:
+          propertyType === 'HOUSE' && houseDetail
+            ? {
+                upsert: {
+                  create: {
+                    totalFloors: houseDetail.totalFloors ? parseInt(houseDetail.totalFloors, 10) : null,
+                    currentFloor: houseDetail.currentFloor,
+                    landArea: houseDetail.landArea ? parseFloat(houseDetail.landArea) : null,
+                    totalFloorArea: houseDetail.totalFloorArea ? parseFloat(houseDetail.totalFloorArea) : null,
+                    buildingArea: houseDetail.buildingArea ? parseFloat(houseDetail.buildingArea) : null,
+                    buildingUse: houseDetail.buildingUse,
+                    approvalDate: houseDetail.approvalDate ? new Date(houseDetail.approvalDate) : null,
+                    roomCount: houseDetail.roomCount ? parseInt(houseDetail.roomCount, 10) : null,
+                    bathroomCount: houseDetail.bathroomCount ? parseInt(houseDetail.bathroomCount, 10) : null,
+                    currentLeaseStatus: houseDetail.currentLeaseStatus,
+                    parkingCount: houseDetail.parkingCount ? parseInt(houseDetail.parkingCount, 10) : null,
+                    maintenanceFeeCommon: houseDetail.maintenanceFeeCommon ? parseFloat(houseDetail.maintenanceFeeCommon) : null,
+                    maintenanceFeeWater: houseDetail.maintenanceFeeWater ? parseFloat(houseDetail.maintenanceFeeWater) : null,
+                    maintenanceFeeElectricity: houseDetail.maintenanceFeeElectricity ? parseFloat(houseDetail.maintenanceFeeElectricity) : null,
+                    maintenanceFeeGas: houseDetail.maintenanceFeeGas ? parseFloat(houseDetail.maintenanceFeeGas) : null,
+                    heatingType: houseDetail.heatingType,
+                    options: houseDetail.options,
+                  },
+                  update: {
+                    totalFloors: houseDetail.totalFloors ? parseInt(houseDetail.totalFloors, 10) : null,
+                    currentFloor: houseDetail.currentFloor,
+                    landArea: houseDetail.landArea ? parseFloat(houseDetail.landArea) : null,
+                    totalFloorArea: houseDetail.totalFloorArea ? parseFloat(houseDetail.totalFloorArea) : null,
+                    buildingArea: houseDetail.buildingArea ? parseFloat(houseDetail.buildingArea) : null,
+                    buildingUse: houseDetail.buildingUse,
+                    approvalDate: houseDetail.approvalDate ? new Date(houseDetail.approvalDate) : null,
+                    roomCount: houseDetail.roomCount ? parseInt(houseDetail.roomCount, 10) : null,
+                    bathroomCount: houseDetail.bathroomCount ? parseInt(houseDetail.bathroomCount, 10) : null,
+                    currentLeaseStatus: houseDetail.currentLeaseStatus,
+                    parkingCount: houseDetail.parkingCount ? parseInt(houseDetail.parkingCount, 10) : null,
+                    maintenanceFeeCommon: houseDetail.maintenanceFeeCommon ? parseFloat(houseDetail.maintenanceFeeCommon) : null,
+                    maintenanceFeeWater: houseDetail.maintenanceFeeWater ? parseFloat(houseDetail.maintenanceFeeWater) : null,
+                    maintenanceFeeElectricity: houseDetail.maintenanceFeeElectricity ? parseFloat(houseDetail.maintenanceFeeElectricity) : null,
+                    maintenanceFeeGas: houseDetail.maintenanceFeeGas ? parseFloat(houseDetail.maintenanceFeeGas) : null,
+                    heatingType: houseDetail.heatingType,
+                    options: houseDetail.options,
+                  },
+                },
+              }
+            : undefined,
+
+        storeDetail:
+          propertyType === 'STORE' && storeDetail
+            ? {
+                upsert: {
+                  create: {
+                    storeName: storeDetail.storeName,
+                    businessType: storeDetail.businessType,
+                    totalFloors: storeDetail.totalFloors ? parseInt(storeDetail.totalFloors, 10) : null,
+                    currentFloor: storeDetail.currentFloor,
+                    landArea: storeDetail.landArea ? parseFloat(storeDetail.landArea) : null,
+                    buildingArea: storeDetail.buildingArea ? parseFloat(storeDetail.buildingArea) : null,
+                    buildingUse: storeDetail.buildingUse,
+                    actualArea: storeDetail.actualArea ? parseFloat(storeDetail.actualArea) : null,
+                    roomCount: storeDetail.roomCount ? parseInt(storeDetail.roomCount, 10) : null,
+                    bathroomCount: storeDetail.bathroomCount ? parseInt(storeDetail.bathroomCount, 10) : null,
+                    approvalDate: storeDetail.approvalDate ? new Date(storeDetail.approvalDate) : null,
+                    parkingCount: storeDetail.parkingCount ? parseInt(storeDetail.parkingCount, 10) : null,
+                    monthlyRentVat: !!storeDetail.monthlyRentVat,
+                    premium: storeDetail.premium ? parseFloat(storeDetail.premium) : null,
+                    maintenanceFee: storeDetail.maintenanceFee ? parseFloat(storeDetail.maintenanceFee) : null,
+                    maintenanceFeeVat: !!storeDetail.maintenanceFeeVat,
+                    adminActionChecked: storeDetail.adminActionChecked,
+                    violationBuilding: storeDetail.violationBuilding,
+                    operationPeriod: storeDetail.operationPeriod,
+                    contractPeriod: storeDetail.contractPeriod,
+                    parkingRequirement: storeDetail.parkingRequirement,
+                    businessRegistrationStatus: storeDetail.businessRegistrationStatus,
+                    rentIncreaseStatus: storeDetail.rentIncreaseStatus,
+                    advertisementStatus: storeDetail.advertisementStatus,
+                    tableCountHall: storeDetail.tableCountHall ? parseInt(storeDetail.tableCountHall, 10) : null,
+                    tableCountRoom: storeDetail.tableCountRoom ? parseInt(storeDetail.tableCountRoom, 10) : null,
+                    employeeCount: storeDetail.employeeCount ? parseInt(storeDetail.employeeCount, 10) : null,
+                    dailyRevenue: storeDetail.dailyRevenue ? parseFloat(storeDetail.dailyRevenue) : null,
+                    equipmentStatus: storeDetail.equipmentStatus,
+                    liquorLoan: storeDetail.liquorLoan,
+                    fireInspectionCert: storeDetail.fireInspectionCert,
+                  },
+                  update: {
+                    storeName: storeDetail.storeName,
+                    businessType: storeDetail.businessType,
+                    totalFloors: storeDetail.totalFloors ? parseInt(storeDetail.totalFloors, 10) : null,
+                    currentFloor: storeDetail.currentFloor,
+                    landArea: storeDetail.landArea ? parseFloat(storeDetail.landArea) : null,
+                    buildingArea: storeDetail.buildingArea ? parseFloat(storeDetail.buildingArea) : null,
+                    buildingUse: storeDetail.buildingUse,
+                    actualArea: storeDetail.actualArea ? parseFloat(storeDetail.actualArea) : null,
+                    roomCount: storeDetail.roomCount ? parseInt(storeDetail.roomCount, 10) : null,
+                    bathroomCount: storeDetail.bathroomCount ? parseInt(storeDetail.bathroomCount, 10) : null,
+                    approvalDate: storeDetail.approvalDate ? new Date(storeDetail.approvalDate) : null,
+                    parkingCount: storeDetail.parkingCount ? parseInt(storeDetail.parkingCount, 10) : null,
+                    monthlyRentVat: !!storeDetail.monthlyRentVat,
+                    premium: storeDetail.premium ? parseFloat(storeDetail.premium) : null,
+                    maintenanceFee: storeDetail.maintenanceFee ? parseFloat(storeDetail.maintenanceFee) : null,
+                    maintenanceFeeVat: !!storeDetail.maintenanceFeeVat,
+                    adminActionChecked: storeDetail.adminActionChecked,
+                    violationBuilding: storeDetail.violationBuilding,
+                    operationPeriod: storeDetail.operationPeriod,
+                    contractPeriod: storeDetail.contractPeriod,
+                    parkingRequirement: storeDetail.parkingRequirement,
+                    businessRegistrationStatus: storeDetail.businessRegistrationStatus,
+                    rentIncreaseStatus: storeDetail.rentIncreaseStatus,
+                    advertisementStatus: storeDetail.advertisementStatus,
+                    tableCountHall: storeDetail.tableCountHall ? parseInt(storeDetail.tableCountHall, 10) : null,
+                    tableCountRoom: storeDetail.tableCountRoom ? parseInt(storeDetail.tableCountRoom, 10) : null,
+                    employeeCount: storeDetail.employeeCount ? parseInt(storeDetail.employeeCount, 10) : null,
+                    dailyRevenue: storeDetail.dailyRevenue ? parseFloat(storeDetail.dailyRevenue) : null,
+                    equipmentStatus: storeDetail.equipmentStatus,
+                    liquorLoan: storeDetail.liquorLoan,
+                    fireInspectionCert: storeDetail.fireInspectionCert,
+                  },
+                },
+              }
+            : undefined,
+
+        officeDetail:
+          propertyType === 'OFFICE' && officeDetail
+            ? {
+                upsert: {
+                  create: {
+                    officeName: officeDetail.officeName,
+                    totalFloors: officeDetail.totalFloors ? parseInt(officeDetail.totalFloors, 10) : null,
+                    currentFloor: officeDetail.currentFloor,
+                    landArea: officeDetail.landArea ? parseFloat(officeDetail.landArea) : null,
+                    buildingArea: officeDetail.buildingArea ? parseFloat(officeDetail.buildingArea) : null,
+                    buildingUse: officeDetail.buildingUse,
+                    actualArea: officeDetail.actualArea ? parseFloat(officeDetail.actualArea) : null,
+                    roomCount: officeDetail.roomCount ? parseInt(officeDetail.roomCount, 10) : null,
+                    bathroomCount: officeDetail.bathroomCount ? parseInt(officeDetail.bathroomCount, 10) : null,
+                    approvalDate: officeDetail.approvalDate ? new Date(officeDetail.approvalDate) : null,
+                    parkingCount: officeDetail.parkingCount ? parseInt(officeDetail.parkingCount, 10) : null,
+                    monthlyRentVat: !!officeDetail.monthlyRentVat,
+                    maintenanceFee: officeDetail.maintenanceFee ? parseFloat(officeDetail.maintenanceFee) : null,
+                    maintenanceFeeVat: !!officeDetail.maintenanceFeeVat,
+                    violationBuilding: officeDetail.violationBuilding,
+                    parkingAndFee: officeDetail.parkingAndFee,
+                    rentIncreaseStatus: officeDetail.rentIncreaseStatus,
+                    advertisementStatus: officeDetail.advertisementStatus,
+                    prosAndCons: officeDetail.prosAndCons,
+                    hvacSystem: officeDetail.hvacSystem,
+                    elevator: officeDetail.elevator,
+                    security: officeDetail.security,
+                    restorationScope: officeDetail.restorationScope,
+                    electricityExpansion: officeDetail.electricityExpansion,
+                    specialTerms: officeDetail.specialTerms,
+                    totalOfficeCount: officeDetail.totalOfficeCount ? parseInt(officeDetail.totalOfficeCount, 10) : null,
+                  },
+                  update: {
+                    officeName: officeDetail.officeName,
+                    totalFloors: officeDetail.totalFloors ? parseInt(officeDetail.totalFloors, 10) : null,
+                    currentFloor: officeDetail.currentFloor,
+                    landArea: officeDetail.landArea ? parseFloat(officeDetail.landArea) : null,
+                    buildingArea: officeDetail.buildingArea ? parseFloat(officeDetail.buildingArea) : null,
+                    buildingUse: officeDetail.buildingUse,
+                    actualArea: officeDetail.actualArea ? parseFloat(officeDetail.actualArea) : null,
+                    roomCount: officeDetail.roomCount ? parseInt(officeDetail.roomCount, 10) : null,
+                    bathroomCount: officeDetail.bathroomCount ? parseInt(officeDetail.bathroomCount, 10) : null,
+                    approvalDate: officeDetail.approvalDate ? new Date(officeDetail.approvalDate) : null,
+                    parkingCount: officeDetail.parkingCount ? parseInt(officeDetail.parkingCount, 10) : null,
+                    monthlyRentVat: !!officeDetail.monthlyRentVat,
+                    maintenanceFee: officeDetail.maintenanceFee ? parseFloat(officeDetail.maintenanceFee) : null,
+                    maintenanceFeeVat: !!officeDetail.maintenanceFeeVat,
+                    violationBuilding: officeDetail.violationBuilding,
+                    parkingAndFee: officeDetail.parkingAndFee,
+                    rentIncreaseStatus: officeDetail.rentIncreaseStatus,
+                    advertisementStatus: officeDetail.advertisementStatus,
+                    prosAndCons: officeDetail.prosAndCons,
+                    hvacSystem: officeDetail.hvacSystem,
+                    elevator: officeDetail.elevator,
+                    security: officeDetail.security,
+                    restorationScope: officeDetail.restorationScope,
+                    electricityExpansion: officeDetail.electricityExpansion,
+                    specialTerms: officeDetail.specialTerms,
+                    totalOfficeCount: officeDetail.totalOfficeCount ? parseInt(officeDetail.totalOfficeCount, 10) : null,
+                  },
+                },
+              }
+            : undefined,
+
+        factoryWarehouseDetail:
+          propertyType === 'FACTORY_WAREHOUSE' && factoryWarehouseDetail
+            ? {
+                upsert: {
+                  create: {
+                    companyName: factoryWarehouseDetail.companyName,
+                    businessType: factoryWarehouseDetail.businessType,
+                    totalFloors: factoryWarehouseDetail.totalFloors ? parseInt(factoryWarehouseDetail.totalFloors, 10) : null,
+                    currentFloor: factoryWarehouseDetail.currentFloor,
+                    structure: factoryWarehouseDetail.structure,
+                    approvalDate: factoryWarehouseDetail.approvalDate ? new Date(factoryWarehouseDetail.approvalDate) : null,
+                    landArea: factoryWarehouseDetail.landArea ? parseFloat(factoryWarehouseDetail.landArea) : null,
+                    totalFloorArea: factoryWarehouseDetail.totalFloorArea ? parseFloat(factoryWarehouseDetail.totalFloorArea) : null,
+                    buildingArea: factoryWarehouseDetail.buildingArea ? parseFloat(factoryWarehouseDetail.buildingArea) : null,
+                    buildingUse: factoryWarehouseDetail.buildingUse,
+                    zoningArea: factoryWarehouseDetail.zoningArea,
+                    landCategory: factoryWarehouseDetail.landCategory,
+                    roadAccessWidth: factoryWarehouseDetail.roadAccessWidth,
+                    ceilingHeight: factoryWarehouseDetail.ceilingHeight ? parseFloat(factoryWarehouseDetail.ceilingHeight) : null,
+                    hoistCapacity: factoryWarehouseDetail.hoistCapacity,
+                    incomingElectricity: factoryWarehouseDetail.incomingElectricity,
+                    operatingElectricity: factoryWarehouseDetail.operatingElectricity,
+                    parkingCount: factoryWarehouseDetail.parkingCount ? parseInt(factoryWarehouseDetail.parkingCount, 10) : null,
+                    rentPerPyeong: factoryWarehouseDetail.rentPerPyeong ? parseFloat(factoryWarehouseDetail.rentPerPyeong) : null,
+                    wastewater: factoryWarehouseDetail.wastewater,
+                    airPollution: factoryWarehouseDetail.airPollution,
+                    noiseLevel: factoryWarehouseDetail.noiseLevel,
+                    allowedBusinessTypes: factoryWarehouseDetail.allowedBusinessTypes,
+                    sewageDirectConnection: factoryWarehouseDetail.sewageDirectConnection,
+                  },
+                  update: {
+                    companyName: factoryWarehouseDetail.companyName,
+                    businessType: factoryWarehouseDetail.businessType,
+                    totalFloors: factoryWarehouseDetail.totalFloors ? parseInt(factoryWarehouseDetail.totalFloors, 10) : null,
+                    currentFloor: factoryWarehouseDetail.currentFloor,
+                    structure: factoryWarehouseDetail.structure,
+                    approvalDate: factoryWarehouseDetail.approvalDate ? new Date(factoryWarehouseDetail.approvalDate) : null,
+                    landArea: factoryWarehouseDetail.landArea ? parseFloat(factoryWarehouseDetail.landArea) : null,
+                    totalFloorArea: factoryWarehouseDetail.totalFloorArea ? parseFloat(factoryWarehouseDetail.totalFloorArea) : null,
+                    buildingArea: factoryWarehouseDetail.buildingArea ? parseFloat(factoryWarehouseDetail.buildingArea) : null,
+                    buildingUse: factoryWarehouseDetail.buildingUse,
+                    zoningArea: factoryWarehouseDetail.zoningArea,
+                    landCategory: factoryWarehouseDetail.landCategory,
+                    roadAccessWidth: factoryWarehouseDetail.roadAccessWidth,
+                    ceilingHeight: factoryWarehouseDetail.ceilingHeight ? parseFloat(factoryWarehouseDetail.ceilingHeight) : null,
+                    hoistCapacity: factoryWarehouseDetail.hoistCapacity,
+                    incomingElectricity: factoryWarehouseDetail.incomingElectricity,
+                    operatingElectricity: factoryWarehouseDetail.operatingElectricity,
+                    parkingCount: factoryWarehouseDetail.parkingCount ? parseInt(factoryWarehouseDetail.parkingCount, 10) : null,
+                    rentPerPyeong: factoryWarehouseDetail.rentPerPyeong ? parseFloat(factoryWarehouseDetail.rentPerPyeong) : null,
+                    wastewater: factoryWarehouseDetail.wastewater,
+                    airPollution: factoryWarehouseDetail.airPollution,
+                    noiseLevel: factoryWarehouseDetail.noiseLevel,
+                    allowedBusinessTypes: factoryWarehouseDetail.allowedBusinessTypes,
+                    sewageDirectConnection: factoryWarehouseDetail.sewageDirectConnection,
+                  },
+                },
+              }
+            : undefined,
+
+        landDetail:
+          propertyType === 'LAND' && landDetail
+            ? {
+                upsert: {
+                  create: {
+                    companyName: landDetail.companyName,
+                    businessType: landDetail.businessType,
+                    landArea: landDetail.landArea ? parseFloat(landDetail.landArea) : null,
+                    rentPerPyeong: landDetail.rentPerPyeong ? parseFloat(landDetail.rentPerPyeong) : null,
+                    zoningArea: landDetail.zoningArea,
+                    landCategory: landDetail.landCategory,
+                    roadAccess: landDetail.roadAccess,
+                    ordinancePermitted: landDetail.ordinancePermitted,
+                    roadAccessConfirmed: landDetail.roadAccessConfirmed,
+                    surfaceRights: landDetail.surfaceRights,
+                    easementRights: landDetail.easementRights,
+                    farmlandsCert: landDetail.farmlandsCert,
+                    landPermitZone: landDetail.landPermitZone,
+                    greenBeltZone: landDetail.greenBeltZone,
+                    unauthorizedStructures: landDetail.unauthorizedStructures,
+                    infrastructure: landDetail.infrastructure,
+                    waterSewageConnection: landDetail.waterSewageConnection,
+                  },
+                  update: {
+                    companyName: landDetail.companyName,
+                    businessType: landDetail.businessType,
+                    landArea: landDetail.landArea ? parseFloat(landDetail.landArea) : null,
+                    rentPerPyeong: landDetail.rentPerPyeong ? parseFloat(landDetail.rentPerPyeong) : null,
+                    zoningArea: landDetail.zoningArea,
+                    landCategory: landDetail.landCategory,
+                    roadAccess: landDetail.roadAccess,
+                    ordinancePermitted: landDetail.ordinancePermitted,
+                    roadAccessConfirmed: landDetail.roadAccessConfirmed,
+                    surfaceRights: landDetail.surfaceRights,
+                    easementRights: landDetail.easementRights,
+                    farmlandsCert: landDetail.farmlandsCert,
+                    landPermitZone: landDetail.landPermitZone,
+                    greenBeltZone: landDetail.greenBeltZone,
+                    unauthorizedStructures: landDetail.unauthorizedStructures,
+                    infrastructure: landDetail.infrastructure,
+                    waterSewageConnection: landDetail.waterSewageConnection,
+                  },
+                },
+              }
+            : undefined,
+      },
+      include: {
+        customer: true,
+        apartmentDetail: true,
+        houseDetail: true,
+        storeDetail: true,
+        officeDetail: true,
+        factoryWarehouseDetail: true,
+        landDetail: true,
+      },
+    });
+
+    return NextResponse.json(formatPropertyOutput(updatedProperty));
+  } catch (error: any) {
+    console.error('Error updating property:', error);
+    return NextResponse.json(
+      { error: error.message || '매물 수정 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+

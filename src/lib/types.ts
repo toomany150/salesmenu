@@ -55,6 +55,104 @@ export const STATUS_LABELS: Record<PropertyStatus, { label: string; color: strin
   CANCELLED: { label: '취소', color: 'bg-rose-100 text-rose-800 border-rose-300' },
 };
 
+// 8방위 방향 목록 및 기준 옵션 정의
+export const DIRECTION_OPTIONS = [
+  '남향',
+  '남동향',
+  '남서향',
+  '동향',
+  '서향',
+  '북동향',
+  '북서향',
+  '북향',
+] as const;
+export type DirectionOption = typeof DIRECTION_OPTIONS[number];
+
+export const DIRECTION_CRITERIA_OPTIONS = [
+  '거실 창문 기준',
+  '주출입구 기준',
+  '안방 창문 기준',
+] as const;
+export type DirectionCriteriaOption = typeof DIRECTION_CRITERIA_OPTIONS[number];
+
+/**
+ * 매물 종류에 따른 기본 방향 기준 세팅값
+ * - 아파트, 주택: '거실 창문 기준'
+ * - 상가점포, 공장, 사무실, 토지 등: '주출입구 기준'
+ */
+export function getDefaultDirectionCriteria(propertyType: PropertyType): DirectionCriteriaOption {
+  if (propertyType === 'APARTMENT' || propertyType === 'HOUSE') {
+    return '거실 창문 기준';
+  }
+  return '주출입구 기준';
+}
+
+// 주택(원룸/투룸/풀옵션) 옵션 카테고리 및 항목 정의
+export const HOUSE_AIRCON_TYPES = [
+  '시스템에어컨',
+  '벽걸이에어컨',
+  '스탠드에어컨',
+  '투인원(2in1)',
+] as const;
+
+export const HOUSE_AIRCON_ROOMS = ['거실', '안방', '방1', '방2', '원룸/전실'] as const;
+
+export interface HouseOptionGroup {
+  category: string;
+  items: string[];
+}
+
+export const HOUSE_OPTION_CATEGORIES: HouseOptionGroup[] = [
+  {
+    category: '주방가전 / 빌트인',
+    items: [
+      '냉장고',
+      '빌트인 냉장고',
+      '세탁기',
+      '건조기',
+      '워시타워',
+      '인덕션',
+      '가스레인지',
+      '하이라이트',
+      '전자레인지',
+      '식기세척기',
+      '음식물처리기',
+      '싱크대/아일랜드식탁',
+    ],
+  },
+  {
+    category: '수납 / 가구 / 현관',
+    items: [
+      '붙박이장',
+      '옷장',
+      '신발장',
+      '침대',
+      '책상/의자',
+      'TV/모니터',
+      'TV수납장',
+      '도어락(디지털키)',
+      '중문',
+      '블라인드/커튼',
+      '빨래건조대',
+    ],
+  },
+  {
+    category: '기타 특이 옵션',
+    items: [
+      '엘리베이터',
+      'CCTV/보안현관',
+      '비디오폰/인터폰',
+      '무인택배함',
+      '베란다/발코니',
+      '테라스/옥상단독사용',
+      '보일러(개별난방)',
+      '주차가능',
+      '반려동물가능',
+      '단기임대가능',
+    ],
+  },
+];
+
 // 아파트 옵션 카테고리 및 항목 정의
 export const APARTMENT_AIRCON_ROOMS = ['거실', '안방', '방1', '방2', '방3'] as const;
 
@@ -150,6 +248,9 @@ export interface HouseData {
   maintenanceFeeGas?: number;
   heatingType?: string;
   options?: string;
+  optionsList?: string[];
+  airconType?: string;
+  airconRooms?: string[];
 }
 
 export interface StoreData {
@@ -275,7 +376,10 @@ export interface PropertyItem {
   status: PropertyStatus;
   transactionType: TransactionType;
   address: string;
+  roadAddress?: string;
+  jibunAddress?: string;
   detailAddress?: string;
+  images?: string[];
   latitude?: number;
   longitude?: number;
   direction?: string;

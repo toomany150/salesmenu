@@ -49,6 +49,7 @@ export const MainDashboard: React.FC = () => {
 
   // Modal States
   const [isPropertyRegOpen, setIsPropertyRegOpen] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<PropertyItem | null>(null);
   const [isCustomerRegOpen, setIsCustomerRegOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
@@ -84,8 +85,27 @@ export const MainDashboard: React.FC = () => {
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
 
-  const handlePropertyCreated = (newProp: PropertyItem) => {
-    setProperties((prev) => [newProp, ...prev]);
+  const handleOpenNewProperty = () => {
+    setEditingProperty(null);
+    setIsPropertyRegOpen(true);
+  };
+
+  const handleOpenEditProperty = (prop: PropertyItem) => {
+    setEditingProperty(prop);
+    setIsPropertyRegOpen(true);
+    setSelectedProperty(null);
+  };
+
+  const handlePropertySaved = (savedProp: PropertyItem) => {
+    setProperties((prev) => {
+      const idx = prev.findIndex((p) => p.id === savedProp.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = savedProp;
+        return next;
+      }
+      return [savedProp, ...prev];
+    });
     fetchData();
   };
 
@@ -102,7 +122,7 @@ export const MainDashboard: React.FC = () => {
         propertyCount={properties.length}
         receivedCustomerCount={receivedCustomers.length}
         searchingCustomerCount={searchingCustomers.length}
-        onOpenNewProperty={() => setIsPropertyRegOpen(true)}
+        onOpenNewProperty={handleOpenNewProperty}
         onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
       />
 
@@ -307,7 +327,7 @@ export const MainDashboard: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => setIsPropertyRegOpen(true)}
+                onClick={handleOpenNewProperty}
                 className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
               >
                 ＋ 새 매물 등록
@@ -316,8 +336,10 @@ export const MainDashboard: React.FC = () => {
 
             <PropertyList
               properties={properties}
+              customers={customers}
               onSelectProperty={(p) => setSelectedProperty(p)}
-              onOpenNewProperty={() => setIsPropertyRegOpen(true)}
+              onOpenNewProperty={handleOpenNewProperty}
+              onEditProperty={handleOpenEditProperty}
             />
           </div>
         )}
@@ -325,12 +347,17 @@ export const MainDashboard: React.FC = () => {
       </main>
 
       {/* 4. Modals */}
-      {/* 1) 새 매물 등록 폼 (공공데이터 대장 연동 + 우측 고정 체크리스트 + 7가지 매물 서브폼) */}
+      {/* 1) 새 매물 등록 및 수정 폼 */}
       <PropertyRegistrationForm
         customers={customers}
         isOpen={isPropertyRegOpen}
-        onClose={() => setIsPropertyRegOpen(false)}
-        onSuccess={handlePropertyCreated}
+        initialData={editingProperty}
+        mode={editingProperty ? 'EDIT' : 'CREATE'}
+        onClose={() => {
+          setIsPropertyRegOpen(false);
+          setEditingProperty(null);
+        }}
+        onSuccess={handlePropertySaved}
       />
 
       {/* 2) 신규 고객 등록 폼 */}
@@ -341,11 +368,12 @@ export const MainDashboard: React.FC = () => {
         defaultGroup={activeTab === 'SEARCHING_GROUP' ? 'SEARCHING' : 'RECEIVED'}
       />
 
-      {/* 3) 매물 상세 모달 (문자 발송 링크 + 카톡 공유 API + 전화걸기 + 대장 정보) */}
+      {/* 3) 매물 상세 모달 (문자 발송 링크 + 카톡 공유 API + 전화걸기 + 대장 정보 + 수정하기) */}
       <PropertyDetailModal
         property={selectedProperty}
         isOpen={!!selectedProperty}
         onClose={() => setSelectedProperty(null)}
+        onEditProperty={handleOpenEditProperty}
       />
 
       {/* 4) 고객 상세 모달 (전화걸기 href="tel:..." + 접수매물/탐색조건) */}

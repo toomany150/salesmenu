@@ -71,18 +71,18 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Action Buttons */}
           <div className="flex items-center space-x-2">
             <button
-              onClick={onOpenNewCustomer}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-2xs"
-            >
-              <Users className="w-3.5 h-3.5 text-blue-600" />
-              <span>고객 등록</span>
-            </button>
-            <button
               onClick={onOpenNewProperty}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm shadow-blue-500/20 active:scale-95"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>새 매물 등록</span>
+            </button>
+            <button
+              onClick={onOpenNewCustomer}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-2xs"
+            >
+              <Users className="w-3.5 h-3.5 text-blue-600" />
+              <span>고객 등록</span>
             </button>
           </div>
         </div>

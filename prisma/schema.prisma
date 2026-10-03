@@ -89,8 +89,13 @@ model Property {
   transactionType     String    
   
   // 소재지 주소
-  address             String    // 도로명/지번 주소
+  address             String    // 기본/대표 주소
+  roadAddress         String?   // 주소1 (도로명 주소)
+  jibunAddress        String?   // 주소2 (지번 주소)
   detailAddress       String?   // 동/호수 또는 층수 (선택)
+  
+  // 매물 사진 (최대 20장, JSON 배열 문자열)
+  images              String?
   
   // 지도 위치 좌표 (위도/경도)
   latitude            Float?    // 위도 (예: 37.4998)
