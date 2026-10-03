@@ -1,6 +1,5 @@
 // src/lib/auth.ts
 // 참좋은 공인중개사사무소 계정 인증 및 접근 제어 모듈
-import { prisma } from './prisma';
 import { UserItem, UserRole } from './types';
 
 // 기본 사전 등록 계정 목록 (개발자/대표 관리자 1명 + 소속공인중개사 5명)
@@ -64,6 +63,7 @@ export const DEFAULT_USERS: Array<Omit<UserItem, 'createdAt' | 'updatedAt'> & { 
 // DB에 기본 계정이 없을 시 자동 시딩
 export async function ensureSeedUsers() {
   try {
+    const { prisma } = await import('./prisma');
     const count = await prisma.user.count();
     if (count === 0) {
       for (const u of DEFAULT_USERS) {
@@ -100,6 +100,7 @@ export async function recordAccessLog(params: {
   userAgent?: string;
 }) {
   try {
+    const { prisma } = await import('./prisma');
     await prisma.accessLog.create({
       data: {
         userId: params.userId,

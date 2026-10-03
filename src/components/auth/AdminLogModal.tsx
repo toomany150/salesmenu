@@ -127,6 +127,31 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
     }
   };
 
+  const handleDeleteUser = async (user: UserItem) => {
+    if (user.role === 'ADMIN') {
+      alert('대표 관리자 계정은 삭제할 수 없습니다.');
+      return;
+    }
+    if (!confirm(`정말로 "${user.name}" (${user.username}) 중개사 계정을 삭제하시겠습니까?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/users?id=${user.id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-user-role': currentUser?.role || 'ADMIN',
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '삭제 실패');
+      alert(`[${user.name}] 중개사 계정이 삭제되었습니다.`);
+      fetchUsers();
+      fetchLogs();
+    } catch (err: any) {
+      alert(err.message || '계정 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   if (!isOpen) return null;
 
   const filteredLogs = logs.filter((l) => {
@@ -438,7 +463,19 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
                           </div>
                         </div>
 
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="활성 계정"></span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="활성 계정"></span>
+                          {!isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(u)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                              title="계정 삭제"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">

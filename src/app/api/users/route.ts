@@ -74,9 +74,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const cleanUsername = username.trim();
+
+    // 중복 아이디 사전 검사
+    const existing = await prisma.user.findUnique({
+      where: { username: cleanUsername },
+    }).catch(() => null);
+
+    if (existing) {
+      return NextResponse.json(
+        { 
+          error: `이미 등록되어 있는 아이디("${cleanUsername}")입니다. (현재 등록자: "${existing.name}") 중복되지 않는 다른 아이디(예: agent6, agent7 등)를 입력해 주세요.` 
+        },
+        { status: 400 }
+      );
+    }
+
     const created = await prisma.user.create({
       data: {
-        username: username.trim(),
+        username: cleanUsername,
         password: password.trim(),
         name: name.trim(),
         role: role === 'ADMIN' ? 'ADMIN' : 'AGENT',
@@ -98,8 +114,78 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     console.error('Error creating user:', err);
+    if (err?.code === 'P2002') {
+      return NextResponse.json(
+        { error: '이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: err.message || '사용자 등록 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, password, name, phone, isActive, adminUser } = body;
+
+    if (adminUser?.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: '소속공인중개사 계정 관리 권한은 관리자(대표)에게만 있습니다.' },
+        { status: 403 }
+      );
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: '수정할 사용자 ID가 필요합니다.' }, { status: 400 });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(name ? { name: name.trim() } : {}),
+        ...(password ? { password: password.trim() } : {}),
+        ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
+        ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+      },
+    });
+
+    return NextResponse.json(updated);
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || '사용자 정보 수정 실패' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const userRole = request.headers.get('x-user-role');
+
+    if (userRole !== 'ADMIN') {
+      return NextResponse.json({ error: '관리자만 삭제할 수 있습니다.' }, { status: 403 });
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: '삭제할 사용자 ID가 필요합니다.' }, { status: 400 });
+    }
+
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (target?.role === 'ADMIN') {
+      return NextResponse.json({ error: '대표 관리자 계정은 삭제할 수 없습니다.' }, { status: 400 });
+    }
+
+    await prisma.user.delete({ where: { id } });
+    return NextResponse.json({ success: true, id });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || '사용자 삭제 실패' },
       { status: 500 }
     );
   }
