@@ -7,13 +7,10 @@ import {
   ExternalLink, 
   ZoomIn, 
   ZoomOut, 
-  Maximize2, 
   Navigation, 
   Building2, 
   Phone, 
   MessageSquare,
-  Sparkles,
-  Compass,
   X,
   ChevronRight
 } from 'lucide-react';

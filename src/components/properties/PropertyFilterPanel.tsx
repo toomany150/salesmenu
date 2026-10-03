@@ -10,11 +10,8 @@ import {
   UserCheck, 
   Building2, 
   DollarSign, 
-  Compass, 
   Check, 
-  X,
-  Sparkles,
-  Maximize2
+  X
 } from 'lucide-react';
 import { 
   PropertyItem, 

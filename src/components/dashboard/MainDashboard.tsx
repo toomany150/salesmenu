@@ -1,28 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Building2, 
-  Users, 
-  PlusCircle, 
-  Search, 
-  Sparkles, 
-  PhoneCall, 
-  Share2, 
-  ClipboardCheck, 
-  TrendingUp,
-  Inbox,
-  Filter,
-  CheckCircle2,
-  RefreshCw
-} from 'lucide-react';
-import { 
-  CustomerItem, 
-  PropertyItem, 
-  CustomerGroup, 
-  PropertyType, 
-  PROPERTY_TYPE_LABELS 
-} from '@/lib/types';
+import { Building2 } from 'lucide-react';
+import { CustomerItem, PropertyItem } from '@/lib/types';
 import { INITIAL_CUSTOMERS, INITIAL_PROPERTIES } from '@/lib/mockData';
 import { Header } from '../layout/Header';
 import { PropertyList } from '../properties/PropertyList';

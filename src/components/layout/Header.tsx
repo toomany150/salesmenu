@@ -4,12 +4,7 @@ import React from 'react';
 import { 
   Building2, 
   Users, 
-  PlusCircle, 
-  PhoneCall, 
-  Search, 
-  Calendar,
-  Sparkles,
-  ClipboardCheck
+  PlusCircle 
 } from 'lucide-react';
 
 interface HeaderProps {

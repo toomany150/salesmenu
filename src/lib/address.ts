@@ -65,9 +65,59 @@ export async function openDaumPostcode(
 }
 
 /**
+ * 카카오 지도 및 Services SDK 동적 로드
+ */
+export function loadKakaoServicesScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if (window.kakao?.maps?.services) return resolve(true);
+
+    const kakaoKey =
+      process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ||
+      process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+
+    if (!kakaoKey || kakaoKey === 'your-kakao-map-key') {
+      return resolve(false);
+    }
+
+    if (window.kakao?.maps) {
+      window.kakao.maps.load(() => {
+        resolve(!!window.kakao?.maps?.services);
+      });
+      return;
+    }
+
+    const existing = document.getElementById('kakao-maps-sdk');
+    if (existing) {
+      existing.addEventListener('load', () => {
+        if (window.kakao?.maps) {
+          window.kakao.maps.load(() => resolve(!!window.kakao?.maps?.services));
+        } else {
+          resolve(false);
+        }
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'kakao-maps-sdk';
+    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&libraries=services,clusterer&autoload=false`;
+    script.onload = () => {
+      if (window.kakao?.maps) {
+        window.kakao.maps.load(() => resolve(!!window.kakao?.maps?.services));
+      } else {
+        resolve(false);
+      }
+    };
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+}
+
+/**
  * 카카오 Geocoder를 활용하여 도로명주소 ↔ 지번주소 상호 자동 조회 및 변환
  */
-export function convertAddressViaGeocoder(
+export async function convertAddressViaGeocoder(
   inputAddress: string
 ): Promise<{
   roadAddress: string;
@@ -75,15 +125,16 @@ export function convertAddressViaGeocoder(
   lat: number;
   lng: number;
 } | null> {
+  if (!inputAddress || !inputAddress.trim()) {
+    return null;
+  }
+
+  const loaded = await loadKakaoServicesScript();
+  if (!loaded || !window.kakao?.maps?.services) {
+    return null;
+  }
+
   return new Promise((resolve) => {
-    if (!inputAddress || !inputAddress.trim()) {
-      return resolve(null);
-    }
-
-    if (typeof window === 'undefined' || !window.kakao?.maps?.services) {
-      return resolve(null);
-    }
-
     try {
       const geocoder = new window.kakao.maps.services.Geocoder();
       geocoder.addressSearch(inputAddress.trim(), (result: any, status: any) => {

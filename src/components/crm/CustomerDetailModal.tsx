@@ -8,11 +8,9 @@ import {
   Building, 
   Calendar, 
   User, 
-  Compass, 
   Target, 
   Tag, 
   Clock, 
-  Sparkles,
   CheckCircle2
 } from 'lucide-react';
 import { CustomerItem, PropertyItem, PROPERTY_TYPE_LABELS } from '@/lib/types';

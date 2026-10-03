@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Building, 
   CheckCircle2, 
@@ -8,7 +8,6 @@ import {
   Loader2, 
   Sparkles, 
   Search, 
-  MapPin, 
   ArrowRightLeft 
 } from 'lucide-react';
 import { PublicBuildingLedgerResult } from '@/lib/types';

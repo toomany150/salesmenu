@@ -5,11 +5,7 @@ import {
   X, 
   UserPlus, 
   Phone, 
-  Target, 
-  Building2, 
-  MapPin, 
-  DollarSign,
-  Calendar
+  Target 
 } from 'lucide-react';
 import { 
   MobileCarrier, 

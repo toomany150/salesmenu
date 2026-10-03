@@ -13,8 +13,6 @@ import {
   Building, 
   User, 
   ExternalLink,
-  ShieldCheck,
-  CheckCircle,
   FileCheck,
   Edit3,
   ChevronLeft,

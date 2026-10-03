@@ -6,7 +6,6 @@ import {
   ExternalLink, 
   ZoomIn, 
   ZoomOut, 
-  Compass, 
   Navigation,
   CheckCircle,
   AlertCircle

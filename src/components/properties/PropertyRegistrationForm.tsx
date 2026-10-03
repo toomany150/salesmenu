@@ -4,23 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   PlusCircle, 
-  Building2, 
-  Home, 
-  Store, 
-  Briefcase, 
-  Factory, 
   Compass, 
-  FileText,
-  UserCheck,
-  Calendar,
-  DollarSign,
-  Compass as DirectionIcon,
-  MapPin,
-  UserPlus,
-  Users,
-  Check,
-  Edit3,
-  Phone
+  MapPin, 
+  UserPlus, 
+  Users, 
+  Check, 
+  Edit3
 } from 'lucide-react';
 import { 
   PropertyType, 
@@ -32,8 +21,7 @@ import {
   DIRECTION_OPTIONS,
   DIRECTION_CRITERIA_OPTIONS,
   getDefaultDirectionCriteria,
-  CARRIER_OPTIONS,
-  MobileCarrier
+  CARRIER_OPTIONS
 } from '@/lib/types';
 import { PublicDataFetcher } from './PublicDataFetcher';
 import { ChecklistPanel } from '../checklists/ChecklistPanel';
