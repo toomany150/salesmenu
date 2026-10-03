@@ -94,11 +94,17 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerCarrier, setCustomerCarrier] = useState<string>('');
 
-  // Public data fields
+  // Public data fields (7대 대장 연동 항목)
   const [landArea, setLandArea] = useState<number | undefined>();
   const [totalFloorArea, setTotalFloorArea] = useState<number | undefined>();
-  const [approvalDate, setApprovalDate] = useState<string | undefined>();
+  const [buildingArea, setBuildingArea] = useState<number | undefined>();
   const [buildingRegisterUse, setBuildingRegisterUse] = useState<string | undefined>();
+  const [zoningArea, setZoningArea] = useState<string | undefined>();
+  const [structureName, setStructureName] = useState<string | undefined>();
+  const [floorCount, setFloorCount] = useState<number | undefined>();
+  const [underFloorCount, setUnderFloorCount] = useState<number | undefined>();
+  const [floorText, setFloorText] = useState<string | undefined>();
+  const [approvalDate, setApprovalDate] = useState<string | undefined>();
 
   // Subform Specific States
   const [apartmentData, setApartmentData] = useState<any>({
@@ -173,11 +179,17 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           setCustomerCarrier('');
         }
 
-        // Public data
+        // Public data (7대 대장 데이터)
         setLandArea(initialData.landArea);
         setTotalFloorArea(initialData.totalFloorArea);
+        setBuildingArea(initialData.buildingArea);
         setApprovalDate(initialData.approvalDate ? initialData.approvalDate.substring(0, 10) : undefined);
         setBuildingRegisterUse(initialData.buildingRegisterUse);
+        setZoningArea(initialData.zoningArea);
+        setStructureName(initialData.structureName);
+        setFloorCount(initialData.floorCount);
+        setUnderFloorCount(initialData.underFloorCount);
+        setFloorText(initialData.floorText);
 
         // Sub-details
         setApartmentData(initialData.apartmentDetail || {
@@ -224,8 +236,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setCustomerCarrier('');
         setLandArea(undefined);
         setTotalFloorArea(undefined);
+        setBuildingArea(undefined);
         setApprovalDate(undefined);
         setBuildingRegisterUse(undefined);
+        setZoningArea(undefined);
+        setStructureName(undefined);
+        setFloorCount(undefined);
+        setUnderFloorCount(undefined);
+        setFloorText(undefined);
         setApartmentData({
           complexName: '',
           supplyArea: 112.4,
@@ -282,57 +300,73 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const handleApplyPublicData = (data: PublicBuildingLedgerResult) => {
     if (data.landArea) setLandArea(data.landArea);
     if (data.totalFloorArea) setTotalFloorArea(data.totalFloorArea);
-    if (data.approvalDate) setApprovalDate(data.approvalDate);
+    if (data.buildingArea) setBuildingArea(data.buildingArea);
     if (data.buildingRegisterUse) setBuildingRegisterUse(data.buildingRegisterUse);
+    if (data.zoningArea) setZoningArea(data.zoningArea);
+    if (data.structureName) setStructureName(data.structureName);
+    if (data.floorCount) setFloorCount(data.floorCount);
+    if (data.underFloorCount !== undefined) setUnderFloorCount(data.underFloorCount);
+    if (data.floorText) setFloorText(data.floorText);
+    if (data.approvalDate) setApprovalDate(data.approvalDate);
 
     // Sub-data updates
     if (propertyType === 'APARTMENT') {
       setApartmentData((prev: any) => ({
         ...prev,
+        supplyArea: data.buildingArea || prev.supplyArea,
         approvalDate: data.approvalDate || prev.approvalDate,
       }));
     } else if (propertyType === 'HOUSE') {
       setHouseData((prev: any) => ({
         ...prev,
-        landArea: data.landArea,
-        totalFloorArea: data.totalFloorArea,
-        buildingArea: data.buildingArea,
-        buildingUse: data.buildingRegisterUse,
-        approvalDate: data.approvalDate,
-        totalFloors: data.floorCount,
+        landArea: data.landArea || prev.landArea,
+        totalFloorArea: data.totalFloorArea || prev.totalFloorArea,
+        buildingArea: data.buildingArea || prev.buildingArea,
+        buildingUse: data.buildingRegisterUse || prev.buildingUse,
+        approvalDate: data.approvalDate || prev.approvalDate,
+        totalFloors: data.floorCount || prev.totalFloors,
+        currentFloor: data.floorText || (data.floorCount ? `지상 ${data.floorCount}층 / 지하 ${data.underFloorCount || 0}층` : prev.currentFloor),
       }));
     } else if (propertyType === 'STORE') {
       setStoreData((prev: any) => ({
         ...prev,
-        landArea: data.landArea,
-        buildingArea: data.buildingArea,
-        buildingUse: data.buildingRegisterUse,
-        approvalDate: data.approvalDate,
-        totalFloors: data.floorCount,
+        landArea: data.landArea || prev.landArea,
+        buildingArea: data.buildingArea || prev.buildingArea,
+        actualArea: data.buildingArea || prev.actualArea,
+        buildingUse: data.buildingRegisterUse || prev.buildingUse,
+        approvalDate: data.approvalDate || prev.approvalDate,
+        totalFloors: data.floorCount || prev.totalFloors,
+        currentFloor: data.floorText || prev.currentFloor,
       }));
     } else if (propertyType === 'OFFICE') {
       setOfficeData((prev: any) => ({
         ...prev,
-        landArea: data.landArea,
-        buildingArea: data.buildingArea,
-        buildingUse: data.buildingRegisterUse,
-        approvalDate: data.approvalDate,
-        totalFloors: data.floorCount,
+        landArea: data.landArea || prev.landArea,
+        buildingArea: data.buildingArea || prev.buildingArea,
+        actualArea: data.buildingArea || prev.actualArea,
+        buildingUse: data.buildingRegisterUse || prev.buildingUse,
+        approvalDate: data.approvalDate || prev.approvalDate,
+        totalFloors: data.floorCount || prev.totalFloors,
+        currentFloor: data.floorText || prev.currentFloor,
       }));
     } else if (propertyType === 'FACTORY_WAREHOUSE') {
       setFactoryWarehouseData((prev: any) => ({
         ...prev,
-        landArea: data.landArea,
-        totalFloorArea: data.totalFloorArea,
-        buildingArea: data.buildingArea,
-        buildingUse: data.buildingRegisterUse,
-        approvalDate: data.approvalDate,
-        totalFloors: data.floorCount,
+        landArea: data.landArea || prev.landArea,
+        totalFloorArea: data.totalFloorArea || prev.totalFloorArea,
+        buildingArea: data.buildingArea || prev.buildingArea,
+        buildingUse: data.buildingRegisterUse || prev.buildingUse,
+        zoningArea: data.zoningArea || prev.zoningArea,
+        structure: data.structureName || prev.structure,
+        approvalDate: data.approvalDate || prev.approvalDate,
+        totalFloors: data.floorCount || prev.totalFloors,
+        currentFloor: data.floorText || prev.currentFloor,
       }));
     } else if (propertyType === 'LAND') {
       setLandData((prev: any) => ({
         ...prev,
-        landArea: data.landArea,
+        landArea: data.landArea || prev.landArea,
+        zoningArea: data.zoningArea || prev.zoningArea,
       }));
     }
   };
@@ -398,8 +432,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       consultationNotes: consultationNotes.trim() || undefined,
       landArea,
       totalFloorArea,
+      buildingArea,
       approvalDate,
       buildingRegisterUse,
+      zoningArea,
+      structureName,
+      floorCount,
+      underFloorCount,
+      floorText,
       customerId: finalCustomerId,
       customerInput,
       managerName: managerName || '사무실',

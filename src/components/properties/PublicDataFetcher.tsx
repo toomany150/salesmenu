@@ -240,37 +240,92 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
         </div>
       )}
 
-      {/* Success Banner and Result Preview */}
+      {/* Success Banner and Result Preview (7대 핵심 대장 항목) */}
       {fetchedData && (
-        <div className="p-3 rounded-lg bg-white border border-emerald-200/90 shadow-2xs transition-all">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+        <div className="p-3.5 rounded-xl bg-white border border-emerald-300 shadow-xs transition-all space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-1">
             <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>대장 정보가 성공적으로 조회되어 아래 폼에 자동 입력되었습니다.</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>정부 건축물대장 정보가 성공적으로 조회되어 아래 폼에 자동 입력되었습니다.</span>
             </div>
-            <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-medium">
-              출처: {fetchedData.source === 'API' ? '국토부 공공데이터 API' : '건축물대장 스마트 매칭'}
+            <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold">
+              출처: {fetchedData.source === 'API' ? '국토부 공공데이터 API' : '일반건축물대장(갑) 정밀 연동'}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className="bg-slate-50 p-2 rounded-md">
-              <span className="text-slate-400 block text-[10px]">대지면적</span>
-              <span className="font-bold text-slate-800">{fetchedData.landArea ? `${fetchedData.landArea} ㎡` : '-'}</span>
+          {/* 7대 핵심 항목 그리드: 대지면적, 연면적, 건축면적, 주용도, 지역, 주구조, 층수 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+            {/* 1. 대지면적 */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold">대지면적</span>
+              <span className="font-black text-slate-900 text-sm">
+                {fetchedData.landArea ? `${fetchedData.landArea} ㎡` : '-'}
+              </span>
             </div>
-            <div className="bg-slate-50 p-2 rounded-md">
-              <span className="text-slate-400 block text-[10px]">연면적</span>
-              <span className="font-bold text-slate-800">{fetchedData.totalFloorArea ? `${fetchedData.totalFloorArea} ㎡` : '-'}</span>
+
+            {/* 2. 연면적 */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold">연면적</span>
+              <span className="font-black text-slate-900 text-sm">
+                {fetchedData.totalFloorArea ? `${fetchedData.totalFloorArea} ㎡` : '-'}
+              </span>
             </div>
-            <div className="bg-slate-50 p-2 rounded-md">
-              <span className="text-slate-400 block text-[10px]">건축물대장상 용도</span>
-              <span className="font-bold text-slate-800 truncate block">{fetchedData.buildingRegisterUse || '-'}</span>
+
+            {/* 3. 건축면적 */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold">건축면적</span>
+              <span className="font-black text-slate-900 text-sm">
+                {fetchedData.buildingArea ? `${fetchedData.buildingArea} ㎡` : '-'}
+              </span>
             </div>
-            <div className="bg-slate-50 p-2 rounded-md">
-              <span className="text-slate-400 block text-[10px]">사용승인일</span>
-              <span className="font-bold text-slate-800">{fetchedData.approvalDate || '-'}</span>
+
+            {/* 4. 주용도 */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold">주용도</span>
+              <span className="font-bold text-slate-800 text-[11px] block truncate" title={fetchedData.buildingRegisterUse}>
+                {fetchedData.buildingRegisterUse || '-'}
+              </span>
+            </div>
+
+            {/* 5. 지역 */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold">지역 (용도지역)</span>
+              <span className="font-bold text-slate-800 text-[11px] block truncate" title={fetchedData.zoningArea}>
+                {fetchedData.zoningArea || '-'}
+              </span>
+            </div>
+
+            {/* 6. 주구조 */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold">주구조</span>
+              <span className="font-bold text-slate-800 text-[11px] block truncate" title={fetchedData.structureName}>
+                {fetchedData.structureName || '-'}
+              </span>
+            </div>
+
+            {/* 7. 층수 */}
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+              <span className="text-slate-500 block text-[10px] font-semibold">층수 (지하/지상)</span>
+              <span className="font-bold text-blue-900 text-[11px] block">
+                {fetchedData.floorText || `지상 ${fetchedData.floorCount || 1}층 / 지하 ${fetchedData.underFloorCount || 0}층`}
+              </span>
             </div>
           </div>
+
+          {/* 추가 정보 (건폐율 / 용적률 / 사용승인일) */}
+          {(fetchedData.buildingCoverageRatio || fetchedData.floorAreaRatio || fetchedData.approvalDate) && (
+            <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex-wrap">
+              {fetchedData.buildingCoverageRatio && (
+                <span>건폐율: <strong className="text-slate-700">{fetchedData.buildingCoverageRatio}%</strong></span>
+              )}
+              {fetchedData.floorAreaRatio && (
+                <span>용적률: <strong className="text-slate-700">{fetchedData.floorAreaRatio}%</strong></span>
+              )}
+              {fetchedData.approvalDate && (
+                <span>사용승인일: <strong className="text-slate-700">{fetchedData.approvalDate}</strong></span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

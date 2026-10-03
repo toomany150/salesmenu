@@ -253,25 +253,45 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">건축물대장상 면적 (㎡)</label>
+          <label className="block text-xs font-medium text-slate-700 mb-1">건축면적 (㎡)</label>
           <input
             type="number"
             step="0.01"
             value={data.buildingArea || ''}
             onChange={(e) => updateField('buildingArea', e.target.value ? parseFloat(e.target.value) : undefined)}
-            placeholder="대장상 면적"
+            placeholder="예: 116.56"
             className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">대장상 용도</label>
+          <label className="block text-xs font-medium text-slate-700 mb-1">대장상 주용도</label>
           <input
             type="text"
             value={data.buildingUse || ''}
             onChange={(e) => updateField('buildingUse', e.target.value)}
-            placeholder="예: 단독주택 / 다가구 / 다세대"
+            placeholder="예: 다가구주택, 근린생활시설"
+            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">지역 (용도지역)</label>
+          <input
+            type="text"
+            value={data.zoningArea || ''}
+            onChange={(e) => updateField('zoningArea', e.target.value)}
+            placeholder="예: 2종일반주거지역"
+            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">주구조</label>
+          <input
+            type="text"
+            value={data.structure || ''}
+            onChange={(e) => updateField('structure', e.target.value)}
+            placeholder="예: 철근콘크리트조, 벽돌조"
             className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
           />
         </div>

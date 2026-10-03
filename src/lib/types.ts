@@ -237,6 +237,8 @@ export interface HouseData {
   totalFloorArea?: number;
   buildingArea?: number;
   buildingUse?: string;
+  zoningArea?: string;
+  structure?: string;
   approvalDate?: string;
   roomCount?: number;
   bathroomCount?: number;
@@ -259,8 +261,11 @@ export interface StoreData {
   totalFloors?: number;
   currentFloor?: string;
   landArea?: number;
+  totalFloorArea?: number;
   buildingArea?: number;
   buildingUse?: string;
+  zoningArea?: string;
+  structure?: string;
   actualArea?: number;
   roomCount?: number;
   bathroomCount?: number;
@@ -310,8 +315,11 @@ export interface OfficeData {
   totalFloors?: number;
   currentFloor?: string;
   landArea?: number;
+  totalFloorArea?: number;
   buildingArea?: number;
   buildingUse?: string;
+  zoningArea?: string;
+  structure?: string;
   actualArea?: number;
   roomCount?: number;
   bathroomCount?: number;
@@ -426,8 +434,14 @@ export interface PropertyItem {
   consultationNotes?: string;
   landArea?: number;
   totalFloorArea?: number;
+  buildingArea?: number;
   approvalDate?: string;
   buildingRegisterUse?: string;
+  zoningArea?: string;
+  structureName?: string;
+  floorCount?: number;
+  underFloorCount?: number;
+  floorText?: string;
   customerId?: string;
   customer?: {
     id: string;
@@ -541,14 +555,19 @@ export interface AccessLogItem {
 // 공공데이터 API 응답 규격
 export interface PublicBuildingLedgerResult {
   address: string;
-  landArea?: number; // 대지면적
-  totalFloorArea?: number; // 연면적
-  buildingArea?: number; // 건축면적
-  buildingRegisterUse?: string; // 주용도 (예: 제2종근린생활시설, 공동주택)
-  approvalDate?: string; // 사용승인일 (YYYY-MM-DD)
-  structureName?: string; // 주구조
+  landArea?: number; // 대지면적 (㎡)
+  totalFloorArea?: number; // 연면적 (㎡)
+  buildingArea?: number; // 건축면적 (㎡)
+  buildingRegisterUse?: string; // 주용도 (예: 다가구주택, 근린생활시설)
+  zoningArea?: string; // 지역 (예: 2종일반주거지역)
+  structureName?: string; // 주구조 (예: 철근콘크리트조, 벽돌조)
   floorCount?: number; // 지상층수
   underFloorCount?: number; // 지하층수
+  floorText?: string; // 층수 표기 (예: 지하 1층, 지상 3층)
+  buildingCoverageRatio?: number; // 건폐율 (%)
+  floorAreaRatio?: number; // 용적률 (%)
+  approvalDate?: string; // 사용승인일 (YYYY-MM-DD)
+  height?: number; // 높이 (m)
   isViolation?: boolean; // 위반건축물 여부
   source: 'API' | 'MOCK_DEMO';
 }
