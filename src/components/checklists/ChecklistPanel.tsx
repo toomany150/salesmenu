@@ -24,21 +24,13 @@ interface ChecklistItem {
 }
 
 const STORE_CHECKLIST: ChecklistItem[] = [
-  { id: 'businessType', title: '1. 업종 적합성', desc: '자유업/신고업/허가업 구분 및 구청 영업신고증 승계 가능 여부', importance: 'CRITICAL' },
-  { id: 'adminAction', title: '2. 행정처분 이력', desc: '영업정지/과징금 등 행정처분 승계 여부 구청 위생과 사전 조회', importance: 'CRITICAL' },
-  { id: 'violation', title: '3. 위반건축물 여부', desc: '불법 증축, 테라스 불법확장 시 신규 인허가 불가 위험', importance: 'CRITICAL' },
-  { id: 'operationPeriod', title: '4. 영업기간', desc: '현재 임차인의 실제 운영 기간 및 단골/상권 안착도 파악', importance: 'NORMAL' },
-  { id: 'contractPeriod', title: '5. 계약기간 & 갱신', desc: '상가건물임대차보호법 10년 계약갱신요구권 잔여 기간', importance: 'HIGH' },
-  { id: 'parking', title: '6. 주차장 요건', desc: '고객 무료주차 시간 및 건물 내 주차 관리 규정', importance: 'NORMAL' },
-  { id: 'businessReg', title: '7. 사업자등록 & 명의', desc: '실제 운영자와 임대차계약자 및 사업자 명의 일치 여부', importance: 'HIGH' },
-  { id: 'rentIncrease', title: '8. 임대료 인상 조건', desc: '신규 임차인 승계 시 임대인이 요구하는 월세 인상 폭 사전 확인', importance: 'CRITICAL' },
-  { id: 'adConsent', title: '9. 점포광고 여부', desc: '점주가 공개 광고를 꺼리는 비밀매물인지 포털 노출 가능 여부', importance: 'NORMAL' },
-  { id: 'tables', title: '10. 테이블수 (홀/룸)', desc: '테이블 회전율 및 룸 완비 여부 (홀 OO석, 룸 OO석)', importance: 'NORMAL' },
-  { id: 'employees', title: '11. 종업원수 & 승계', desc: '주방/홀 직원 승계 희망 여부 및 인건비 규모', importance: 'NORMAL' },
-  { id: 'dailyRevenue', title: '12. 일매출 & 포스자료', desc: 'POS기 증빙 가능한 월평균/일평균 매출액 확인', importance: 'HIGH' },
-  { id: 'equipment', title: '13. 비품체크 (인수불가/렌탈)', desc: '제빙기, 정수기, 포스기, 식기세척기 렌탈 승계 or 소유권', importance: 'HIGH' },
-  { id: 'liquorLoan', title: '14. 주류대출여부', desc: '주류도매상 선급대출 잔액 및 상환/승계 필요 여부', importance: 'HIGH' },
-  { id: 'fireCert', title: '15. 소방필증 (완비증명)', desc: '지하 66㎡ 이상, 2층 이상 100㎡ 이상 다중이용업소 필수', importance: 'CRITICAL' },
+  { id: 'businessType', title: '1. 업종 인허가 승계', desc: '자유업/신고업/허가업 구분 및 구청 영업신고증 승계 가능 여부', importance: 'CRITICAL' },
+  { id: 'adminAction', title: '2. 행정처분 이력 확인', desc: '영업정지/과징금 등 행정처분 승계 여부 구청 위생과 사전 조회', importance: 'CRITICAL' },
+  { id: 'restoration', title: '3. 원상복구특약 명시', desc: '시설 권리양수도 시 기존 인테리어 원상복구 면제 특약 및 철거 범위 확인', importance: 'CRITICAL' },
+  { id: 'dailyRevenue', title: '4. 일매출 & 포스자료', desc: 'POS기/부가세과세표준증명 등 객관적 실매출 증빙 확인', importance: 'HIGH' },
+  { id: 'equipment', title: '5. 비품/렌탈 승계 확인', desc: '제빙기, 정수기, 포스기, 식기세척기 렌탈 승계 or 소유권 귀속 여부', importance: 'HIGH' },
+  { id: 'fireCert', title: '6. 소방필증 (완비증명)', desc: '지하 66㎡ 이상, 2층 이상 100㎡ 이상 다중이용업소 비상구/방염 필증 완비', importance: 'CRITICAL' },
+  { id: 'sanitation', title: '7. 정화조 용량 & 환경', desc: '업종 변경 시 정화조 용량 초과 여부 및 하수도 원인자부담금 사전 검토', importance: 'HIGH' },
 ];
 
 const OFFICE_CHECKLIST: ChecklistItem[] = [

@@ -264,27 +264,44 @@ export interface StoreData {
   actualArea?: number;
   roomCount?: number;
   bathroomCount?: number;
+  toiletGenderType?: string; // 남녀구분 (남녀분리, 남녀공용, 내부전용, 외부공용)
   approvalDate?: string;
   parkingCount?: number;
+  isParkingImpossible?: boolean; // 주차 불가능 여부
+  // 설비 스펙
+  electricityCapacity?: string; // 전기용량 (kW)
+  electricityType?: string; // 전기구분 (개별, 공용)
+  waterType?: string; // 수도구분 (개별, 공용)
+  gasType?: string; // 가스구분 (도시가스, LPG, 없음)
   monthlyRentVat?: boolean;
   premium?: number;
   maintenanceFee?: number;
+  isNoMaintenanceFee?: boolean; // 관리비 없음 여부
   maintenanceFeeVat?: boolean;
-  // 체크리스트
-  adminActionChecked?: string;
-  violationBuilding?: string;
-  operationPeriod?: string;
-  contractPeriod?: string;
-  parkingRequirement?: string;
-  businessRegistrationStatus?: string;
-  rentIncreaseStatus?: string;
-  advertisementStatus?: string;
+  // 운영 및 계약 조건
+  tableCount?: number; // 총 테이블수
   tableCountHall?: number;
   tableCountRoom?: number;
-  employeeCount?: number;
+  employeeCount?: number; // 종업원수
+  operationPeriod?: string; // 영업기간
+  contractYear?: string; // 계약년도
+  renewalPeriodRemain?: string; // 계약갱신권 잔여기간
+  violationBuilding?: string; // 위반건축물 여부
+  businessRegistrationStatus?: string; // 사업자등록여부
+  operatorContractorMatch?: string; // 실제운영자/임대차계약자/사업자명의 일치 여부
+  liquorLoan?: string; // 주류대출여부
+  rentIncreaseCondition?: string; // 임대료 인상조건 및 인상액/비율
+  storeAdStatus?: string; // 점포 자체 광고 여부 (광고진행, 비공개)
+  otherAgencyAdStatus?: string; // 타부동산 광고 여부
+  restorationTerms?: string; // 원상복구특약
+  // 체크리스트
+  adminActionChecked?: string;
+  contractPeriod?: string;
+  parkingRequirement?: string;
+  rentIncreaseStatus?: string;
+  advertisementStatus?: string;
   dailyRevenue?: number;
   equipmentStatus?: string;
-  liquorLoan?: string;
   fireInspectionCert?: string;
 }
 
@@ -298,11 +315,27 @@ export interface OfficeData {
   actualArea?: number;
   roomCount?: number;
   bathroomCount?: number;
+  toiletGenderType?: string; // 남녀구분 (남녀분리, 남녀공용, 층별분리)
   approvalDate?: string;
   parkingCount?: number;
+  isParkingImpossible?: boolean; // 주차 불가능 여부
+  // 설비 스펙
+  electricityCapacity?: string; // 전기용량 (kW)
+  electricityType?: string; // 전기구분 (개별, 공용)
+  waterType?: string; // 수도구분 (개별, 공용)
+  gasType?: string; // 가스구분
   monthlyRentVat?: boolean;
   maintenanceFee?: number;
+  isNoMaintenanceFee?: boolean; // 관리비 없음 여부
   maintenanceFeeVat?: boolean;
+  // 계약 및 운영 조건
+  contractYear?: string; // 계약년도
+  renewalPeriodRemain?: string; // 계약갱신권 잔여기간
+  operatorContractorMatch?: string; // 명의 일치 여부
+  storeAdStatus?: string; // 광고 노출 여부
+  otherAgencyAdStatus?: string; // 타부동산 광고 여부
+  rentIncreaseCondition?: string; // 임대료 인상조건 및 인상액/비율
+  restorationTerms?: string; // 원상복구특약
   // 체크리스트
   violationBuilding?: string;
   parkingAndFee?: string;
@@ -385,9 +418,11 @@ export interface PropertyItem {
   direction?: string;
   directionCriteria?: string;
   availableDate?: string;
+  isImmediateAvailable?: boolean; // 즉시가능
   price?: number;
   deposit?: number;
   monthlyRent?: number;
+  isNoMaintenanceFee?: boolean; // 관리비 없음
   consultationNotes?: string;
   landArea?: number;
   totalFloorArea?: number;

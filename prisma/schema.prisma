@@ -107,9 +107,11 @@ model Property {
   
   // 일정 및 가격 (단위: 만원)
   availableDate       DateTime? // 입주가능일 (즉시입주 가능 여부 포함)
+  isImmediateAvailable Boolean  @default(false) // 즉시가능 여부
   price               Float?    // 매매가 (만원)
   deposit             Float?    // 보증금 (만원)
   monthlyRent         Float?    // 월세 (만원)
+  isNoMaintenanceFee  Boolean   @default(false) // 관리비 없음 여부
   
   consultationNotes   String?   // 상담내용(메모)
 
@@ -225,30 +227,49 @@ model StoreDetail {
   actualArea                 Float?   // 실평수 (㎡)
   roomCount                  Int?     // 방수 / 구획룸 수
   bathroomCount              Int?     // 욕실/화장실 수
+  toiletGenderType           String?  // 남녀구분 (남녀분리, 남녀공용, 내부전용, 외부공용)
   approvalDate               DateTime? // 사용승인일
   parkingCount               Int?     // 가능주차대수
+  isParkingImpossible        Boolean  @default(false) // 주차 불가능 여부
+
+  // 설비 스펙 (전기, 수도, 가스)
+  electricityCapacity        String?  // 전기용량 (예: 25kW)
+  electricityType            String?  // 전기구분 (개별, 공용)
+  waterType                  String?  // 수도구분 (개별, 공용)
+  gasType                    String?  // 가스구분 (도시가스, LPG, 없음)
 
   // 금액 조건
   monthlyRentVat             Boolean  @default(false) // 월세 부가세 별도 여부
   premium                    Float?   // 권리금 (만원)
   maintenanceFee             Float?   // 관리비 (만원)
+  isNoMaintenanceFee         Boolean  @default(false) // 관리비 없음 여부
   maintenanceFeeVat          Boolean  @default(false) // 관리비 부가세 별도 여부
 
-  // 🚨 상담 체크리스트 (UI 고정 노출 항목)
-  adminActionChecked         String?  // 행정처분체크 (유무/내역)
-  violationBuilding          String?  // 위반건축물 (유무/내역)
-  operationPeriod            String?  // 영업기간 (운영 개월/년수)
-  contractPeriod             String?  // 계약기간 (잔여기간 등)
-  parkingRequirement         String?  // 주차장 요건
-  businessRegistrationStatus String?  // 사업자등록여부 및 명의자
-  rentIncreaseStatus         String?  // 임대료 인상여부 및 조건
-  advertisementStatus        String?  // 점포광고여부 (온라인/포털/비공개)
+  // 운영 및 계약 조건
+  tableCount                 Int?     // 총 테이블수
   tableCountHall             Int?     // 테이블수 (홀)
   tableCountRoom             Int?     // 테이블수 (룸)
   employeeCount              Int?     // 종업원수
+  operationPeriod            String?  // 영업기간 (운영 개월/년수)
+  contractYear               String?  // 계약년도
+  renewalPeriodRemain        String?  // 계약갱신권 잔여기간
+  violationBuilding          String?  // 위반건축물 (유무/내역)
+  businessRegistrationStatus String?  // 사업자등록여부
+  operatorContractorMatch    String?  // 운영자/계약자/사업자 명의 일치 여부
+  liquorLoan                 String?  // 주류대출여부 및 금액/승계조건
+  rentIncreaseCondition      String?  // 임대료 인상조건 및 인상액/비율
+  storeAdStatus              String?  // 점포 자체 광고 여부 (공개광고/비공개)
+  otherAgencyAdStatus        String?  // 타부동산 광고 여부 (없음/진행중)
+  restorationTerms           String?  // 원상복구특약
+
+  // 🚨 상담 체크리스트
+  adminActionChecked         String?  // 행정처분체크 (유무/내역)
+  contractPeriod             String?  // 계약기간 (잔여기간 등)
+  parkingRequirement         String?  // 주차장 요건
+  rentIncreaseStatus         String?  // 임대료 인상여부 및 조건
+  advertisementStatus        String?  // 점포광고여부 (온라인/포털/비공개)
   dailyRevenue               Float?   // 일매출 (만원)
   equipmentStatus            String?  // 비품체크 (인수불가/렌탈 품목 목록)
-  liquorLoan                 String?  // 주류대출여부 및 승계조건
   fireInspectionCert         String?  // 소방필증 (완비증명서 구비 여부)
 }
 
@@ -270,13 +291,31 @@ model OfficeDetail {
   actualArea           Float?   // 실평수 (㎡)
   roomCount            Int?     // 룸/회의실 수
   bathroomCount        Int?     // 화장실 수 (전용/공용)
+  toiletGenderType     String?  // 남녀구분 (남녀분리, 남녀공용, 층별분리)
   approvalDate         DateTime? // 사용승인일
   parkingCount         Int?     // 배정 주차대수
+  isParkingImpossible  Boolean  @default(false) // 주차 불가능 여부
+
+  // 설비 스펙
+  electricityCapacity  String?  // 전기용량 (예: 25kW)
+  electricityType      String?  // 전기구분 (개별, 공용)
+  waterType            String?  // 수도구분 (개별, 공용)
+  gasType              String?  // 가스구분
 
   // 금액 조건
   monthlyRentVat       Boolean  @default(false) // 월세 부가세 별도 여부
   maintenanceFee       Float?   // 관리비 (만원)
+  isNoMaintenanceFee   Boolean  @default(false) // 관리비 없음 여부
   maintenanceFeeVat    Boolean  @default(false) // 관리비 부가세 별도 여부
+
+  // 운영 및 계약 조건
+  contractYear         String?  // 계약년도
+  renewalPeriodRemain  String?  // 계약갱신권 잔여기간
+  operatorContractorMatch String? // 명의 일치 여부
+  storeAdStatus        String?  // 광고 노출 여부
+  otherAgencyAdStatus  String?  // 타부동산 광고 여부
+  rentIncreaseCondition String? // 임대료 인상조건 및 인상액/비율
+  restorationTerms     String?  // 원상복구특약
 
   // 🚨 상담 체크리스트 (UI 고정 노출 항목)
   violationBuilding    String?  // 위반건축물 여부
