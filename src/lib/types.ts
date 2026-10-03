@@ -450,20 +450,38 @@ export interface PropertyItem {
   updatedAt: string;
 }
 
-// 고객 요구조건
+// 고객 요구조건 및 심층 상담장
 export interface CustomerDemandItem {
   id: string;
   customerId: string;
   targetPropertyType: PropertyType;
   targetTransactionType: TransactionType;
   targetRegion?: string;
+  regionReason?: string;
   minBudget?: number;
   maxBudget?: number;
+  targetPrice?: number;
+  targetJeonse?: number;
+  targetDeposit?: number;
+  targetMonthlyRent?: number;
   minDeposit?: number;
   maxDeposit?: number;
   minMonthlyRent?: number;
   maxMonthlyRent?: number;
+  preferredFloor?: string;
   preferredArea?: number;
+  preferredAreaPy?: number;
+  parkingRequirement?: string;
+  moveInTiming?: string;
+  moveInReason?: string;
+  nonNegotiableCondition?: string;
+  negotiableCondition?: string;
+  premiumLimit?: number;
+  premiumReason?: string;
+  minRequiredArea?: number;
+  minRequiredAreaPy?: number;
+  minAreaReason?: string;
+  previousVisitedProps?: string;
   moveInDate?: string;
   requirements?: string;
   status: 'ACTIVE' | 'MATCHED' | 'HOLD';

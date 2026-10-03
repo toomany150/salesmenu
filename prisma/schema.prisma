@@ -89,7 +89,7 @@ model Customer {
   @@index([managerName])
 }
 
-// [물건 찾음] 매수인 / 임차인 희망 조건
+// [물건 찾음] 매수인 / 임차인 희망 조건 및 심층 상담장
 model CustomerDemand {
   id                    String    @id @default(cuid())
   customerId            String
@@ -99,18 +99,44 @@ model CustomerDemand {
   targetPropertyType    String    
   // 거래유형: 매매, 전세, 월세
   targetTransactionType String    
-  targetRegion          String?   // 희망 지역 (예: 강남구 역삼동, 역세권 도보 5분)
+  targetRegion          String?   // 희망 지역/상권 (예: 강남구 역삼동, 역세권 도보 5분)
+  regionReason          String?   // 희망지역/상권 선택 이유
   
   // 예산 조건 (단위: 만원)
   minBudget             Float?    // 최소 매매가/희망예산
   maxBudget             Float?    // 최대 매매가/희망예산
+  targetPrice           Float?    // 희망 매매가액 (만원)
+  targetJeonse          Float?    // 희망 전세가액 (만원)
   minDeposit            Float?    // 최소 보증금
-  maxDeposit            Float?    // 최대 보증금
+  maxDeposit            Float?    // 최대 보증금 / 희망 보증금 (만원)
   minMonthlyRent        Float?    // 최소 월세
-  maxMonthlyRent        Float?    // 최대 월세
+  maxMonthlyRent        Float?    // 최대 월세 / 희망 월세 (만원)
   
+  // 층수 및 면적 조건 (평/㎡ 양방향 환산)
+  preferredFloor        String?   // 희망 층수 (예: 1층 선호, 3층 이하, 로얄층, 무관 등)
   preferredArea         Float?    // 희망 전용/실면적 (㎡)
-  moveInDate            DateTime? // 입주 희망일
+  preferredAreaPy       Float?    // 희망 전용/실면적 (평)
+  
+  // 주차 요건
+  parkingRequirement    String?   // 주차 요건 (예: 주차 무관, 최소 2대 필수, 자주식 선호 등)
+  
+  // 입주 및 오픈 시기
+  moveInTiming          String?   // 희망 입주/오픈 시기 (예: 즉시가능, 2개월 이내, 협의 등)
+  moveInReason          String?   // 희망 입주/오픈 시기 이유 (예: 현 임대차만료일, 개업 인테리어 등)
+  
+  // <공통 심층 상담 체크포인트>
+  nonNegotiableCondition String? // 절대로 양보할 수 없는 최우선 조건 하나 (1순위 타협불가)
+  negotiableCondition    String? // 매물이 정말 좋을 경우 가장 포기하기 쉬운 조건 (양보가능 조건)
+  
+  // <상가 전용 심층 상담 조건> (targetPropertyType == 'STORE')
+  premiumLimit          Float?    // 권리금 상한선 (만원)
+  premiumReason         String?   // 권리금 상한 이유
+  minRequiredArea       Float?    // 최소 필요 면적 (㎡)
+  minRequiredAreaPy     Float?    // 최소 필요 면적 (평)
+  minAreaReason         String?   // 최소 필요 면적 이유 (예: 테이블 12개 및 주방 설비 필요 등)
+  previousVisitedProps  String?   // 지금까지 둘러본 매물 및 계약하지 않은 이유
+  
+  moveInDate            DateTime? // 입주 희망일 (선택)
   requirements          String?   // 기타 요청사항/선호옵션
   status                String    @default("ACTIVE") // ACTIVE(상담/탐색중), MATCHED(매칭완료), HOLD(보류)
 
