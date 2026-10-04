@@ -32,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAdminLogs,
   onGoHome,
 }) => {
-  const { currentUser, login, logout } = useAuth();
+  const { currentUser, login, logout, loginAsDefaultAdmin } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN';
 
   // Inline Agent Login form state
@@ -40,6 +40,12 @@ export const Header: React.FC<HeaderProps> = ({
   const [agentPassword, setAgentPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
+
+  const handleLogout = async () => {
+    if (confirm(`${currentUser?.name || '현재'} 계정에서 로그아웃하시겠습니까?`)) {
+      await logout();
+    }
+  };
 
   const handleAgentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,66 +106,78 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* 2. 소공(소속공인중개사) 아이디/비밀번호 입력칸 & 로그인 세션 */}
+          {/* 2. 소공/대표 아이디/비밀번호 입력칸 & 로그인 세션 */}
           <div className="flex items-center justify-end flex-1 gap-2 flex-wrap sm:flex-nowrap">
             {!currentUser ? (
-              <form onSubmit={handleAgentLogin} className="flex items-center gap-1.5 bg-slate-50/90 p-1 rounded-xl border border-slate-200">
-                <div className="relative">
-                  <User className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={agentId}
-                    onChange={(e) => {
-                      setAgentId(e.target.value);
-                      if (loginError) setLoginError('');
-                    }}
-                    placeholder="소공 아이디"
-                    className="w-24 sm:w-28 pl-6 pr-2 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 placeholder:text-slate-400"
-                    required
-                  />
-                </div>
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <form onSubmit={handleAgentLogin} className="flex items-center gap-1.5 bg-slate-50/90 p-1 rounded-xl border border-slate-200 shadow-2xs">
+                  <div className="relative">
+                    <User className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={agentId}
+                      onChange={(e) => {
+                        setAgentId(e.target.value);
+                        if (loginError) setLoginError('');
+                      }}
+                      placeholder="소공/대표 ID"
+                      className="w-24 sm:w-28 pl-6 pr-2 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 placeholder:text-slate-400"
+                      required
+                    />
+                  </div>
 
-                <div className="relative">
-                  <Lock className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    value={agentPassword}
-                    onChange={(e) => {
-                      setAgentPassword(e.target.value);
-                      if (loginError) setLoginError('');
-                    }}
-                    placeholder="비밀번호"
-                    className="w-20 sm:w-24 pl-6 pr-2 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 placeholder:text-slate-400"
-                    required
-                  />
-                </div>
+                  <div className="relative">
+                    <Lock className="w-3 h-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      value={agentPassword}
+                      onChange={(e) => {
+                        setAgentPassword(e.target.value);
+                        if (loginError) setLoginError('');
+                      }}
+                      placeholder="비밀번호"
+                      className="w-20 sm:w-24 pl-6 pr-2 py-1 text-xs bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 placeholder:text-slate-400"
+                      required
+                    />
+                  </div>
 
-                <button
-                  type="submit"
-                  disabled={isLoggingIn}
-                  className="px-3 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors shadow-2xs shrink-0 cursor-pointer"
-                >
-                  {isLoggingIn ? '접속중' : '로그인'}
-                </button>
-
-                {loginError && (
-                  <span 
-                    title={loginError}
-                    className="flex items-center gap-0.5 text-[11px] font-bold text-rose-600 px-1 shrink-0"
+                  <button
+                    type="submit"
+                    disabled={isLoggingIn}
+                    className="px-3 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors shadow-2xs shrink-0 cursor-pointer"
                   >
-                    <AlertCircle className="w-3 h-3" />
-                    <span className="hidden md:inline">{loginError}</span>
-                  </span>
-                )}
-              </form>
+                    {isLoggingIn ? '접속중' : '로그인'}
+                  </button>
+
+                  {loginError && (
+                    <span 
+                      title={loginError}
+                      className="flex items-center gap-0.5 text-[11px] font-bold text-rose-600 px-1 shrink-0"
+                    >
+                      <AlertCircle className="w-3 h-3" />
+                      <span className="hidden md:inline">{loginError}</span>
+                    </span>
+                  )}
+                </form>
+
+                {/* 원클릭 대표(기본값) 접속 버튼 */}
+                <button
+                  type="button"
+                  onClick={loginAsDefaultAdmin}
+                  title="개업공인중개사(대표) 기본 세션으로 바로 접속"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-purple-900 hover:text-white hover:bg-purple-700 bg-purple-100/90 border border-purple-300 rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                >
+                  <span>👑 대표 기본 접속</span>
+                </button>
+              </div>
             ) : (
               /* 로그인 완료된 상태 */
-              <div className="flex items-center gap-2 bg-slate-100/90 pl-3 pr-1.5 py-1 rounded-xl border border-slate-200 text-xs">
+              <div className="flex items-center gap-2 bg-slate-100/90 pl-3 pr-2 py-1.5 rounded-xl border border-slate-200 text-xs shadow-2xs">
                 <div className="flex items-center gap-1.5">
                   <UserCircle2 className={`w-4 h-4 ${isAdmin ? 'text-purple-600' : 'text-blue-600'}`} />
                   <span className="font-extrabold text-slate-900">{currentUser.name}</span>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                    isAdmin ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                    isAdmin ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
                   }`}>
                     {isAdmin ? '👑 대표' : '👤 소공'}
                   </span>
@@ -167,21 +185,25 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {isAdmin && onOpenAdminLogs && (
                   <button
+                    type="button"
                     onClick={onOpenAdminLogs}
                     title="접속 로그 및 중개사 계정 관리"
-                    className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-                    <span className="hidden md:inline">관리</span>
+                    <span className="hidden sm:inline">관리</span>
                   </button>
                 )}
 
+                {/* 눈에 잘 띄는 선명한 로그아웃 버튼 */}
                 <button
-                  onClick={logout}
-                  title="로그아웃"
-                  className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                  type="button"
+                  onClick={handleLogout}
+                  title="현재 계정에서 로그아웃"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-rose-700 hover:text-white hover:bg-rose-600 bg-rose-50 border border-rose-200 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer ml-0.5"
                 >
                   <LogOut className="w-3.5 h-3.5" />
+                  <span>로그아웃</span>
                 </button>
               </div>
             )}

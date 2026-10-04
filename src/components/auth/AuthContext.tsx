@@ -13,6 +13,7 @@ interface AuthContextType {
   availableAgents: string[];
   addCustomAgent: (name: string) => void;
   removeCustomAgent: (name: string) => void;
+  loginAsDefaultAdmin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => ({ success: false }),
   logout: async () => {},
+  loginAsDefaultAdmin: () => {},
   availableAgents: ['개업공인중개사 (대표)'],
   addCustomAgent: () => {},
   removeCustomAgent: () => {},
@@ -74,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     try {
       const stored = localStorage.getItem('cham_real_estate_user');
+      const isExplicitLoggedOut = localStorage.getItem('cham_explicit_logged_out');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.id) {
@@ -81,6 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setCurrentUser(DEFAULT_ADMIN_USER);
         }
+      } else if (isExplicitLoggedOut === 'true') {
+        setCurrentUser(null);
       } else {
         setCurrentUser(DEFAULT_ADMIN_USER);
       }
@@ -139,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setCurrentUser(data.user);
       localStorage.setItem('cham_real_estate_user', JSON.stringify(data.user));
+      localStorage.removeItem('cham_explicit_logged_out');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || '네트워크 오류가 발생했습니다.' };
@@ -161,8 +167,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // ignore
       }
     }
-    setCurrentUser(DEFAULT_ADMIN_USER);
+    setCurrentUser(null);
     localStorage.removeItem('cham_real_estate_user');
+    localStorage.setItem('cham_explicit_logged_out', 'true');
+  };
+
+  const loginAsDefaultAdmin = () => {
+    setCurrentUser(DEFAULT_ADMIN_USER);
+    localStorage.setItem('cham_real_estate_user', JSON.stringify(DEFAULT_ADMIN_USER));
+    localStorage.removeItem('cham_explicit_logged_out');
   };
 
   return (
@@ -172,6 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         logout,
+        loginAsDefaultAdmin,
         availableAgents,
         addCustomAgent,
         removeCustomAgent,
