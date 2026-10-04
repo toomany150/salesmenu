@@ -642,6 +642,41 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
               </div>
             </div>
           </div>
+
+          {/* 행정처분 이력 점검란 (영업정지/과징금/시정명령 등 구청 위생과 조회) */}
+          <div className="p-3.5 bg-rose-50/60 rounded-xl border border-rose-200">
+            <label className="block text-sm font-bold text-rose-950 mb-1.5">
+              행정처분 이력 점검 (영업정지 / 과징금 / 시정명령 승계 리스크) *
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-1">
+                <select
+                  value={data.administrativeDisposition?.includes('이력있음') ? '처분있음' : '처분없음'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '처분없음') {
+                      updateField('administrativeDisposition', '행정처분 이력 없음 (구청 위생과 사전 조회 완료 정상)');
+                    } else {
+                      updateField('administrativeDisposition', '행정처분 이력있음: 세부 내역 및 신규 양수인 승계 여부 확인 필요');
+                    }
+                  }}
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-rose-300 rounded-xl font-bold text-rose-950"
+                >
+                  <option value="처분없음">🟢 행정처분 이력 없음 (정상)</option>
+                  <option value="처분있음">🔴 행정처분 이력 있음 (주의)</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <input
+                  type="text"
+                  value={data.administrativeDisposition || ''}
+                  onChange={(e) => updateField('administrativeDisposition', e.target.value)}
+                  placeholder="예: 행정처분 이력 없음 (구청 위생과 조회 완료) / 최근 1년간 처분이력 기재"
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-rose-300 rounded-xl focus:ring-2 focus:ring-rose-500 font-medium text-slate-900"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

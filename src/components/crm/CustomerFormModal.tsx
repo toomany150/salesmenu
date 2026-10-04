@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   UserPlus, 
@@ -19,7 +19,8 @@ import {
   Ban,
   Store,
   DollarSign,
-  HelpCircle
+  HelpCircle,
+  MapPin
 } from 'lucide-react';
 import { 
   MobileCarrier, 
@@ -27,9 +28,12 @@ import {
   CARRIER_OPTIONS, 
   PropertyType, 
   TransactionType,
-  PROPERTY_TYPE_LABELS 
+  PROPERTY_TYPE_LABELS,
+  PROPERTY_TYPE_ORDER
 } from '@/lib/types';
 import { useAuth } from '@/components/auth/AuthContext';
+import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
+import { VoiceInput, VoiceTextarea } from '@/components/common/VoiceInput';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -69,11 +73,83 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [carrier, setCarrier] = useState<MobileCarrier>('SK');
   const [phone, setPhone] = useState('');
   const [type, setType] = useState<CustomerType>(defaultGroup === 'RECEIVED' ? 'SELLER' : 'BUYER');
+  const [subType, setSubType] = useState<string>(
+    defaultGroup === 'RECEIVED' ? '매도인' : '매수인'
+  );
   const [memo, setMemo] = useState('');
   const [managerName, setManagerName] = useState<string>('사무실');
 
-  // 2. 희망 조건 기본 항목
-  const [targetPropertyType, setTargetPropertyType] = useState<PropertyType>('STORE');
+  // 1-2. [물건 접수] 매도인/임대인/임차인(권리금) 물건 상세 정보 상태
+  const [recvPropertyType, setRecvPropertyType] = useState<PropertyType>('APARTMENT');
+  const [recvTransactionType, setRecvTransactionType] = useState<string>('매매');
+  // 희망 가격
+  const [recvPrice, setRecvPrice] = useState('');
+  const [recvJeonse, setRecvJeonse] = useState('');
+  const [recvDeposit, setRecvDeposit] = useState('');
+  const [recvMonthlyRent, setRecvMonthlyRent] = useState('');
+  const [recvPremium, setRecvPremium] = useState('');
+  // 조정할 수 있는 가격 (네고선)
+  const [recvNegoPrice, setRecvNegoPrice] = useState('');
+  const [recvNegoJeonse, setRecvNegoJeonse] = useState('');
+  const [recvNegoDeposit, setRecvNegoDeposit] = useState('');
+  const [recvNegoMonthlyRent, setRecvNegoMonthlyRent] = useState('');
+  const [recvNegoPremium, setRecvNegoPremium] = useState('');
+  // 위치 및 층수
+  const [recvFloorAndUnit, setRecvFloorAndUnit] = useState('');
+  const [recvMoveInTiming, setRecvMoveInTiming] = useState('즉시가능');
+  const [recvRoadAddress, setRecvRoadAddress] = useState('');
+  const [recvJibunAddress, setRecvJibunAddress] = useState('');
+  const [recvDetailAddress, setRecvDetailAddress] = useState('');
+  // 실거래시 지원세부사항 (렌트프리, 인테리어비용지원 등)
+  const [recvDealSupport, setRecvDealSupport] = useState('');
+  // 공실 및 이전 업종
+  const [recvIsEmpty, setRecvIsEmpty] = useState(false);
+  const [recvEmptyPeriod, setRecvEmptyPeriod] = useState('');
+  const [recvPreviousBusiness, setRecvPreviousBusiness] = useState('');
+  // 주거용 특화 (반려동물/외국인)
+  const [recvPetAllowed, setRecvPetAllowed] = useState<'YES' | 'NO' | 'DISCUSS'>('YES');
+  const [recvForeignerAllowed, setRecvForeignerAllowed] = useState<'YES' | 'NO' | 'DISCUSS'>('YES');
+  // 상가/사무실 특화 (주차)
+  const [recvParkingAvailable, setRecvParkingAvailable] = useState<'YES' | 'NO' | 'DISCUSS'>('YES');
+  const [recvParkingCount, setRecvParkingCount] = useState('');
+  // 상가 임대 특화 (임차거부 업종)
+  const [recvRestrictedBusinesses, setRecvRestrictedBusinesses] = useState('');
+
+  const debounceAddressRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleRecvRoadAddressChange = (val: string) => {
+    setRecvRoadAddress(val);
+    if (debounceAddressRef.current) clearTimeout(debounceAddressRef.current);
+    if (!val || val.trim().length < 5) return;
+    debounceAddressRef.current = setTimeout(async () => {
+      const converted = await convertAddressViaGeocoder(val.trim());
+      if (converted && converted.jibunAddress) {
+        setRecvJibunAddress(converted.jibunAddress);
+      }
+    }, 600);
+  };
+
+  const handleRecvJibunAddressChange = (val: string) => {
+    setRecvJibunAddress(val);
+    if (debounceAddressRef.current) clearTimeout(debounceAddressRef.current);
+    if (!val || val.trim().length < 5) return;
+    debounceAddressRef.current = setTimeout(async () => {
+      const converted = await convertAddressViaGeocoder(val.trim());
+      if (converted && converted.roadAddress) {
+        setRecvRoadAddress(converted.roadAddress);
+      }
+    }, 600);
+  };
+
+  const handleOpenRecvPostcode = () => {
+    openDaumPostcode((result) => {
+      setRecvRoadAddress(result.roadAddress);
+      setRecvJibunAddress(result.jibunAddress);
+    });
+  };
+
+  // 2. 희망 조건 기본 항목 (물건 찾음 탐색 모드)
+  const [targetPropertyType, setTargetPropertyType] = useState<PropertyType>('APARTMENT');
   const [targetTransactionType, setTargetTransactionType] = useState<TransactionType>('월세');
   const [targetRegion, setTargetRegion] = useState('');
   const [regionReason, setRegionReason] = useState(''); // 희망지역/상권 이유
@@ -266,6 +342,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       carrier: isSearching ? undefined : carrier,
       phone: phone.trim(),
       type,
+      subType,
       group,
       memo: memo.trim() || undefined,
       managerName: managerName || '사무실',
@@ -274,7 +351,52 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       currentUser,
     };
 
-    if (isSearching) {
+    if (!isSearching) {
+      payload.receivedDetail = {
+        propertyType: recvPropertyType,
+        transactionType: recvTransactionType,
+        price: recvPrice ? parseFloat(recvPrice) : undefined,
+        jeonse: recvJeonse ? parseFloat(recvJeonse) : undefined,
+        deposit: recvDeposit ? parseFloat(recvDeposit) : undefined,
+        monthlyRent: recvMonthlyRent ? parseFloat(recvMonthlyRent) : undefined,
+        premium: recvPremium ? parseFloat(recvPremium) : undefined,
+        negotiablePrice: recvNegoPrice ? parseFloat(recvNegoPrice) : undefined,
+        negotiableJeonse: recvNegoJeonse ? parseFloat(recvNegoJeonse) : undefined,
+        negotiableDeposit: recvNegoDeposit ? parseFloat(recvNegoDeposit) : undefined,
+        negotiableMonthlyRent: recvNegoMonthlyRent ? parseFloat(recvNegoMonthlyRent) : undefined,
+        negotiablePremium: recvNegoPremium ? parseFloat(recvNegoPremium) : undefined,
+        floorAndUnit: recvFloorAndUnit.trim() || undefined,
+        moveInTiming: recvMoveInTiming.trim() || undefined,
+        roadAddress: recvRoadAddress.trim() || undefined,
+        jibunAddress: recvJibunAddress.trim() || undefined,
+        detailAddress: recvDetailAddress.trim() || undefined,
+        dealSupportDetails: recvDealSupport.trim() || undefined,
+        isEmpty: recvIsEmpty,
+        emptyPeriodOrMoveOutDate: recvEmptyPeriod.trim() || undefined,
+        previousBusiness: recvPreviousBusiness.trim() || undefined,
+        petAllowed: recvPetAllowed,
+        foreignerAllowed: recvForeignerAllowed,
+        parkingAvailable: recvParkingAvailable,
+        parkingDetails: recvParkingCount.trim() || undefined,
+        restrictedBusinesses: recvRestrictedBusinesses.trim() || undefined,
+      };
+
+      // 고객 상담 메모에 물건 접수 주요 정보 자동 보존
+      const recvSummaryParts: string[] = [];
+      if (recvRoadAddress || recvJibunAddress) recvSummaryParts.push(`소재지: ${recvRoadAddress || recvJibunAddress} ${recvDetailAddress}`.trim());
+      if (recvFloorAndUnit) recvSummaryParts.push(`층/호수: ${recvFloorAndUnit}`);
+      if (recvPrice) recvSummaryParts.push(`희망매매: ${formatKoreanMoney(recvPrice)}`);
+      if (recvDeposit || recvMonthlyRent) recvSummaryParts.push(`보증금/월세: ${formatKoreanMoney(recvDeposit)}/${formatKoreanMoney(recvMonthlyRent)}`);
+      if (recvPremium) recvSummaryParts.push(`권리금: ${formatKoreanMoney(recvPremium)}`);
+      if (recvDealSupport) recvSummaryParts.push(`거래지원: ${recvDealSupport}`);
+      if (recvIsEmpty) recvSummaryParts.push(`공실(전업종: ${recvPreviousBusiness || '미상'})`);
+      if (recvRestrictedBusinesses) recvSummaryParts.push(`임차거부업종: ${recvRestrictedBusinesses}`);
+
+      if (recvSummaryParts.length > 0) {
+        const extraNote = `\n[접수물건 정보] ${recvSummaryParts.join(' | ')}`;
+        payload.memo = payload.memo ? `${payload.memo}${extraNote}` : extraNote.trim();
+      }
+    } else {
       payload.demand = {
         targetPropertyType,
         targetTransactionType,
@@ -367,69 +489,93 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   고객 그룹 및 구분 *
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className={`p-2.5 rounded-xl border transition-all ${
-                    !isSearching ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-500/20' : 'border-slate-200 bg-slate-50/60'
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {/* [물건 접수] 매도/임대인/임차인(권리금원함) */}
+                  <div className={`p-3 rounded-xl border-2 transition-all ${
+                    !isSearching ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500/20' : 'border-slate-200 bg-slate-50/70'
                   }`}>
-                    <span className="text-[11px] font-bold text-blue-800 block mb-1.5 flex items-center gap-1">
-                      <Building2 className="w-3.5 h-3.5" />
-                      [물건 접수] 매도/임대인
+                    <span className="text-xs font-black text-blue-900 block mb-2 flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-blue-600" />
+                      [물건 접수] 매도인 / 임대인 / 임차인(권리금원함)
                     </span>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-3 gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setType('SELLER')}
-                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
-                          type === 'SELLER'
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        onClick={() => { setType('SELLER'); setSubType('SELLER'); }}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
+                          type === 'SELLER' && subType !== 'LESSEE_PREMIUM'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                         }`}
                       >
                         매도인
                       </button>
                       <button
                         type="button"
-                        onClick={() => setType('LESSOR')}
-                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
-                          type === 'LESSOR'
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        onClick={() => { setType('LESSOR'); setSubType('LESSOR'); }}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
+                          type === 'LESSOR' && subType !== 'LESSEE_PREMIUM'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                         }`}
                       >
                         임대인
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => { setType('LESSOR'); setSubType('LESSEE_PREMIUM'); }}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
+                          subType === 'LESSEE_PREMIUM'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-white text-blue-800 border-blue-300 hover:bg-blue-100/50'
+                        }`}
+                      >
+                        임차인(권리금)
+                      </button>
                     </div>
                   </div>
 
-                  <div className={`p-2.5 rounded-xl border transition-all ${
-                    isSearching ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/20' : 'border-slate-200 bg-slate-50/60'
+                  {/* [물건 찾음] 매수/임차인/임차인(권리금가능) */}
+                  <div className={`p-3 rounded-xl border-2 transition-all ${
+                    isSearching ? 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-500/20' : 'border-slate-200 bg-slate-50/70'
                   }`}>
-                    <span className="text-[11px] font-bold text-indigo-800 block mb-1.5 flex items-center gap-1">
-                      <Target className="w-3.5 h-3.5" />
-                      [물건 찾음] 매수/임차인
+                    <span className="text-xs font-black text-indigo-900 block mb-2 flex items-center gap-1.5">
+                      <Target className="w-4 h-4 text-indigo-600" />
+                      [물건 찾음] 매수인 / 임차인 / 임차인(권리금가능)
                     </span>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-3 gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setType('BUYER')}
-                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
-                          type === 'BUYER'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        onClick={() => { setType('BUYER'); setSubType('BUYER'); }}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
+                          type === 'BUYER' && subType !== 'LESSEE_PREMIUM_OK'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                         }`}
                       >
                         매수인
                       </button>
                       <button
                         type="button"
-                        onClick={() => setType('LESSEE')}
-                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
-                          type === 'LESSEE'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        onClick={() => { setType('LESSEE'); setSubType('LESSEE'); }}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
+                          type === 'LESSEE' && subType !== 'LESSEE_PREMIUM_OK'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                         }`}
                       >
                         임차인
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setType('LESSEE'); setSubType('LESSEE_PREMIUM_OK'); }}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
+                          subType === 'LESSEE_PREMIUM_OK'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white text-indigo-800 border-indigo-300 hover:bg-indigo-100/50'
+                        }`}
+                      >
+                        임차인(권리금가능)
                       </button>
                     </div>
                   </div>
@@ -536,14 +682,20 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 </div>
               )}
 
+              {/* 상담 메모 및 고객 특이사항 (직접 타자 또는 마이크 음성 입력 가능) */}
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">상담 메모 및 고객 특이사항</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    📝 상담 메모 및 고객 특이사항
+                    <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-normal">타자 & 마이크 음성 입력</span>
+                  </span>
+                </label>
+                <VoiceTextarea
                   value={memo}
-                  onChange={(e) => setMemo(e.target.value)}
-                  placeholder="예: 선호 상담시간 오후 2~5시, 기존 방문 손님, 특정 학군 선호 등"
-                  className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  onChange={setMemo}
+                  rows={2}
+                  placeholder="예: 선호 상담시간 오후 2~5시, 기존 방문 손님, 특정 학군 선호 등 직접 입력하거나 마이크 버튼을 눌러 음성으로 입력하세요."
+                  className="text-xs"
                 />
               </div>
             </div>
@@ -574,7 +726,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         onChange={(e) => setTargetPropertyType(e.target.value as PropertyType)}
                         className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                       >
-                        {(['STORE', 'APARTMENT', 'HOUSE', 'OFFICE', 'FACTORY_WAREHOUSE', 'LAND', 'ETC'] as PropertyType[]).map((p) => (
+                        {PROPERTY_TYPE_ORDER.map((p) => (
                           <option key={p} value={p}>{PROPERTY_TYPE_LABELS[p]}</option>
                         ))}
                       </select>
@@ -1131,14 +1283,13 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       절대로 양보할 수 없는 최우선 조건 하나 *
                     </label>
                     <p className="text-[11px] text-rose-800 leading-tight">
-                      &quot;나열한 여러 조건 중 어떤 것이 절대 포기 못할 1순위인가요?&quot; 질문
+                      &quot;나열한 여러 조건 중 어떤 것이 절대 포기 못할 1순위인가요?&quot; 질문 (음성 마이크 지원)
                     </p>
-                    <input
-                      type="text"
+                    <VoiceInput
                       value={nonNegotiableCondition}
-                      onChange={(e) => setNonNegotiableCondition(e.target.value)}
+                      onChange={setNonNegotiableCondition}
                       placeholder="예: 1층 전면 노출 필수 / 주차 최소 2대 / 예산 3천 초과 절대불가"
-                      className="w-full text-xs font-bold px-3 py-2 bg-white border border-rose-300 rounded-lg focus:ring-2 focus:ring-rose-500 text-rose-900"
+                      className="text-xs font-bold border-rose-300 focus:ring-rose-500 text-rose-900"
                     />
                     <div className="flex flex-wrap gap-1">
                       {['1층 전면 노출', '주차 2대 필수', '예산 초과 절대불가', '역세권 도보 5분', '즉시 입주'].map((cond) => (
@@ -1161,14 +1312,13 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       매물이 정말 좋을 경우 가장 포기하기 쉬운 조건 *
                     </label>
                     <p className="text-[11px] text-emerald-800 leading-tight">
-                      &quot;원하는 입지나 조건이 완벽하다면 어떤 조건을 가장 먼저 양보할 수 있나요?&quot;
+                      &quot;원하는 입지나 조건이 완벽하다면 어떤 조건을 가장 먼저 양보할 수 있나요?&quot; (음성 마이크 지원)
                     </p>
-                    <input
-                      type="text"
+                    <VoiceInput
                       value={negotiableCondition}
-                      onChange={(e) => setNegotiableCondition(e.target.value)}
+                      onChange={setNegotiableCondition}
                       placeholder="예: 인테리어 좋다면 월세 30만 상향 가능 / 2층도 검토 / 주차 인근 공영 활용"
-                      className="w-full text-xs font-bold px-3 py-2 bg-white border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 text-emerald-900"
+                      className="text-xs font-bold border-emerald-300 focus:ring-emerald-500 text-emerald-900"
                     />
                     <div className="flex flex-wrap gap-1">
                       {['월세 20~30만 상향 가능', '2층/지하도 검토', '면적 약간 작아도 무방', '주차 인근 공영 활용', '입주시점 조율'].map((cond) => (
@@ -1232,6 +1382,481 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   </p>
                 </div>
 
+              </div>
+            )}
+
+            {/* ────────────────────────────────────────────────────────── */}
+            {/* 섹션 3. [물건 접수] 매도인 / 임대인 / 임차인(권리금) 물건 상세 정보 */}
+            {/* ────────────────────────────────────────────────────────── */}
+            {!isSearching && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="p-4 bg-blue-50/50 rounded-xl border-2 border-blue-200 space-y-4">
+                  <div className="flex items-center justify-between border-b border-blue-200/80 pb-2.5">
+                    <h3 className="text-xs font-black text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-blue-600" />
+                      [물건 접수 상세] 매물 종류 · 거래유형 · 희망/조정 가격 · 주소 · 특약/지원
+                    </h3>
+                    <span className="text-[11px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-full border border-blue-200">
+                      내놓는 물건 스펙
+                    </span>
+                  </div>
+
+                  {/* 3-1. 매물 종류 & 거래 유형 & 층수/동호수 & 입주시기 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">매물 종류 *</label>
+                      <select
+                        value={recvPropertyType}
+                        onChange={(e) => setRecvPropertyType(e.target.value as PropertyType)}
+                        className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                      >
+                        {PROPERTY_TYPE_ORDER.map((p) => (
+                          <option key={p} value={p}>{PROPERTY_TYPE_LABELS[p]}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">거래 유형 *</label>
+                      <select
+                        value={recvTransactionType}
+                        onChange={(e) => setRecvTransactionType(e.target.value as any)}
+                        className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                      >
+                        <option value="매매">매매</option>
+                        <option value="전세">전세</option>
+                        <option value="월세">월세</option>
+                        <option value="임대">임대 (보증금/월세)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">매물 층수나 동호수</label>
+                      <input
+                        type="text"
+                        value={recvFloorAndUnit}
+                        onChange={(e) => setRecvFloorAndUnit(e.target.value)}
+                        placeholder="예: 3층 301호 / 1층 전면"
+                        className="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">입주시기 및 오픈시기</label>
+                      <input
+                        type="text"
+                        value={recvMoveInTiming}
+                        onChange={(e) => setRecvMoveInTiming(e.target.value)}
+                        placeholder="예: 즉시가능 / 협의 / 11월말"
+                        className="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3-2. 물건 주소 (도로명 / 지번 양방향 자동완성 및 우편번호 검색) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        물건 주소 (도로명 또는 지번 입력 시 반대편 자동완성)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleOpenRecvPostcode}
+                        className="px-2.5 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-2xs"
+                      >
+                        우편번호/주소 검색
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-600 block mb-1">도로명 주소</span>
+                        <input
+                          type="text"
+                          value={recvRoadAddress}
+                          onChange={(e) => handleRecvRoadAddressChange(e.target.value)}
+                          placeholder="도로명 주소 입력 시 지번 자동 변환"
+                          className="w-full text-xs px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-600 block mb-1">지번 주소</span>
+                        <input
+                          type="text"
+                          value={recvJibunAddress}
+                          onChange={(e) => handleRecvJibunAddressChange(e.target.value)}
+                          placeholder="지번 주소 입력 시 도로명 자동 변환"
+                          className="w-full text-xs px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <input
+                        type="text"
+                        value={recvDetailAddress}
+                        onChange={(e) => setRecvDetailAddress(e.target.value)}
+                        placeholder="상세 주소 (동, 층, 호수 등)"
+                        className="w-full text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3-3. 희망 가격 (매매가 / 전세가 / 보증금 / 월세 / 권리금) & 조정할 수 있는 가격 */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-3">
+                    <h4 className="text-xs font-black text-slate-800 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        💰 희망 가격 & 조정할 수 있는 가격 (단위: 만원)
+                      </span>
+                      <span className="text-[11px] font-normal text-slate-500">
+                        의뢰받은 희망가와 협의 가능한 한도선을 미리 기록하여 최적 매칭
+                      </span>
+                    </h4>
+
+                    {/* 매매의 경우 */}
+                    {recvTransactionType === '매매' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="p-2.5 bg-blue-50/40 rounded-lg border border-blue-200">
+                          <label className="block text-xs font-bold text-blue-900 mb-1">희망 매매가액 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvPrice}
+                            onChange={(e) => setRecvPrice(e.target.value)}
+                            placeholder="예: 50000 (5억원)"
+                            className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">조정할 수 있는 매매가액 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvNegoPrice}
+                            onChange={(e) => setRecvNegoPrice(e.target.value)}
+                            placeholder="예: 48000 (최저선 4억 8천)"
+                            className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 전세의 경우 */}
+                    {recvTransactionType === '전세' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="p-2.5 bg-blue-50/40 rounded-lg border border-blue-200">
+                          <label className="block text-xs font-bold text-blue-900 mb-1">희망 전세가액 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvJeonse}
+                            onChange={(e) => setRecvJeonse(e.target.value)}
+                            placeholder="예: 30000 (3억원)"
+                            className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">조정할 수 있는 전세가액 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvNegoJeonse}
+                            onChange={(e) => setRecvNegoJeonse(e.target.value)}
+                            placeholder="예: 28000"
+                            className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 월세/임대의 경우 */}
+                    {(recvTransactionType === '월세' || recvTransactionType === '임대') && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                        <div className="p-2 bg-blue-50/40 rounded-lg border border-blue-200">
+                          <label className="block text-[11px] font-bold text-blue-900 mb-1">희망 보증금 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvDeposit}
+                            onChange={(e) => setRecvDeposit(e.target.value)}
+                            placeholder="예: 3000"
+                            className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                        <div className="p-2 bg-blue-50/40 rounded-lg border border-blue-200">
+                          <label className="block text-[11px] font-bold text-blue-900 mb-1">희망 월세 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvMonthlyRent}
+                            onChange={(e) => setRecvMonthlyRent(e.target.value)}
+                            placeholder="예: 250"
+                            className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                        <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">조정 보증금 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvNegoDeposit}
+                            onChange={(e) => setRecvNegoDeposit(e.target.value)}
+                            placeholder="예: 2000"
+                            className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                        <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">조정 월세 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvNegoMonthlyRent}
+                            onChange={(e) => setRecvNegoMonthlyRent(e.target.value)}
+                            placeholder="예: 230"
+                            className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 권리금 (상가이거나 임차인(권리금원함)인 경우 또는 필요 시) */}
+                    {(recvPropertyType === 'STORE' || subType === 'LESSEE_PREMIUM') && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                        <div className="p-2.5 bg-amber-50/50 rounded-lg border border-amber-200">
+                          <label className="block text-xs font-bold text-amber-900 mb-1">희망 권리금 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvPremium}
+                            onChange={(e) => setRecvPremium(e.target.value)}
+                            placeholder="예: 5000 (무권리면 0 입력)"
+                            className="w-full text-xs font-bold px-3 py-2 bg-white border border-amber-300 rounded-lg text-amber-950"
+                          />
+                        </div>
+                        <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">조정할 수 있는 권리금 (만원)</label>
+                          <input
+                            type="number"
+                            value={recvNegoPremium}
+                            onChange={(e) => setRecvNegoPremium(e.target.value)}
+                            placeholder="예: 3500 (최저 수용 가능선)"
+                            className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3-4. 실거래 시 지원 세부사항 (렌트프리, 인테리어비용지원 등) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2">
+                    <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        🎁 실거래 시 지원 세부사항 (렌트프리, 인테리어비용지원 등)
+                        <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-normal">음성 마이크 지원</span>
+                      </span>
+                    </label>
+                    <VoiceInput
+                      value={recvDealSupport}
+                      onChange={setRecvDealSupport}
+                      placeholder="예: 렌트프리 1개월 제공 가능, 인테리어 공사기간 2주 협의, 시설비 일부 감액 등"
+                      className="text-xs font-semibold"
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {['렌트프리 1개월', '렌트프리 2개월', '인테리어 공사기간 15일 지원', '인테리어 비용 협의 지원', '시설 무상 승계'].map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setRecvDealSupport((prev) => prev ? `${prev}, ${tag}` : tag)}
+                          className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200"
+                        >
+                          +{tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3-5. 물건 비어있음 여부 / 빈 시기나 이사시기 / 전에 하던 업종 */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800">
+                        물건 공실 여부 및 이사/전 업종 정보
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRecvIsEmpty(true)}
+                          className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
+                            recvIsEmpty
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                              : 'bg-white text-slate-600 border-slate-300'
+                          }`}
+                        >
+                          현재 공실 상태
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRecvIsEmpty(false)}
+                          className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
+                            !recvIsEmpty
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                              : 'bg-white text-slate-600 border-slate-300'
+                          }`}
+                        >
+                          현재 운영/거주 중
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          {recvIsEmpty ? '공실이 된 시기 (빈 시기)' : '이사/퇴거 예정 시기'}
+                        </label>
+                        <input
+                          type="text"
+                          value={recvEmptyPeriod}
+                          onChange={(e) => setRecvEmptyPeriod(e.target.value)}
+                          placeholder={recvIsEmpty ? "예: 2024년 6월부터 공실 (약 3개월째)" : "예: 2024년 11월 30일 이사 확정"}
+                          className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          전에 하던 업종 (또는 현재 업종)
+                        </label>
+                        <input
+                          type="text"
+                          value={recvPreviousBusiness}
+                          onChange={(e) => setRecvPreviousBusiness(e.target.value)}
+                          placeholder="예: 카페(일반음식점), 의류매장, 미용실, IT사무실 등"
+                          className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3-6. 주거용 vs 상업용 조건부 특화 항목 */}
+                  {/* 주거용(아파트/주택): 반려동물/외국인 가능 여부 */}
+                  {(recvPropertyType === 'APARTMENT' || recvPropertyType === 'HOUSE') ? (
+                    <div className="p-3.5 bg-amber-50/40 rounded-xl border border-amber-200 space-y-2.5">
+                      <span className="text-xs font-black text-amber-950 block">
+                        🏠 주거용 필수 확인 조건 (반려동물 및 외국인 거주)
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">반려동물 가능 여부</label>
+                          <div className="grid grid-cols-3 gap-1">
+                            {[
+                              { label: '가능', val: 'YES' },
+                              { label: '불가', val: 'NO' },
+                              { label: '협의', val: 'DISCUSS' },
+                            ].map((opt) => (
+                              <button
+                                key={opt.val}
+                                type="button"
+                                onClick={() => setRecvPetAllowed(opt.val as any)}
+                                className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                                  recvPetAllowed === opt.val
+                                    ? 'bg-amber-600 text-white border-amber-600'
+                                    : 'bg-white text-slate-700 border-slate-300'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1">외국인 입주 가능 여부</label>
+                          <div className="grid grid-cols-3 gap-1">
+                            {[
+                              { label: '가능', val: 'YES' },
+                              { label: '불가', val: 'NO' },
+                              { label: '협의', val: 'DISCUSS' },
+                            ].map((opt) => (
+                              <button
+                                key={opt.val}
+                                type="button"
+                                onClick={() => setRecvForeignerAllowed(opt.val as any)}
+                                className={`py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                                  recvForeignerAllowed === opt.val
+                                    ? 'bg-amber-600 text-white border-amber-600'
+                                    : 'bg-white text-slate-700 border-slate-300'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* 상가/사무실 등 나머지: 주차 가능 여부 및 상가 임차거부 업종 */
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                          🚗 주차 가능 여부 및 조건
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="flex gap-1">
+                            {[
+                              { label: '가능', val: 'YES' },
+                              { label: '불가', val: 'NO' },
+                              { label: '협의', val: 'DISCUSS' },
+                            ].map((opt) => (
+                              <button
+                                key={opt.val}
+                                type="button"
+                                onClick={() => setRecvParkingAvailable(opt.val as any)}
+                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                                  recvParkingAvailable === opt.val
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-slate-700 border-slate-300'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              value={recvParkingCount}
+                              onChange={(e) => setRecvParkingCount(e.target.value)}
+                              placeholder="예: 무료 1대 가능 / 기계식 / 인근 공영주차장 이용"
+                              className="w-full text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 상가 임대의 경우 임차 거부 업종 */}
+                      {recvPropertyType === 'STORE' && (
+                        <div className="pt-2 border-t border-slate-200">
+                          <label className="block text-xs font-bold text-rose-900 mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              🚫 상가 임대 시 임차 거부 업종
+                              <span className="text-[10px] text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded font-normal">음성 마이크 지원</span>
+                            </span>
+                          </label>
+                          <VoiceInput
+                            value={recvRestrictedBusinesses}
+                            onChange={setRecvRestrictedBusinesses}
+                            placeholder="예: 고기구이(냄새/연기), 유흥주점/단란주점 사절, 소음 유발 업종, 종교시설 불가 등"
+                            className="text-xs font-semibold border-rose-300 focus:ring-rose-500"
+                          />
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {['유흥/주점 불가', '고기구이(냄새/연기) 불가', '소음 유발 업종 사절', '종교시설 불가'].map((r) => (
+                              <button
+                                key={r}
+                                type="button"
+                                onClick={() => setRecvRestrictedBusinesses((prev) => prev ? `${prev}, ${r}` : r)}
+                                className="px-2 py-0.5 text-[10px] font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 rounded border border-rose-200"
+                              >
+                                +{r}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
               </div>
             )}
 

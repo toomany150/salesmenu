@@ -274,11 +274,95 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
               </div>
             </div>
           </div>
+
+          {/* 엘리베이터 유무 및 대수 체크란 (섹터 2 추가) */}
+          <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-bold text-blue-950 flex items-center gap-1.5">
+                <span>🛗 엘리베이터 유무 및 대수 *</span>
+              </label>
+              
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const has = true;
+                    onChange({
+                      ...data,
+                      hasElevator: has,
+                      elevator: data.elevator || '승객용 2대 운행중',
+                    });
+                  }}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
+                    data.hasElevator !== false
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  🟢 있음
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange({
+                      ...data,
+                      hasElevator: false,
+                      elevator: '엘리베이터 없음(계단이용)',
+                      elevatorPassengerCount: 0,
+                      elevatorFreightCount: 0,
+                    });
+                  }}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
+                    data.hasElevator === false
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  🔴 없음
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">승객용 엘리베이터 수</label>
+                <input
+                  type="number"
+                  disabled={data.hasElevator === false}
+                  value={data.hasElevator === false ? 0 : (data.elevatorPassengerCount || '')}
+                  onChange={(e) => updateField('elevatorPassengerCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                  placeholder={data.hasElevator === false ? '없음' : '예: 2 (대)'}
+                  className="w-full text-sm px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">화물/비상용 엘리베이터 수</label>
+                <input
+                  type="number"
+                  disabled={data.hasElevator === false}
+                  value={data.hasElevator === false ? 0 : (data.elevatorFreightCount || '')}
+                  onChange={(e) => updateField('elevatorFreightCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                  placeholder={data.hasElevator === false ? '없음' : '예: 1 (대)'}
+                  className="w-full text-sm px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">운행 특징/상세 메모</label>
+                <input
+                  type="text"
+                  value={data.elevator || ''}
+                  onChange={(e) => updateField('elevator', e.target.value)}
+                  placeholder="예: 승객용 2대 + 대형 화물용 1대 (혼잡도 적음)"
+                  className="w-full text-sm px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-slate-900 font-medium"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 섹터 3. 유틸리티 & 냉난방·빌딩 시설 */}
+      {/* 섹터 3. 유틸리티 & 냉난방·빌딩 시설 및 위반건축물 체크 */}
       {/* ────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border-2 border-teal-200/90 shadow-xs overflow-hidden">
         <div className="bg-gradient-to-r from-teal-50 to-emerald-50 px-4 py-3 border-b border-teal-200 flex items-center justify-between">
@@ -288,15 +372,15 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
             </div>
             <div>
               <h4 className="text-sm font-bold text-teal-950">
-                섹터 3. 유틸리티 (전기·수도) 및 냉난방·빌딩 시설
+                섹터 3. 유틸리티 (전기·수도) 및 냉난방·빌딩 시설 & 위반건축물 점검
               </h4>
               <span className="text-xs text-teal-700">
-                전기 용량(kW) 및 개별/공용, 수도, 냉난방 시스템, 엘리베이터
+                전기 용량(kW) 및 개별/공용, 수도, 냉난방 시스템, 위반건축물 여부 점검
               </span>
             </div>
           </div>
           <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-teal-200/80 text-teal-900">
-            설비스펙
+            설비·법적규격
           </span>
         </div>
 
@@ -355,7 +439,7 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
                       className={`py-2 px-2 text-xs font-bold rounded-lg border transition-all ${
                         data.waterType === type
                           ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
                       {type}
@@ -381,6 +465,47 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
               />
             </div>
 
+          </div>
+
+          {/* 위반건축물 체크란 (섹터 3 추가) */}
+          <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-300 space-y-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-700" />
+              <label className="text-sm font-bold text-amber-950">
+                위반건축물 점검 체크란 (불법증축/용도변경 미신고/이행강제금) *
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-1">
+                <select
+                  value={data.violationBuilding?.includes('위반건축물있음') ? '위반있음' : '위반없음'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '위반없음') {
+                      updateField('violationBuilding', '위반건축물 없음 (대장상 정상 등재)');
+                    } else {
+                      updateField('violationBuilding', '위반건축물있음: 대장상 위반 표기 또는 불법확장 확인 필요');
+                    }
+                  }}
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl font-bold text-amber-950"
+                >
+                  <option value="위반없음">🟢 위반건축물 없음 (정상)</option>
+                  <option value="위반있음">🔴 위반건축물 있음 (주의)</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <input
+                  type="text"
+                  value={data.violationBuildingDetail || (data.violationBuilding || '')}
+                  onChange={(e) => {
+                    updateField('violationBuildingDetail', e.target.value);
+                    updateField('violationBuilding', e.target.value);
+                  }}
+                  placeholder="예: 위반건축물 없음 (정상) / 발코니 불법확장 또는 용도변경 미신고 내역 기재"
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 font-medium text-slate-900"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

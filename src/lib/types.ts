@@ -44,6 +44,17 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   ETC: '기타',
 };
 
+// 사용자가 지정한 표준 매물 종류 정렬 순서
+export const PROPERTY_TYPE_ORDER: PropertyType[] = [
+  'APARTMENT',
+  'HOUSE',
+  'STORE',
+  'OFFICE',
+  'FACTORY_WAREHOUSE',
+  'LAND',
+  'ETC',
+];
+
 export type TransactionType = '매매' | '전세' | '월세';
 
 export type PropertyStatus = 'AVAILABLE' | 'CONTRACTED' | 'HOLD' | 'CANCELLED';
@@ -295,6 +306,7 @@ export interface StoreData {
   businessRegistrationStatus?: string; // 사업자등록여부
   operatorContractorMatch?: string; // 실제운영자/임대차계약자/사업자명의 일치 여부
   liquorLoan?: string; // 주류대출여부
+  administrativeDisposition?: string; // 행정처분이력 (영업정지/과징금 등)
   rentIncreaseCondition?: string; // 임대료 인상조건 및 인상액/비율
   storeAdStatus?: string; // 점포 자체 광고 여부 (광고진행, 비공개)
   otherAgencyAdStatus?: string; // 타부동산 광고 여부
@@ -327,6 +339,10 @@ export interface OfficeData {
   approvalDate?: string;
   parkingCount?: number;
   isParkingImpossible?: boolean; // 주차 불가능 여부
+  // 엘리베이터 유무 및 대수
+  hasElevator?: boolean; // 엘리베이터 유무
+  elevatorPassengerCount?: number; // 승객용 대수
+  elevatorFreightCount?: number; // 화물/비상용 대수
   // 설비 스펙
   electricityCapacity?: string; // 전기용량 (kW)
   electricityType?: string; // 전기구분 (개별, 공용)
@@ -339,13 +355,14 @@ export interface OfficeData {
   // 계약 및 운영 조건
   contractYear?: string; // 계약년도
   renewalPeriodRemain?: string; // 계약갱신권 잔여기간
+  violationBuilding?: string; // 위반건축물 체크란
+  violationBuildingDetail?: string; // 위반건축물 세부내용
   operatorContractorMatch?: string; // 명의 일치 여부
   storeAdStatus?: string; // 광고 노출 여부
   otherAgencyAdStatus?: string; // 타부동산 광고 여부
   rentIncreaseCondition?: string; // 임대료 인상조건 및 인상액/비율
   restorationTerms?: string; // 원상복구특약
   // 체크리스트
-  violationBuilding?: string;
   parkingAndFee?: string;
   rentIncreaseStatus?: string;
   advertisementStatus?: string;
@@ -503,6 +520,44 @@ export interface CustomerDemandItem {
   updatedAt: string;
 }
 
+// [물건 접수] 매도인/임대인/임차인(권리금) 접수 물건 상세 규격
+export interface CustomerReceivedPropertyDetail {
+  propertyType?: PropertyType;
+  transactionType?: string; // '매매' | '전세' | '월세' | '임대'
+  // 희망 가격
+  price?: number; // 매매가액
+  jeonse?: number; // 전세가액
+  deposit?: number; // 보증금
+  monthlyRent?: number; // 월세
+  premium?: number; // 권리금
+  // 조정할 수 있는 가격 (조정 가능선)
+  negotiablePrice?: number;
+  negotiableJeonse?: number;
+  negotiableDeposit?: number;
+  negotiableMonthlyRent?: number;
+  negotiablePremium?: number;
+  // 위치 및 층수
+  floorAndUnit?: string; // 매물층수나 동호수
+  moveInTiming?: string; // 입주시기 및 오픈시기
+  roadAddress?: string; // 도로명 주소
+  jibunAddress?: string; // 지번 주소
+  detailAddress?: string; // 상세 주소
+  // 실거래 지원
+  dealSupportDetails?: string; // 실거래시 지원 세부사항 (렌트프리, 인테리어 비용 지원 등)
+  // 공실 및 이전 업종
+  isEmpty?: boolean; // 물건 비어있음 여부
+  emptyPeriodOrMoveOutDate?: string; // 빈 시기나 이사시기
+  previousBusiness?: string; // 전에 하던 업종
+  // 주거용 특화 (아파트/주택)
+  petAllowed?: boolean | string; // 반려동물 가능 여부 ('YES' | 'NO' | 'DISCUSS')
+  foreignerAllowed?: boolean | string; // 외국인 가능 여부 ('YES' | 'NO' | 'DISCUSS')
+  // 상가/사무실 등 상업/업무용 특화
+  parkingAvailable?: boolean | string; // 주차 가능 여부 ('YES' | 'NO' | 'DISCUSS')
+  parkingDetails?: string; // 주차 상세
+  // 상가 임대 특화
+  restrictedBusinesses?: string; // 임차거부 업종
+}
+
 // 고객 인터페이스 (매수자/임차인은 통신사 정보 불필요)
 export interface CustomerItem {
   id: string;
@@ -510,8 +565,11 @@ export interface CustomerItem {
   carrier?: MobileCarrier;
   phone: string;
   type: CustomerType;
+  subType?: string; // '매도인' | '임대인' | '임차인(권리금)' | '매수인' | '임차인' | '임차인(권리금가능)'
   group: CustomerGroup;
   memo?: string;
+  // [물건 접수] 상세 정보
+  receivedDetail?: CustomerReceivedPropertyDetail;
   // 담당 권한자 및 등록자 정보
   managerName?: string; // '사무실' 또는 소속공인중개사 이름
   createdById?: string;

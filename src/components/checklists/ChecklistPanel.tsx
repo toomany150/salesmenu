@@ -25,27 +25,21 @@ interface ChecklistItem {
 
 const STORE_CHECKLIST: ChecklistItem[] = [
   { id: 'businessType', title: '1. 업종 인허가 승계', desc: '자유업/신고업/허가업 구분 및 구청 영업신고증 승계 가능 여부', importance: 'CRITICAL' },
-  { id: 'adminAction', title: '2. 행정처분 이력 확인', desc: '영업정지/과징금 등 행정처분 승계 여부 구청 위생과 사전 조회', importance: 'CRITICAL' },
-  { id: 'restoration', title: '3. 원상복구특약 명시', desc: '시설 권리양수도 시 기존 인테리어 원상복구 면제 특약 및 철거 범위 확인', importance: 'CRITICAL' },
-  { id: 'dailyRevenue', title: '4. 일매출 & 포스자료', desc: 'POS기/부가세과세표준증명 등 객관적 실매출 증빙 확인', importance: 'HIGH' },
-  { id: 'equipment', title: '5. 비품/렌탈 승계 확인', desc: '제빙기, 정수기, 포스기, 식기세척기 렌탈 승계 or 소유권 귀속 여부', importance: 'HIGH' },
-  { id: 'fireCert', title: '6. 소방필증 (완비증명)', desc: '지하 66㎡ 이상, 2층 이상 100㎡ 이상 다중이용업소 비상구/방염 필증 완비', importance: 'CRITICAL' },
-  { id: 'sanitation', title: '7. 정화조 용량 & 환경', desc: '업종 변경 시 정화조 용량 초과 여부 및 하수도 원인자부담금 사전 검토', importance: 'HIGH' },
+  { id: 'restoration', title: '2. 원상복구특약 명시', desc: '시설 권리양수도 시 기존 인테리어 원상복구 면제 특약 및 철거 범위 확인', importance: 'CRITICAL' },
+  { id: 'dailyRevenue', title: '3. 일매출 & 포스자료', desc: 'POS기/부가세과세표준증명 등 객관적 실매출 증빙 확인', importance: 'HIGH' },
+  { id: 'equipment', title: '4. 비품/렌탈 승계 확인', desc: '제빙기, 정수기, 포스기, 식기세척기 렌탈 승계 or 소유권 귀속 여부', importance: 'HIGH' },
+  { id: 'fireCert', title: '5. 소방필증 (완비증명)', desc: '지하 66㎡ 이상, 2층 이상 100㎡ 이상 다중이용업소 비상구/방염 필증 완비', importance: 'CRITICAL' },
+  { id: 'sanitation', title: '6. 정화조 용량 & 환경', desc: '업종 변경 시 정화조 용량 초과 여부 및 하수도 원인자부담금 사전 검토', importance: 'HIGH' },
 ];
 
 const OFFICE_CHECKLIST: ChecklistItem[] = [
-  { id: 'violation', title: '1. 위반건축물 여부', desc: '용도변경 미신고 및 발코니 불법확장 체크', importance: 'CRITICAL' },
-  { id: 'parkingFee', title: '2. 주차대수 및 추가요금', desc: '호실당 무료 배정 대수 및 방문객 주차권 할인 규정', importance: 'HIGH' },
-  { id: 'rentIncrease', title: '3. 임대료 인상여부', desc: '재계약 시 보증금/월세 갱신 기준', importance: 'NORMAL' },
-  { id: 'adStatus', title: '4. 점포/간판 광고 여부', desc: '1층 로비 인포메이션 보드 및 층별 현판 부착 가능 여부', importance: 'NORMAL' },
-  { id: 'prosCons', title: '5. 매물 장단점', desc: '채광, 뷰, 엘리베이터 혼잡도, 주변 편의시설', importance: 'NORMAL' },
-  { id: 'hvac', title: '6. 냉난방 시스템', desc: '개별 FCU 천장형인지 중앙공급(야간/주말 가동여부)인지', importance: 'HIGH' },
-  { id: 'elevator', title: '7. 엘리베이터 대수', desc: '승객용 대수 및 대형 화물엘리베이터 유무', importance: 'NORMAL' },
-  { id: 'security', title: '8. 보안 및 출입관리', desc: '24시간 출입 가능 여부, 지문인식/캡스/경비실 상주', importance: 'NORMAL' },
-  { id: 'restoration', title: '9. 원상복구 범위 명확화', desc: '유리 칸막이/바닥재 승계 인정 여부 (분쟁 1위 항목)', importance: 'CRITICAL' },
-  { id: 'electric', title: '10. 전기 증설 가능 여부', desc: '서버룸/PC 다량 사용 시 건물 변압기 여유 용량 확인', importance: 'HIGH' },
-  { id: 'specialTerms', title: '11. 특약사항 협의', desc: '인테리어 공사기간(렌트프리 Free-Rent) 제공 일수', importance: 'HIGH' },
-  { id: 'totalOffices', title: '12. 건물 내 총 사무실수', desc: '입주사 현황 및 동종 경쟁업종 입주 제한 여부', importance: 'NORMAL' },
+  { id: 'adStatus', title: '1. 점포/간판 광고 여부', desc: '1층 로비 인포메이션 보드 및 층별 현판 부착 가능 여부', importance: 'NORMAL' },
+  { id: 'prosCons', title: '2. 매물 장단점', desc: '채광, 뷰, 주변 편의시설 및 접근성', importance: 'NORMAL' },
+  { id: 'security', title: '3. 보안 및 출입관리', desc: '24시간 출입 가능 여부, 지문인식/캡스/경비실 상주', importance: 'NORMAL' },
+  { id: 'restoration', title: '4. 원상복구 범위 명확화', desc: '유리 칸막이/바닥재 승계 인정 여부 (분쟁 1위 항목)', importance: 'CRITICAL' },
+  { id: 'electric', title: '5. 전기 증설 가능 여부', desc: '서버룸/PC 다량 사용 시 건물 변압기 여유 용량 확인', importance: 'HIGH' },
+  { id: 'specialTerms', title: '6. 특약사항 협의', desc: '인테리어 공사기간(렌트프리 Free-Rent) 제공 일수', importance: 'HIGH' },
+  { id: 'totalOffices', title: '7. 건물 내 총 사무실수', desc: '입주사 현황 및 동종 경쟁업종 입주 제한 여부', importance: 'NORMAL' },
 ];
 
 const FACTORY_CHECKLIST: ChecklistItem[] = [

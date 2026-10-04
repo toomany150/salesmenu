@@ -50,6 +50,13 @@ export interface PropertyFilterCriteria {
   isFullOption?: boolean;
   hasElevator?: boolean;
   hasParking?: boolean;
+  // Region Filter (시/구/동)
+  targetCity?: string;
+  targetGu?: string;
+  targetDong?: string;
+  // Floor Filter (지하/1층/2층 등)
+  floorFilter?: string;
+  customFloorInput?: string;
   // Matched Customer ID
   matchedCustomerId?: string;
 }
@@ -81,6 +88,15 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
 
   // 4. 거래종류: [전체, 매매, 전세, 월세]
   const [transactionType, setTransactionType] = useState<string>('ALL');
+
+  // 4-1. 원하는 지역 조건: (ㅇㅇ 시, ㅇㅇ 구, ㅇㅇ 동)
+  const [targetCity, setTargetCity] = useState<string>('');
+  const [targetGu, setTargetGu] = useState<string>('');
+  const [targetDong, setTargetDong] = useState<string>('');
+
+  // 4-2. 원하는 층수 조건: (ALL, BASEMENT, 1F, 2F, 3_5F, HIGH_FLOOR, CUSTOM)
+  const [floorFilter, setFloorFilter] = useState<string>('ALL');
+  const [customFloorInput, setCustomFloorInput] = useState<string>('');
 
   // 5. 금액 조건 (만원 단위)
   const [minPrice, setMinPrice] = useState<string>('');
@@ -311,6 +327,52 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
         if (!hasAc && !hasFridge && !hasWasher) return false;
       }
 
+      // 11. 원하는 지역 조건: ㅇㅇ 시 / ㅇㅇ 구 / ㅇㅇ 동
+      const combinedAddr = `${p.address} ${p.roadAddress || ''} ${p.jibunAddress || ''} ${p.detailAddress || ''}`.toLowerCase();
+      if (targetCity.trim()) {
+        const city = targetCity.trim().toLowerCase();
+        if (!combinedAddr.includes(city)) return false;
+      }
+      if (targetGu.trim()) {
+        const gu = targetGu.trim().toLowerCase();
+        if (!combinedAddr.includes(gu)) return false;
+      }
+      if (targetDong.trim()) {
+        const dong = targetDong.trim().toLowerCase();
+        if (!combinedAddr.includes(dong)) return false;
+      }
+
+      // 12. 원하는 층수 조건: 지하 / 1층 / 2층 / 3~5층 / 고층 / 직접입력
+      if (floorFilter !== 'ALL') {
+        const floorStr = (
+          p.floorText ||
+          p.storeDetail?.currentFloor ||
+          p.officeDetail?.currentFloor ||
+          p.houseDetail?.currentFloor ||
+          ''
+        ).toLowerCase();
+
+        if (floorFilter === 'BASEMENT') {
+          const isBasement = floorStr.includes('지하') || (p.underFloorCount && p.underFloorCount > 0);
+          if (!isBasement) return false;
+        } else if (floorFilter === '1F') {
+          const is1F = floorStr.includes('1층') || floorStr.includes('1 f') || floorStr === '1' || (p.floorCount === 1);
+          if (!is1F) return false;
+        } else if (floorFilter === '2F') {
+          const is2F = floorStr.includes('2층') || floorStr.includes('2 f') || floorStr === '2';
+          if (!is2F) return false;
+        } else if (floorFilter === '3_5F') {
+          const isMid = [3, 4, 5].some(n => floorStr.includes(`${n}층`)) || (p.floorCount && p.floorCount >= 3 && p.floorCount <= 5);
+          if (!isMid) return false;
+        } else if (floorFilter === 'HIGH_FLOOR') {
+          const isHigh = floorStr.includes('고층') || floorStr.includes('로얄') || (p.floorCount && p.floorCount >= 6) || [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20].some(n => floorStr.includes(`${n}층`));
+          if (!isHigh) return false;
+        } else if (floorFilter === 'CUSTOM' && customFloorInput.trim()) {
+          const target = customFloorInput.trim().toLowerCase();
+          if (!floorStr.includes(target)) return false;
+        }
+      }
+
       return true;
     });
   }, [
@@ -319,6 +381,11 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
     statusFilter,
     propertyType,
     transactionType,
+    targetCity,
+    targetGu,
+    targetDong,
+    floorFilter,
+    customFloorInput,
     minPrice,
     maxPrice,
     minDeposit,
@@ -341,6 +408,11 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
       status: statusFilter,
       propertyType,
       transactionType,
+      targetCity,
+      targetGu,
+      targetDong,
+      floorFilter,
+      customFloorInput,
       minPrice: minPrice ? parseFloat(minPrice) : undefined,
       maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
       minDeposit: minDeposit ? parseFloat(minDeposit) : undefined,
@@ -358,7 +430,7 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
       isFullOption,
       matchedCustomerId: selectedCustomerId || undefined,
     });
-  }, [filtered, statusFilter, propertyType, transactionType]);
+  }, [filtered, statusFilter, propertyType, transactionType, targetCity, targetGu, targetDong, floorFilter, customFloorInput]);
 
   // Reset all filters
   const handleReset = () => {
@@ -366,6 +438,11 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
     setStatusFilter('ALL');
     setPropertyType('ALL');
     setTransactionType('ALL');
+    setTargetCity('');
+    setTargetGu('');
+    setTargetDong('');
+    setFloorFilter('ALL');
+    setCustomFloorInput('');
     setMinPrice('');
     setMaxPrice('');
     setMinDeposit('');
@@ -555,6 +632,163 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
                 {t === 'ALL' ? '전체' : t}
               </button>
             ))}
+          </div>
+
+        </div>
+
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* 행 1-2. [원하는 지역 (ㅇㅇ 시 ㅇㅇ 구 ㅇㅇ 동)] & [원하는 층수 (지하/1층/2층/고층 등)] */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50/80 p-3.5 rounded-2xl border border-blue-200/90 shadow-2xs grid grid-cols-1 lg:grid-cols-12 gap-3.5 text-xs">
+          
+          {/* 1) 원하는 지역 (ㅇㅇ 시   ㅇㅇ 구   ㅇㅇ 동) */}
+          <div className="lg:col-span-7 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                <span>📍 원하는 지역 조건 (ㅇㅇ 시 · ㅇㅇ 구 · ㅇㅇ 동)</span>
+              </span>
+              {(targetCity || targetGu || targetDong) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetCity('');
+                    setTargetGu('');
+                    setTargetDong('');
+                  }}
+                  className="text-[11px] font-bold text-rose-600 hover:underline"
+                >
+                  지역 초기화
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">시 / 도 (ㅇㅇ 시)</label>
+                <input
+                  type="text"
+                  value={targetCity}
+                  onChange={(e) => setTargetCity(e.target.value)}
+                  placeholder="예: 서울, 경기, 부산"
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 text-xs shadow-2xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">구 / 군 (ㅇㅇ 구)</label>
+                <input
+                  type="text"
+                  value={targetGu}
+                  onChange={(e) => setTargetGu(e.target.value)}
+                  placeholder="예: 강남구, 서초구"
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 text-xs shadow-2xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 mb-0.5">동 / 읍 / 면 (ㅇㅇ 동)</label>
+                <input
+                  type="text"
+                  value={targetDong}
+                  onChange={(e) => setTargetDong(e.target.value)}
+                  placeholder="예: 역삼동, 서초동"
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 text-xs shadow-2xs"
+                />
+              </div>
+            </div>
+
+            {/* 빠른 추천 지역 칩 */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] text-slate-400 font-medium">추천:</span>
+              {[
+                { city: '서울', gu: '강남구', dong: '역삼동', label: '강남구 역삼동' },
+                { city: '서울', gu: '서초구', dong: '서초동', label: '서초구 서초동' },
+                { city: '부산', gu: '해운대구', dong: '우동', label: '부산 해운대' },
+                { city: '경기', gu: '분당구', dong: '정자동', label: '분당 정자동' },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => {
+                    setTargetCity(chip.city);
+                    setTargetGu(chip.gu);
+                    setTargetDong(chip.dong);
+                  }}
+                  className="px-2 py-0.5 text-[10px] font-semibold bg-white hover:bg-blue-100 text-slate-700 hover:text-blue-800 rounded-md border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2) 원하는 층수 조건 (지하/1층/2층/고층 등) */}
+          <div className="lg:col-span-5 space-y-2 border-t lg:border-t-0 lg:border-l border-slate-200/80 lg:pl-3.5 pt-2 lg:pt-0">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                <span>🏢 원하는 층수 조건</span>
+              </span>
+              {floorFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFloorFilter('ALL');
+                    setCustomFloorInput('');
+                  }}
+                  className="text-[11px] font-bold text-rose-600 hover:underline"
+                >
+                  층수 초기화
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { id: 'ALL', label: '전체' },
+                { id: 'BASEMENT', label: '지하' },
+                { id: '1F', label: '1층' },
+                { id: '2F', label: '2층' },
+                { id: '3_5F', label: '3~5층' },
+                { id: 'HIGH_FLOOR', label: '6층+(고층)' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    setFloorFilter(f.id);
+                    setCustomFloorInput('');
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    floorFilter === f.id
+                      ? 'bg-indigo-600 text-white shadow-2xs ring-2 ring-indigo-300'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 직접 층수 입력 */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <span className="text-[11px] font-bold text-slate-600 shrink-0">직접 입력:</span>
+              <input
+                type="text"
+                value={customFloorInput}
+                onChange={(e) => {
+                  setCustomFloorInput(e.target.value);
+                  if (e.target.value.trim()) {
+                    setFloorFilter('CUSTOM');
+                  } else {
+                    setFloorFilter('ALL');
+                  }
+                }}
+                placeholder="예: 7층, 옥탑, 반지하 등"
+                className={`flex-1 px-2.5 py-1 bg-white border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 shadow-2xs ${
+                  floorFilter === 'CUSTOM' ? 'border-indigo-500 ring-1 ring-indigo-400' : 'border-slate-300'
+                }`}
+              />
+            </div>
           </div>
 
         </div>

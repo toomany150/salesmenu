@@ -23,12 +23,14 @@ interface HeaderProps {
   onOpenNewCustomer: () => void;
   onOpenAdminLogs?: () => void;
   onOpenLogin?: () => void;
+  onGoHome?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenNewProperty,
   onOpenNewCustomer,
   onOpenAdminLogs,
+  onGoHome,
 }) => {
   const { currentUser, login, logout } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -70,27 +72,32 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
           
-          {/* 1. Logo & Office Brand + admin 버튼 */}
+          {/* 1. Logo & Office Brand + admin 버튼 (클릭 시 홈화면 이동) */}
           <div className="flex items-center space-x-3 shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight">
+            <button
+              type="button"
+              onClick={onGoHome}
+              title="참좋은 공인중개사사무소 홈으로 이동"
+              className="flex items-center space-x-3 text-left group cursor-pointer focus:outline-hidden"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
                 참좋은 공인중개사사무소
               </span>
-              
-              {/* admin 란 (관리자 접속 및 관리) */}
-              <button
-                type="button"
-                onClick={onOpenAdminLogs}
-                title="관리자(Admin) 접속 및 계정·보안로그 관리 (초기비번: 1234)"
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
-                <span>admin</span>
-              </button>
-            </div>
+            </button>
+            
+            {/* admin 란 (관리자 접속 및 관리) */}
+            <button
+              type="button"
+              onClick={onOpenAdminLogs}
+              title="관리자(Admin) 접속 및 계정·보안로그 관리 (초기비번: 1234)"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
+              <span>admin</span>
+            </button>
           </div>
 
           {/* 2. 소공(소속공인중개사) 아이디/비밀번호 입력칸 & 로그인 세션 */}

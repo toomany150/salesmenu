@@ -116,6 +116,7 @@ const DashboardContent: React.FC = () => {
     <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-16">
       
       {/* 1. Global Navigation Header */}
+      {/* 1. Global Navigation Header */}
       <Header
         propertyCount={properties.length}
         receivedCustomerCount={receivedCustomers.length}
@@ -124,155 +125,188 @@ const DashboardContent: React.FC = () => {
         onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
         onOpenAdminLogs={() => setIsAdminLogsOpen(true)}
         onOpenLogin={() => setIsLoginOpen(true)}
+        onGoHome={() => setActiveTab('RECEIVED_GROUP')}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
         
         {/* Top Summary Banner */}
-        <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-            <span className="text-xs font-semibold text-slate-500 block">전체 등록 매물</span>
+        <div className="mb-4 sm:mb-6 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs">
+            <span className="text-[11px] sm:text-xs font-semibold text-slate-500 block">전체 등록 매물</span>
             <div className="flex items-baseline justify-between mt-1">
-              <span className="text-2xl font-black text-slate-900">{properties.length}</span>
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">실시간 가동</span>
+              <span className="text-xl sm:text-2xl font-black text-slate-900">{properties.length}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">실시간 가동</span>
             </div>
           </div>
 
           <div 
             onClick={() => setActiveTab('RECEIVED_GROUP')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
               activeTab === 'RECEIVED_GROUP' 
-                ? 'bg-blue-50/70 border-blue-400 shadow-xs ring-2 ring-blue-500/20' 
+                ? 'bg-blue-50/80 border-blue-400 shadow-xs ring-2 ring-blue-500/20' 
                 : 'bg-white border-slate-200 hover:border-blue-300'
             }`}
           >
-            <span className="text-xs font-semibold text-blue-800 block">[물건 접수] 매도·임대</span>
+            <span className="text-[11px] sm:text-xs font-bold text-blue-900 block truncate">[물건 접수] 매도·임대·권리금</span>
             <div className="flex items-baseline justify-between mt-1">
-              <span className="text-2xl font-black text-blue-900">{receivedCustomers.length}</span>
-              <span className="text-xs text-blue-600 font-semibold">의뢰 고객</span>
+              <span className="text-xl sm:text-2xl font-black text-blue-900">{receivedCustomers.length}</span>
+              <span className="text-[10px] sm:text-xs text-blue-600 font-semibold">의뢰 고객</span>
             </div>
           </div>
 
           <div 
             onClick={() => setActiveTab('SEARCHING_GROUP')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
               activeTab === 'SEARCHING_GROUP' 
-                ? 'bg-indigo-50/70 border-indigo-400 shadow-xs ring-2 ring-indigo-500/20' 
+                ? 'bg-indigo-50/80 border-indigo-400 shadow-xs ring-2 ring-indigo-500/20' 
                 : 'bg-white border-slate-200 hover:border-indigo-300'
             }`}
           >
-            <span className="text-xs font-semibold text-indigo-800 block">[물건 찾음] 매수·임차</span>
+            <span className="text-[11px] sm:text-xs font-bold text-indigo-900 block truncate">[물건 찾음] 매수·임차</span>
             <div className="flex items-baseline justify-between mt-1">
-              <span className="text-2xl font-black text-indigo-900">{searchingCustomers.length}</span>
-              <span className="text-xs text-indigo-600 font-semibold">탐색 고객</span>
+              <span className="text-xl sm:text-2xl font-black text-indigo-900">{searchingCustomers.length}</span>
+              <span className="text-[10px] sm:text-xs text-indigo-600 font-semibold">탐색 고객</span>
             </div>
           </div>
 
           <div 
             onClick={() => setActiveTab('ALL_PROPERTIES')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+            className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
               activeTab === 'ALL_PROPERTIES' 
-                ? 'bg-slate-900 text-white border-slate-900 shadow-xs' 
+                ? 'bg-slate-900 text-white border-slate-900 shadow-xs ring-2 ring-slate-800' 
                 : 'bg-white border-slate-200 hover:border-slate-300'
             }`}
           >
-            <span className={`text-xs font-semibold block ${activeTab === 'ALL_PROPERTIES' ? 'text-slate-300' : 'text-slate-500'}`}>
-              매물장검색
+            <span className={`text-[11px] sm:text-xs font-bold block ${activeTab === 'ALL_PROPERTIES' ? 'text-slate-300' : 'text-slate-600'}`}>
+              매물장 검색
             </span>
             <div className="flex items-baseline justify-between mt-1">
-              <span className={`text-2xl font-black ${activeTab === 'ALL_PROPERTIES' ? 'text-white' : 'text-slate-900'}`}>
+              <span className={`text-xl sm:text-2xl font-black ${activeTab === 'ALL_PROPERTIES' ? 'text-white' : 'text-slate-900'}`}>
                 {properties.length}
               </span>
-              <span className={`text-xs font-semibold ${activeTab === 'ALL_PROPERTIES' ? 'text-blue-300' : 'text-slate-600'}`}>
-                실시간 조건 검색 →
+              <span className={`text-[10px] sm:text-xs font-semibold ${activeTab === 'ALL_PROPERTIES' ? 'text-blue-300' : 'text-slate-600'}`}>
+                실시간 검색 →
               </span>
             </div>
           </div>
         </div>
 
-        {/* 2. Core Tab Bar: [물건 접수] vs [물건 찾음] vs [전체 매물장] */}
-        <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-2xs mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            
-            {/* Tab 1: [물건 접수] 매도인 / 임대인 */}
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* 2. 2단 내비게이션 바 (가독성 및 모바일 최적화) */}
+        {/* 첫째 줄: 고객 검색 / 매물장 검색 */}
+        {/* 둘째 줄: [물건 접수] 매도인/임대인/임차인(권리금원함) vs [물건 찾음] 매수인/임차인/임차인(권리금가능) */}
+        {/* ────────────────────────────────────────────────────────── */}
+        <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-2xs mb-4 sm:mb-6 space-y-2">
+          
+          {/* 첫째 줄: 고객 검색 vs 매물장 검색 */}
+          <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => setActiveTab('RECEIVED_GROUP')}
-              className={`flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-                activeTab === 'RECEIVED_GROUP'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-500/20'
-                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/60'
+              onClick={() => {
+                if (activeTab === 'ALL_PROPERTIES') {
+                  setActiveTab('RECEIVED_GROUP');
+                }
+              }}
+              className={`flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 sm:px-5 rounded-xl font-black text-xs sm:text-sm transition-all ${
+                activeTab !== 'ALL_PROPERTIES'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-500/20'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${activeTab === 'RECEIVED_GROUP' ? 'bg-white' : 'bg-blue-600'}`}></span>
-                <span>[물건 접수] 매도인 / 임대인</span>
+              <span className="text-sm sm:text-base">👥</span>
+              <span>고객 검색 (고객 관리장)</span>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-bold ${
+                activeTab !== 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {receivedCustomers.length + searchingCustomers.length}명
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ALL_PROPERTIES')}
+              className={`flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 sm:px-5 rounded-xl font-black text-xs sm:text-sm transition-all ${
+                activeTab === 'ALL_PROPERTIES'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25 ring-2 ring-slate-800'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+              }`}
+            >
+              <Building2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-blue-400" />
+              <span>매물장 검색 (조건 필터)</span>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-bold ${
+                activeTab === 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {properties.length}건
+              </span>
+            </button>
+          </div>
+
+          {/* 둘째 줄: [물건 접수] 매도인/임대인/임차인(권리금원함) vs [물건 찾음] 매수인/임차인/임차인(권리금가능) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+            {/* 버튼 1: [물건 접수] */}
+            <button
+              onClick={() => setActiveTab('RECEIVED_GROUP')}
+              className={`flex items-center justify-between py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl font-extrabold text-xs sm:text-sm transition-all ${
+                activeTab === 'RECEIVED_GROUP'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-500/20'
+                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-left">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeTab === 'RECEIVED_GROUP' ? 'bg-white' : 'bg-blue-600'}`}></span>
+                <span className="leading-tight">
+                  [물건 접수] 매도인 / 임대인 / 임차인(권리금원함)
+                </span>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                activeTab === 'RECEIVED_GROUP' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-black shrink-0 ${
+                activeTab === 'RECEIVED_GROUP' ? 'bg-white/25 text-white' : 'bg-blue-100 text-blue-800'
               }`}>
                 {receivedCustomers.length}명
               </span>
             </button>
 
-            {/* Tab 2: [물건 찾음] 매수인 / 임차인 */}
+            {/* 버튼 2: [물건 찾음] */}
             <button
               onClick={() => setActiveTab('SEARCHING_GROUP')}
-              className={`flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+              className={`flex items-center justify-between py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl font-extrabold text-xs sm:text-sm transition-all ${
                 activeTab === 'SEARCHING_GROUP'
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20 ring-2 ring-indigo-500/20'
-                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/60'
+                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${activeTab === 'SEARCHING_GROUP' ? 'bg-white' : 'bg-indigo-600'}`}></span>
-                <span>[물건 찾음] 매수인 / 임차인</span>
+              <div className="flex items-center gap-2 text-left">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeTab === 'SEARCHING_GROUP' ? 'bg-white' : 'bg-indigo-600'}`}></span>
+                <span className="leading-tight">
+                  [물건 찾음] 매수인 / 임차인 / 임차인(권리금가능)
+                </span>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                activeTab === 'SEARCHING_GROUP' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-black shrink-0 ${
+                activeTab === 'SEARCHING_GROUP' ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-800'
               }`}>
                 {searchingCustomers.length}명
               </span>
             </button>
-
-            {/* Tab 3: 매물장검색 */}
-            <button
-              onClick={() => setActiveTab('ALL_PROPERTIES')}
-              className={`flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-                activeTab === 'ALL_PROPERTIES'
-                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20'
-                  : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/60'
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
-              <span>매물장검색</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                activeTab === 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
-              }`}>
-                {properties.length}건
-              </span>
-            </button>
-
           </div>
+
         </div>
 
         {/* 3. Main Dynamic Content View */}
         {activeTab === 'RECEIVED_GROUP' && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-blue-500/10 via-sky-500/5 to-transparent p-4 rounded-xl border border-blue-200/60 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-blue-500/10 via-sky-500/5 to-transparent p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-blue-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
               <div>
-                <h3 className="font-extrabold text-sm text-blue-950 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                  [물건 접수] 매도인 / 임대인 고객관리장
+                <h3 className="font-black text-sm sm:text-base text-blue-950 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0"></span>
+                  [물건 접수] 매도인 / 임대인 / 임차인(권리금원함) 고객관리장
                 </h3>
-                <p className="text-xs text-blue-800/80 mt-0.5">
-                  내놓을 매물 정보(소재지 주소, 대장 연동 정보, 희망 가격)와 함께 고객을 관리합니다.
+                <p className="text-xs sm:text-sm text-blue-800/80 mt-1">
+                  내놓을 매물 정보(소재지 주소, 대장 연동 정보, 희망 가격, 협의 가격)와 함께 고객을 관리합니다.
                 </p>
               </div>
               <button
                 onClick={() => setIsCustomerRegOpen(true)}
-                className="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
+                className="w-full sm:w-auto px-4 py-2.5 text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all active:scale-95 shrink-0"
               >
-                ＋ 매도/임대인 등록
+                ＋ [물건 접수] 고객 등록
               </button>
             </div>
 
@@ -287,21 +321,21 @@ const DashboardContent: React.FC = () => {
 
         {activeTab === 'SEARCHING_GROUP' && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-4 rounded-xl border border-indigo-200/60 flex items-center justify-between">
+            <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-indigo-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
               <div>
-                <h3 className="font-extrabold text-sm text-indigo-950 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                  [물건 찾음] 매수인 / 임차인 고객관리장
+                <h3 className="font-black text-sm sm:text-base text-indigo-950 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0"></span>
+                  [물건 찾음] 매수인 / 임차인 / 임차인(권리금가능) 고객관리장
                 </h3>
-                <p className="text-xs text-indigo-800/80 mt-0.5">
-                  희망하는 매물 유형, 지역, 예산(매매가/보증금/월세), 입주 희망 조건과 함께 관리합니다.
+                <p className="text-xs sm:text-sm text-indigo-800/80 mt-1">
+                  희망 매물 유형, 지역, 예산(매매가/보증금/월세/권리금), 입주 희망 조건, 양보 불가 1순위 조건과 함께 관리합니다.
                 </p>
               </div>
               <button
                 onClick={() => setIsCustomerRegOpen(true)}
-                className="px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm"
+                className="w-full sm:w-auto px-4 py-2.5 text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all active:scale-95 shrink-0"
               >
-                ＋ 매수/임차인 등록
+                ＋ [물건 찾음] 고객 등록
               </button>
             </div>
 
