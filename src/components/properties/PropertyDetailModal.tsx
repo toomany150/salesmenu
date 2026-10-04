@@ -59,7 +59,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const handleDeleteProperty = async () => {
     if (!canDelete) {
-      alert('매물 삭제 권한은 프로그램 관리자(대표)에게만 있습니다.');
+      alert('매물 삭제 권한은 개업공인중개사(대표)에게만 있습니다.');
       return;
     }
     if (!confirm(`정말로 매물 #${property.propertyNumber} (${property.address})을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.`)) {

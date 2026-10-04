@@ -903,7 +903,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                               ? 'bg-slate-100 text-slate-800 border-slate-300'
                               : 'bg-blue-100 text-blue-900 border-blue-300'
                           }`}>
-                            {managerName === '개업공인중개사 (대표)' ? '👑 개업공인중개사 (대표) [기본값]' : managerName === '사무실' ? '🏢 사무실 (공용)' : `👤 ${managerName}`}
+                            {managerName === '개업공인중개사 (대표)' ? '👑 개업공인중개사 (대표)' : managerName === '사무실' ? '🏢 사무실 (공용)' : `👤 ${managerName}`}
                           </span>
                         </div>
 

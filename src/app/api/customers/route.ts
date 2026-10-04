@@ -348,7 +348,7 @@ export async function DELETE(request: NextRequest) {
 
     if (userRole !== 'ADMIN') {
       return NextResponse.json(
-        { error: '고객 삭제 권한은 프로그램 관리자(대표)에게만 있습니다. 소속공인중개사는 삭제할 수 없습니다.' },
+        { error: '고객 삭제 권한은 개업공인중개사(대표)에게만 있습니다. 소속공인중개사는 삭제할 수 없습니다.' },
         { status: 403 }
       );
     }

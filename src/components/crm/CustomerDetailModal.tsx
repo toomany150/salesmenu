@@ -69,7 +69,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
 
   const handleDelete = async () => {
     if (!canDelete) {
-      alert('고객 삭제 권한은 프로그램 관리자(대표)에게만 있습니다.');
+      alert('고객 삭제 권한은 개업공인중개사(대표)에게만 있습니다.');
       return;
     }
 

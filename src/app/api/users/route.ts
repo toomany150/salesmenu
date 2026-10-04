@@ -58,11 +58,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { username, password, name, role, phone, isActive, adminUser } = body;
+    const headerRole = request.headers.get('x-user-role');
 
-    // 관리자 권한 확인
-    if (adminUser?.role !== 'ADMIN') {
+    // 관리자(대표) 권한 확인: 헤더 또는 adminUser 정보 확인
+    const isAuthorizedAdmin = 
+      headerRole === 'ADMIN' || 
+      adminUser?.role === 'ADMIN' || 
+      adminUser?.name?.includes('개업공인중개사') ||
+      adminUser?.name?.includes('대표');
+
+    if (!isAuthorizedAdmin) {
       return NextResponse.json(
-        { error: '소속공인중개사 계정 관리 권한은 관리자(대표)에게만 있습니다.' },
+        { error: '소속공인중개사 계정 관리 권한은 개업공인중개사(대표)에게만 있습니다.' },
         { status: 403 }
       );
     }
@@ -102,8 +109,8 @@ export async function POST(request: NextRequest) {
     });
 
     await recordAccessLog({
-      userId: adminUser.id,
-      userName: adminUser.name,
+      userId: adminUser?.id || undefined,
+      userName: adminUser?.name || '개업공인중개사 (대표)',
       userRole: 'ADMIN',
       action: 'CREATE_USER',
       targetType: 'AUTH',
@@ -131,10 +138,17 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, password, name, phone, isActive, adminUser } = body;
+    const headerRole = request.headers.get('x-user-role');
 
-    if (adminUser?.role !== 'ADMIN') {
+    const isAuthorizedAdmin = 
+      headerRole === 'ADMIN' || 
+      adminUser?.role === 'ADMIN' || 
+      adminUser?.name?.includes('개업공인중개사') ||
+      adminUser?.name?.includes('대표');
+
+    if (!isAuthorizedAdmin) {
       return NextResponse.json(
-        { error: '소속공인중개사 계정 관리 권한은 관리자(대표)에게만 있습니다.' },
+        { error: '소속공인중개사 계정 관리 권한은 개업공인중개사(대표)에게만 있습니다.' },
         { status: 403 }
       );
     }
@@ -169,7 +183,7 @@ export async function DELETE(request: NextRequest) {
     const userRole = request.headers.get('x-user-role');
 
     if (userRole !== 'ADMIN') {
-      return NextResponse.json({ error: '관리자만 삭제할 수 있습니다.' }, { status: 403 });
+      return NextResponse.json({ error: '소속공인중개사 계정 관리 권한은 개업공인중개사(대표)에게만 있습니다.' }, { status: 403 });
     }
 
     if (!id) {

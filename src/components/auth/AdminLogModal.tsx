@@ -29,7 +29,7 @@ interface AdminLogModalProps {
 }
 
 export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, login } = useAuth();
+  const { currentUser, login, addCustomAgent } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN';
 
   const [activeTab, setActiveTab] = useState<'LOGS' | 'USERS' | 'PASSWORD'>('LOGS');
@@ -135,19 +135,28 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
     try {
       const res = await fetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-role': 'ADMIN',
+        },
         body: JSON.stringify({
           username: newUsername.trim(),
           password: newPassword.trim(),
           name: newName.trim(),
           phone: newPhone.trim(),
           role: newRole,
+          adminUser: currentUser || { id: 'usr-admin', name: '개업공인중개사 (대표)', role: 'ADMIN' },
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || '계정 생성에 실패했습니다.');
+      }
+
+      // 새 권한자 목록에도 자동 반영
+      if (newName.trim()) {
+        addCustomAgent(newName.trim());
       }
 
       setUserMsg({ type: 'success', text: `[${newName}] 소공 계정이 성공적으로 발급되었습니다!` });
@@ -171,6 +180,9 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
     try {
       const res = await fetch(`/api/users?id=${userToDelete.id}`, {
         method: 'DELETE',
+        headers: {
+          'x-user-role': 'ADMIN',
+        },
       });
       const data = await res.json();
       if (!res.ok) {
