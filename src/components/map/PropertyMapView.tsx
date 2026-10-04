@@ -1,18 +1,21 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { 
   MapPin, 
-  Layers, 
   ExternalLink, 
   ZoomIn, 
   ZoomOut, 
+  RotateCcw,
   Navigation, 
   Building2, 
   Phone, 
   MessageSquare,
   X,
-  ChevronRight
+  ChevronRight,
+  Compass,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 import { PropertyItem, PropertyType, PROPERTY_TYPE_LABELS } from '@/lib/types';
 import { getCoordinatesFromAddress, getKakaoMapUrl, getNaverMapUrl, DEFAULT_CENTER } from '@/lib/geo';
@@ -20,6 +23,7 @@ import { getCoordinatesFromAddress, getKakaoMapUrl, getNaverMapUrl, DEFAULT_CENT
 declare global {
   interface Window {
     kakao?: any;
+    L?: any;
   }
 }
 
@@ -39,189 +43,40 @@ export const PropertyMapView: React.FC<PropertyMapViewProps> = ({
   height = 'h-[620px]',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [kakaoReady, setKakaoReady] = useState(false);
+  const leafletMapRef = useRef<any>(null);
+  const leafletMarkersRef = useRef<any[]>([]);
+  const kakaoMapRef = useRef<any>(null);
+  const kakaoMarkersRef = useRef<any[]>([]);
+
+  // Engine state: 'LEAFLET' (100% interactive tile map, no API key required) or 'KAKAO'
+  const [mapEngine, setMapEngine] = useState<'LEAFLET' | 'KAKAO'>('LEAFLET');
+  const [kakaoAvailable, setKakaoAvailable] = useState(false);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
   const [activeProperty, setActiveProperty] = useState<(PropertyItem & { coords?: { lat: number; lng: number } }) | null>(null);
 
-  // Fallback Canvas/Interactive Map Pan & Zoom states
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-  // Map Filter states
+  // Filter states
   const [filterType, setFilterType] = useState<string>('ALL');
 
   // Filter properties
-  const displayProperties = properties.filter((p) => {
-    if (filterType !== 'ALL' && p.propertyType !== filterType) return false;
-    return true;
-  });
+  const displayProperties = useMemo(() => {
+    return properties.filter((p) => {
+      if (filterType !== 'ALL' && p.propertyType !== filterType) return false;
+      return true;
+    });
+  }, [properties, filterType]);
 
   // Calculate coordinates for all properties
-  const mappedProperties = displayProperties.map((p, idx) => {
-    const coords = (p.latitude && p.longitude)
-      ? { lat: p.latitude, lng: p.longitude }
-      : getCoordinatesFromAddress(p.address, idx);
-    return {
-      ...p,
-      coords,
-    };
-  });
-
-  // Kakao Map Script Dynamic Loader & Polling Detector
-  useEffect(() => {
-    const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY || 'ab4074f3fc327e405a625fc856bee022';
-
-    const checkAndInitKakao = () => {
-      if (window.kakao && window.kakao.maps) {
-        try {
-          window.kakao.maps.load(() => {
-            setKakaoReady(true);
-          });
-          return true;
-        } catch (e) {
-          if (window.kakao.maps.Map) {
-            setKakaoReady(true);
-            return true;
-          }
-        }
-      }
-      return false;
-    };
-
-    if (checkAndInitKakao()) return;
-
-    // Check if script exists, if not create
-    let script = document.getElementById('kakao-map-sdk') as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement('script');
-      script.id = 'kakao-map-sdk';
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&autoload=false&libraries=services,clusterer`;
-      script.async = true;
-      document.head.appendChild(script);
-    }
-
-    const onLoad = () => {
-      checkAndInitKakao();
-    };
-
-    script.addEventListener('load', onLoad);
-
-    // Interval poll for up to 6 seconds
-    const interval = setInterval(() => {
-      if (checkAndInitKakao()) {
-        clearInterval(interval);
-      }
-    }, 400);
-
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-    }, 6000);
-
-    return () => {
-      script?.removeEventListener('load', onLoad);
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, []);
-
-  // Sync selectedPropertyId to activeProperty and filterType
-  useEffect(() => {
-    if (selectedPropertyId) {
-      const found = properties.find((p) => p.id === selectedPropertyId);
-      if (found) {
-        // If current filter excludes this property, auto reset to ALL
-        if (filterType !== 'ALL' && found.propertyType !== filterType) {
-          setFilterType('ALL');
-        }
-        const coords = (found.latitude && found.longitude)
-          ? { lat: found.latitude, lng: found.longitude }
-          : getCoordinatesFromAddress(found.address);
-        setActiveProperty({ ...found, coords } as any);
-      }
-    }
-  }, [selectedPropertyId, properties, filterType]);
-
-  // Initialize Kakao Map if ready
-  useEffect(() => {
-    if (!kakaoReady || !mapContainerRef.current || !window.kakao?.maps) return;
-
-    try {
-      const container = mapContainerRef.current;
-      container.innerHTML = ''; // Clean container before init
-
-      const centerCoords = mappedProperties.length > 0 
-        ? new window.kakao.maps.LatLng(mappedProperties[0].coords.lat, mappedProperties[0].coords.lng)
-        : new window.kakao.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
-
-      const options = {
-        center: centerCoords,
-        level: 4,
+  const mappedProperties = useMemo(() => {
+    return displayProperties.map((p, idx) => {
+      const coords = (p.latitude && p.longitude)
+        ? { lat: p.latitude, lng: p.longitude }
+        : getCoordinatesFromAddress(p.address, idx);
+      return {
+        ...p,
+        coords,
       };
-
-      const map = new window.kakao.maps.Map(container, options);
-
-      // Add Zoom Control
-      const zoomControl = new window.kakao.maps.ZoomControl();
-      map.addControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT);
-
-      // Add Markers
-      mappedProperties.forEach((item) => {
-        const markerPosition = new window.kakao.maps.LatLng(item.coords.lat, item.coords.lng);
-        const marker = new window.kakao.maps.Marker({
-          position: markerPosition,
-          map: map,
-        });
-
-        // Click event on marker
-        window.kakao.maps.event.addListener(marker, 'click', () => {
-          setActiveProperty(item);
-          map.panTo(markerPosition);
-        });
-      });
-
-      // If activeProperty exists, pan to it
-      if (activeProperty?.coords) {
-        const pos = new window.kakao.maps.LatLng(activeProperty.coords.lat, activeProperty.coords.lng);
-        map.panTo(pos);
-      }
-    } catch (err) {
-      console.warn('Kakao map initialization skipped/fallback:', err);
-    }
-  }, [kakaoReady, mappedProperties.length, filterType]);
-
-  // Drag Handlers for Simulated Interactive Map
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPanOffset({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
     });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // Convert GPS lat/lng to normalized 2D screen coordinate percentages
-  // Bounds around Seoul Gangnam / Gyeonggi area
-  const minLat = 37.4700;
-  const maxLat = 37.5300;
-  const minLng = 127.0000;
-  const maxLng = 127.0700;
-
-  const getPinStyle = (lat: number, lng: number) => {
-    const normX = ((lng - minLng) / (maxLng - minLng)) * 100;
-    const normY = (1 - (lat - minLat) / (maxLat - minLat)) * 100;
-    const clampedX = Math.max(10, Math.min(90, normX));
-    const clampedY = Math.max(10, Math.min(90, normY));
-    return { left: `${clampedX}%`, top: `${clampedY}%` };
-  };
+  }, [displayProperties]);
 
   const getPriceText = (p: PropertyItem) => {
     if (p.transactionType === '매매') {
@@ -245,18 +100,269 @@ export const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     }
   };
 
+  // 1. Check Kakao Map Availability
+  useEffect(() => {
+    const checkKakao = () => {
+      if (typeof window !== 'undefined' && window.kakao && window.kakao.maps) {
+        try {
+          window.kakao.maps.load(() => {
+            setKakaoAvailable(true);
+          });
+        } catch (e) {
+          if (window.kakao.maps.Map) {
+            setKakaoAvailable(true);
+          }
+        }
+      }
+    };
+    checkKakao();
+    const timer = setTimeout(checkKakao, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 2. Initialize Leaflet Map (Real Interactive Zoom/Pan Engine)
+  useEffect(() => {
+    let isMounted = true;
+
+    const initLeaflet = async () => {
+      if (!mapContainerRef.current) return;
+      if (mapEngine !== 'LEAFLET') return;
+
+      try {
+        const L = (await import('leaflet')).default;
+        if (!isMounted || !mapContainerRef.current) return;
+
+        // Cleanup existing map instance if any
+        if (leafletMapRef.current) {
+          leafletMapRef.current.remove();
+          leafletMapRef.current = null;
+        }
+
+        // Determine initial center
+        const initialCenter = mappedProperties.length > 0 
+          ? [mappedProperties[0].coords.lat, mappedProperties[0].coords.lng]
+          : [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng];
+
+        // Create Leaflet Map with smooth zoom & wheel
+        const map = L.map(mapContainerRef.current, {
+          center: initialCenter as [number, number],
+          zoom: 14,
+          zoomControl: false, // We render a custom modern zoom controller
+          attributionControl: false,
+          maxZoom: 19,
+          minZoom: 7,
+        });
+
+        // Add standard high-res tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap contributors',
+        }).addTo(map);
+
+        leafletMapRef.current = map;
+        setLeafletLoaded(true);
+
+        // Render markers
+        renderLeafletMarkers(L, map);
+      } catch (err) {
+        console.error('Failed to initialize interactive leaflet map:', err);
+      }
+    };
+
+    initLeaflet();
+
+    return () => {
+      isMounted = false;
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
+  }, [mapEngine]);
+
+  // Render Leaflet Markers
+  const renderLeafletMarkers = (L: any, map: any) => {
+    if (!map) return;
+
+    // Clear previous markers
+    leafletMarkersRef.current.forEach((m) => m.remove());
+    leafletMarkersRef.current = [];
+
+    const bounds: [number, number][] = [];
+
+    mappedProperties.forEach((item) => {
+      const lat = item.coords.lat;
+      const lng = item.coords.lng;
+      bounds.push([lat, lng]);
+
+      const isSelected = activeProperty?.id === item.id;
+      const typeLabel = PROPERTY_TYPE_LABELS[item.propertyType] || '매물';
+      const priceText = getPriceText(item);
+      const badgeClass = getBadgeColor(item.propertyType);
+
+      // Create custom rich HTML pin
+      const iconHtml = `
+        <div style="transform: translate(-50%, -100%);" class="group relative cursor-pointer select-none">
+          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-xl border text-xs font-bold transition-all ${badgeClass} ${
+            isSelected ? 'ring-4 ring-yellow-400 scale-110' : 'hover:scale-105'
+          }">
+            <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+            <span>${typeLabel}</span>
+            <span class="bg-black/35 px-1.5 py-0.5 rounded text-[11px] font-extrabold text-yellow-300">
+              ${priceText}
+            </span>
+          </div>
+          <div class="w-2.5 h-2.5 bg-slate-900 rotate-45 mx-auto -mt-1 border-r border-b border-white shadow"></div>
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        className: 'custom-property-pin',
+        html: iconHtml,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+
+      const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+
+      marker.on('click', () => {
+        setActiveProperty(item);
+        map.panTo([lat, lng], { animate: true, duration: 0.5 });
+      });
+
+      leafletMarkersRef.current.push(marker);
+    });
+
+    // Auto fit bounds if multiple markers exist
+    if (bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    } else if (bounds.length === 1) {
+      map.setView(bounds[0], 14, { animate: true });
+    }
+  };
+
+  // Re-render Leaflet markers on property/filter changes
+  useEffect(() => {
+    if (mapEngine === 'LEAFLET' && leafletMapRef.current && typeof window !== 'undefined') {
+      import('leaflet').then((LModule) => {
+        renderLeafletMarkers(LModule.default, leafletMapRef.current);
+      });
+    }
+  }, [mappedProperties, activeProperty?.id, mapEngine]);
+
+  // 3. Initialize Kakao Map if user toggles to Kakao
+  useEffect(() => {
+    if (mapEngine !== 'KAKAO' || !mapContainerRef.current || !window.kakao?.maps) return;
+
+    try {
+      const container = mapContainerRef.current;
+      container.innerHTML = '';
+
+      const centerCoords = mappedProperties.length > 0 
+        ? new window.kakao.maps.LatLng(mappedProperties[0].coords.lat, mappedProperties[0].coords.lng)
+        : new window.kakao.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
+
+      const options = {
+        center: centerCoords,
+        level: 4,
+      };
+
+      const map = new window.kakao.maps.Map(container, options);
+      kakaoMapRef.current = map;
+
+      // Add Zoom Control
+      const zoomControl = new window.kakao.maps.ZoomControl();
+      map.addControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT);
+
+      // Add Markers
+      kakaoMarkersRef.current = [];
+      mappedProperties.forEach((item) => {
+        const markerPosition = new window.kakao.maps.LatLng(item.coords.lat, item.coords.lng);
+        const marker = new window.kakao.maps.Marker({
+          position: markerPosition,
+          map: map,
+        });
+
+        window.kakao.maps.event.addListener(marker, 'click', () => {
+          setActiveProperty(item);
+          map.panTo(markerPosition);
+        });
+
+        kakaoMarkersRef.current.push(marker);
+      });
+    } catch (e) {
+      console.warn('Kakao map initialization error, falling back to Leaflet:', e);
+      setMapEngine('LEAFLET');
+    }
+  }, [mapEngine, mappedProperties]);
+
+  // Sync selectedPropertyId to activeProperty and focus map
+  useEffect(() => {
+    if (selectedPropertyId) {
+      const found = properties.find((p) => p.id === selectedPropertyId);
+      if (found) {
+        if (filterType !== 'ALL' && found.propertyType !== filterType) {
+          setFilterType('ALL');
+        }
+        const coords = (found.latitude && found.longitude)
+          ? { lat: found.latitude, lng: found.longitude }
+          : getCoordinatesFromAddress(found.address);
+        setActiveProperty({ ...found, coords } as any);
+
+        if (mapEngine === 'LEAFLET' && leafletMapRef.current && coords) {
+          leafletMapRef.current.setView([coords.lat, coords.lng], 15, { animate: true });
+        } else if (mapEngine === 'KAKAO' && kakaoMapRef.current && coords && window.kakao?.maps) {
+          const pos = new window.kakao.maps.LatLng(coords.lat, coords.lng);
+          kakaoMapRef.current.panTo(pos);
+        }
+      }
+    }
+  }, [selectedPropertyId, properties, filterType, mapEngine]);
+
+  // Zoom handlers for Leaflet
+  const handleZoomIn = () => {
+    if (mapEngine === 'LEAFLET' && leafletMapRef.current) {
+      leafletMapRef.current.zoomIn();
+    } else if (mapEngine === 'KAKAO' && kakaoMapRef.current) {
+      const currentLevel = kakaoMapRef.current.getLevel();
+      kakaoMapRef.current.setLevel(currentLevel - 1);
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mapEngine === 'LEAFLET' && leafletMapRef.current) {
+      leafletMapRef.current.zoomOut();
+    } else if (mapEngine === 'KAKAO' && kakaoMapRef.current) {
+      const currentLevel = kakaoMapRef.current.getLevel();
+      kakaoMapRef.current.setLevel(currentLevel + 1);
+    }
+  };
+
+  const handleResetCenter = () => {
+    if (mappedProperties.length === 0) return;
+    if (mapEngine === 'LEAFLET' && leafletMapRef.current) {
+      if (mappedProperties.length === 1) {
+        leafletMapRef.current.setView([mappedProperties[0].coords.lat, mappedProperties[0].coords.lng], 14, { animate: true });
+      } else {
+        const bounds = mappedProperties.map((p) => [p.coords.lat, p.coords.lng] as [number, number]);
+        leafletMapRef.current.fitBounds(bounds, { padding: [50, 50] });
+      }
+    } else if (mapEngine === 'KAKAO' && kakaoMapRef.current && window.kakao?.maps) {
+      const centerCoords = new window.kakao.maps.LatLng(mappedProperties[0].coords.lat, mappedProperties[0].coords.lng);
+      kakaoMapRef.current.panTo(centerCoords);
+    }
+  };
+
   return (
     <div className={`relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-xl ${height} ${className}`}>
       
       {/* Top Map Controls Bar */}
-      <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-auto">
+      <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-wrap items-center justify-between gap-2 pointer-events-auto">
         
         {/* Filter Pills */}
         <div className="flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700 shadow-md">
           <button
-            onClick={() => {
-              setFilterType('ALL');
-            }}
+            onClick={() => setFilterType('ALL')}
             className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
               filterType === 'ALL'
                 ? 'bg-blue-600 text-white'
@@ -289,144 +395,77 @@ export const PropertyMapView: React.FC<PropertyMapViewProps> = ({
           })}
         </div>
 
-        {/* Map Engine Badge and External Links */}
-        <div className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-slate-300 shadow-md">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="font-semibold text-slate-200">
-            {kakaoReady ? '카카오 지도 실시간 연동' : 'GIS 실시간 매물 지도'}
-          </span>
-          <span className="text-slate-500">|</span>
-          <span className="font-bold text-amber-400">{mappedProperties.length}개 위치 핀 표시</span>
+        {/* Engine Switch & Status Indicator */}
+        <div className="flex items-center gap-2">
+          {kakaoAvailable && (
+            <div className="flex items-center bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700 shadow-md text-xs">
+              <button
+                onClick={() => setMapEngine('LEAFLET')}
+                className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                  mapEngine === 'LEAFLET' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                실시간 타일지도
+              </button>
+              <button
+                onClick={() => setMapEngine('KAKAO')}
+                className={`px-2 py-0.5 rounded-lg font-bold transition-all ${
+                  mapEngine === 'KAKAO' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                카카오 지도
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-slate-300 shadow-md">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-semibold text-slate-200">
+              {mapEngine === 'KAKAO' ? '카카오 지도 실시간 연동' : '실시간 인터랙티브 지도 (확대/축소 지원)'}
+            </span>
+            <span className="text-slate-500">|</span>
+            <span className="font-bold text-amber-400">{mappedProperties.length}개 위치 핀</span>
+          </div>
         </div>
       </div>
 
-      {/* Actual Kakao Map or High-Resolution Real Map Canvas */}
-      {kakaoReady ? (
-        <div ref={mapContainerRef} className="w-full h-full" />
-      ) : (
-        <div
-          className="w-full h-full relative cursor-grab active:cursor-grabbing select-none overflow-hidden bg-[#e4e9ec]"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+      {/* Real Interactive Map Canvas (Full Tile Rendering, Smooth Pan & Zoom) */}
+      <div 
+        ref={mapContainerRef} 
+        className="w-full h-full z-0 bg-[#e4e9ec]"
+        style={{ minHeight: '100%' }}
+      />
+
+      {/* Floating Zoom & Center Reset Controls */}
+      <div className="absolute right-4 bottom-5 z-[1000] flex flex-col gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-xl border border-slate-300 shadow-xl">
+        <button
+          onClick={handleZoomIn}
+          title="실시간 확대 (마우스 휠 가능)"
+          className="p-2 text-slate-700 hover:bg-slate-100 active:bg-slate-200 rounded-lg transition-colors cursor-pointer"
         >
-          {/* Detailed Korean Real Map Grid & Satellite/Road Simulation */}
-          <div
-            className="w-full h-full absolute inset-0 transition-transform duration-75"
-            style={{
-              transform: `scale(${zoomLevel}) translate(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px)`,
-              backgroundImage: `
-                radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.4) 0%, rgba(228, 233, 236, 0.9) 100%),
-                linear-gradient(to right, #d0d7de 1.5px, transparent 1.5px),
-                linear-gradient(to bottom, #d0d7de 1.5px, transparent 1.5px)
-              `,
-              backgroundSize: '100% 100%, 75px 75px, 75px 75px',
-            }}
-          >
-            {/* Real OpenStreetMap Korean Map Tiles Background for 100% genuine map visual */}
-            <div 
-              className="absolute inset-0 opacity-80 pointer-events-none"
-              style={{
-                backgroundImage: 'url("https://tile.openstreetmap.org/14/13974/6368.png"), url("https://tile.openstreetmap.org/14/13975/6368.png")',
-                backgroundSize: '50% 100%, 50% 100%',
-                backgroundPosition: '0 0, 100% 0',
-                backgroundRepeat: 'no-repeat',
-              }}
-            />
-            {/* Simulated River / Major Roads */}
-            <svg className="w-full h-full absolute inset-0 pointer-events-none opacity-40" xmlns="http://www.w3.org/2000/svg">
-              {/* Han River Curve Simulation */}
-              <path
-                d="M -100,160 Q 250,220 500,170 T 1100,200 T 1600,150"
-                fill="none"
-                stroke="#9bc3ea"
-                strokeWidth="42"
-                strokeLinecap="round"
-              />
-              {/* Teheran-ro / Major Boulevard */}
-              <path
-                d="M 50,380 L 1400,380"
-                fill="none"
-                stroke="#c9d6df"
-                strokeWidth="16"
-              />
-              <path
-                d="M 50,380 L 1400,380"
-                fill="none"
-                stroke="#ffffff"
-                strokeWidth="10"
-              />
-              {/* Gangnam-daero Cross Boulevard */}
-              <path
-                d="M 450,50 L 450,750"
-                fill="none"
-                stroke="#c9d6df"
-                strokeWidth="16"
-              />
-              <path
-                d="M 450,50 L 450,750"
-                fill="none"
-                stroke="#ffffff"
-                strokeWidth="10"
-              />
-            </svg>
-
-            {/* Landmarks / District Labels */}
-            <div className="absolute top-[28%] left-[42%] text-[11px] font-bold text-slate-500 bg-white/70 px-2 py-0.5 rounded-full border border-slate-300/80 shadow-2xs pointer-events-none">
-              강남역 / 테헤란로 상권
-            </div>
-            <div className="absolute top-[34%] left-[62%] text-[11px] font-bold text-slate-500 bg-white/70 px-2 py-0.5 rounded-full border border-slate-300/80 shadow-2xs pointer-events-none">
-              역삼 / 선릉역 비즈니스 밸리
-            </div>
-            <div className="absolute top-[42%] left-[24%] text-[11px] font-bold text-slate-500 bg-white/70 px-2 py-0.5 rounded-full border border-slate-300/80 shadow-2xs pointer-events-none">
-              서초동 법원 / 주거단지
-            </div>
-
-            {/* Interactive Property Map Pins */}
-            {mappedProperties.map((p) => {
-              const pos = getPinStyle(p.coords.lat, p.coords.lng);
-              const isSelected = activeProperty?.id === p.id;
-              const badgeClass = getBadgeColor(p.propertyType);
-
-              return (
-                <div
-                  key={p.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveProperty(p);
-                  }}
-                  style={pos}
-                  className="absolute -translate-x-1/2 -translate-y-full cursor-pointer transition-transform hover:scale-110 z-10 group"
-                >
-                  {/* Pin Body with Price Tag */}
-                  <div className={`relative flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-lg border text-xs font-bold transition-all ${badgeClass} ${
-                    isSelected ? 'ring-4 ring-yellow-400 scale-110 z-20' : ''
-                  }`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                    <span>{PROPERTY_TYPE_LABELS[p.propertyType]}</span>
-                    <span className="bg-black/25 px-1.5 py-0.2 rounded-sm text-[11px] font-extrabold text-yellow-300">
-                      {getPriceText(p)}
-                    </span>
-                  </div>
-
-                  {/* Pin Pointer Needle */}
-                  <div className="w-2.5 h-2.5 bg-slate-800 rotate-45 mx-auto -mt-1.5 border-r border-b border-white shadow-xs"></div>
-
-                  {/* Address Tooltip on Hover */}
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 hidden group-hover:block bg-slate-900 text-white text-[11px] font-medium px-2 py-1 rounded-md whitespace-nowrap shadow-xl z-30">
-                    <span className="font-bold text-yellow-300">#{p.propertyNumber}</span> {p.address}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          title="실시간 축소 (마우스 휠 가능)"
+          className="p-2 text-slate-700 hover:bg-slate-100 active:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <div className="w-full h-[1px] bg-slate-200 my-0.5" />
+        <button
+          onClick={handleResetCenter}
+          title="매물 위치 전체 보기 / 초기화"
+          className="p-2 text-slate-700 hover:bg-slate-100 active:bg-slate-200 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold transition-colors cursor-pointer"
+        >
+          <RotateCcw className="w-3.5 h-3.5 mb-0.5" />
+          <span>초기화</span>
+        </button>
+      </div>
 
       {/* Floating Property Detail Card on Pin Click */}
       {activeProperty && (
-        <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:w-96 z-30 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4.5 animate-in slide-in-from-bottom-4 duration-200">
+        <div className="absolute bottom-5 left-4 right-4 sm:left-6 sm:w-96 z-[1000] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 p-4.5 animate-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-start justify-between gap-2 pb-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <span className={`px-2 py-0.5 text-xs font-bold rounded-md ${getBadgeColor(activeProperty.propertyType)}`}>
@@ -505,36 +544,6 @@ export const PropertyMapView: React.FC<PropertyMapViewProps> = ({
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Floating Zoom & Pan Controls for Simulated Canvas */}
-      {!kakaoReady && (
-        <div className="absolute right-4 bottom-4 z-20 flex flex-col gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-xl border border-slate-300 shadow-lg">
-          <button
-            onClick={() => setZoomLevel((z) => Math.min(2.2, z + 0.2))}
-            title="지도 확대"
-            className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setZoomLevel((z) => Math.max(0.8, z - 0.2))}
-            title="지도 축소"
-            className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setZoomLevel(1);
-              setPanOffset({ x: 0, y: 0 });
-            }}
-            title="원위치 복귀"
-            className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold"
-          >
-            초기화
-          </button>
         </div>
       )}
 

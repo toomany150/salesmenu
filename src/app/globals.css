@@ -1,3 +1,4 @@
+@import 'leaflet/dist/leaflet.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -57,3 +58,16 @@ body {
   font-size: 0.75rem;
   font-weight: 600;
 }
+
+/* Leaflet Custom Pin styling */
+.custom-property-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-container {
+  font-family: inherit;
+  width: 100%;
+  height: 100%;
+}
+
