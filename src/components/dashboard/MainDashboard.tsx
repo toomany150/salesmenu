@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Building2 } from 'lucide-react';
+import { Building2, Users } from 'lucide-react';
 import { CustomerItem, PropertyItem } from '@/lib/types';
 import { INITIAL_CUSTOMERS, INITIAL_PROPERTIES } from '@/lib/mockData';
 import { Header } from '../layout/Header';
@@ -153,9 +153,6 @@ const DashboardContent: React.FC = () => {
               <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">📊</span>
               <span>전체 현황</span>
             </h2>
-            <span className="text-[11px] sm:text-xs font-semibold text-slate-400">
-              실시간 데이터베이스 집계
-            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
@@ -226,10 +223,13 @@ const DashboardContent: React.FC = () => {
         {/* 섹션 2. 🏢 새매물등록 / 매물장 검색(조건 필터) */}
         {/* (2번째 첨부 이미지 바로 밑에 위치) */}
         {/* ────────────────────────────────────────────────────────── */}
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* 섹션 2. 🏢 새매물등록 / 매물장 검색(조건 필터) */}
+        {/* ────────────────────────────────────────────────────────── */}
         <section className="bg-gradient-to-r from-emerald-50 via-teal-50/70 to-emerald-50/40 p-3.5 sm:p-4 rounded-2xl border-2 border-emerald-300/90 shadow-2xs">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-emerald-600 text-white shadow-2xs text-xs sm:text-sm font-bold">🏢</span>
+              <span className="p-2 rounded-xl bg-emerald-600 text-white shadow-2xs text-xs sm:text-sm font-bold shrink-0">🏢</span>
               <div>
                 <span className="text-xs sm:text-sm font-extrabold text-emerald-950 block">
                   매물 관리 및 실시간 조건 검색
@@ -271,104 +271,100 @@ const DashboardContent: React.FC = () => {
         </section>
 
         {/* ────────────────────────────────────────────────────────── */}
-        {/* 섹션 3. 👥 고객 관리 섹션 (사용자 요청 세로 줄 순서대로 배치) */}
-        {/* 줄 1: 고객 등록란 */}
-        {/* 줄 2: [물건 접수] 매도인 / 임대인 / 임차인(권리금 원함) */}
-        {/* 줄 3: [물건 찾음] 매수인 / 임차인 / 임차인(권리금 가능) */}
-        {/* 줄 4: 고객 검색(조건 필터) */}
+        {/* 섹션 3. 👥 고객 관리 및 실시간 조건 검색 (매물 관리와 1:1 완벽 통일) */}
         {/* ────────────────────────────────────────────────────────── */}
-        <section className="bg-gradient-to-b from-blue-50/90 via-sky-50/50 to-indigo-50/70 p-3.5 sm:p-5 rounded-2xl border-2 border-blue-200/90 shadow-2xs space-y-3">
+        <section className="bg-gradient-to-r from-blue-50 via-sky-50/70 to-blue-50/40 p-3.5 sm:p-4 rounded-2xl border-2 border-blue-300/90 shadow-2xs space-y-3">
           
-          {/* 1) 그 밑에 줄에: 고객 등록란 */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white/95 p-3 rounded-xl border border-blue-200 shadow-2xs">
+          {/* 상단 통일 헤더 (2번째 매물 관리 이미지와 완벽히 동일한 구조/위치/높이/버튼 구성) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-blue-600 text-white shadow-2xs text-xs font-bold">👥</span>
+              <span className="p-2 rounded-xl bg-blue-600 text-white shadow-2xs text-xs sm:text-sm font-bold shrink-0">👥</span>
               <div>
-                <span className="text-xs sm:text-sm font-black text-blue-950 block">
-                  고객 등록란
+                <span className="text-xs sm:text-sm font-extrabold text-blue-950 block">
+                  고객 관리 및 실시간 조건 검색
                 </span>
                 <span className="text-[11px] text-blue-800">
-                  의뢰인 기본정보, 상담 메모 및 특이사항, 음성(STT) 입력 지원
+                  신규 고객 등록과 함께 매도·임대 및 매수·임차 고객 조건 검색을 실행합니다.
                 </span>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsCustomerRegOpen(true)}
-              className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs sm:text-sm font-black text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-xl shadow-md shadow-blue-500/25 transition-all cursor-pointer shrink-0"
-            >
-              <span>＋ 고객 등록</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* 고객등록 버튼 (2번째 이미지와 나란히 배치) */}
+              <button
+                type="button"
+                onClick={() => setIsCustomerRegOpen(true)}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-black text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-xl shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+              >
+                <span>＋ 새 고객 등록</span>
+              </button>
+
+              {/* 고객검색(조건필터) 버튼 (2번째 이미지와 나란히 배치) */}
+              <button
+                type="button"
+                onClick={() => handleSelectTabWithScroll(activeTab === 'SEARCHING_GROUP' ? 'SEARCHING_GROUP' : 'RECEIVED_GROUP')}
+                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all cursor-pointer ${
+                  activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP'
+                    ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25 ring-2 ring-slate-800'
+                    : 'bg-white hover:bg-slate-50 text-slate-800 border-2 border-blue-300 shadow-2xs'
+                }`}
+              >
+                <Users className="w-4 h-4 text-blue-500" />
+                <span>고객장 검색 (조건 필터)</span>
+                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200 text-slate-800">
+                  {customers.length}명
+                </span>
+              </button>
+            </div>
           </div>
 
-          {/* 2) 그 밑에: [물건 접수] 매도인/임대인/임차인(권리금 원함) */}
-          <div>
+          {/* 고객 분류 바로가기 (물건 접수 / 물건 찾음) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-blue-200/70">
+            {/* [물건 접수] 매도인 / 임대인 / 임차인(권리금 원함) */}
             <button
               type="button"
               onClick={() => handleSelectTabWithScroll('RECEIVED_GROUP')}
-              className={`w-full flex items-center justify-between py-3 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
+              className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
                 activeTab === 'RECEIVED_GROUP'
                   ? 'bg-blue-600 text-white border-blue-700 shadow-md shadow-blue-500/30 ring-2 ring-blue-400'
-                  : 'bg-white hover:bg-blue-50/70 text-blue-950 border-blue-300 shadow-2xs'
+                  : 'bg-white hover:bg-blue-50/80 text-blue-950 border-blue-300 shadow-2xs'
               }`}
             >
-              <div className="flex items-center gap-2.5 text-left">
-                <span className={`w-3 h-3 rounded-full shrink-0 ${activeTab === 'RECEIVED_GROUP' ? 'bg-white' : 'bg-blue-600'}`}></span>
-                <span className="leading-tight">
+              <div className="flex items-center gap-2.5 text-left truncate">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeTab === 'RECEIVED_GROUP' ? 'bg-white' : 'bg-blue-600'}`}></span>
+                <span className="leading-tight truncate">
                   [물건 접수] 매도인 / 임대인 / 임차인(권리금 원함)
                 </span>
               </div>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-black shrink-0 ${
+              <span className={`px-2 py-0.5 rounded-full text-xs font-black shrink-0 ml-2 ${
                 activeTab === 'RECEIVED_GROUP' ? 'bg-white/25 text-white' : 'bg-blue-100 text-blue-800'
               }`}>
                 {receivedCustomers.length}명
               </span>
             </button>
-          </div>
 
-          {/* 3) 그 밑에: [물건 찾음] 매수인/임차인/임차인(권리금 가능) */}
-          <div>
+            {/* [물건 찾음] 매수인 / 임차인 / 임차인(권리금 가능) */}
             <button
               type="button"
               onClick={() => handleSelectTabWithScroll('SEARCHING_GROUP')}
-              className={`w-full flex items-center justify-between py-3 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
+              className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
                 activeTab === 'SEARCHING_GROUP'
                   ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-500/30 ring-2 ring-indigo-400'
-                  : 'bg-white hover:bg-indigo-50/70 text-indigo-950 border-indigo-300 shadow-2xs'
+                  : 'bg-white hover:bg-indigo-50/80 text-indigo-950 border-indigo-300 shadow-2xs'
               }`}
             >
-              <div className="flex items-center gap-2.5 text-left">
-                <span className={`w-3 h-3 rounded-full shrink-0 ${activeTab === 'SEARCHING_GROUP' ? 'bg-white' : 'bg-indigo-600'}`}></span>
-                <span className="leading-tight">
+              <div className="flex items-center gap-2.5 text-left truncate">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeTab === 'SEARCHING_GROUP' ? 'bg-white' : 'bg-indigo-600'}`}></span>
+                <span className="leading-tight truncate">
                   [물건 찾음] 매수인 / 임차인 / 임차인(권리금 가능)
                 </span>
               </div>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-black shrink-0 ${
+              <span className={`px-2 py-0.5 rounded-full text-xs font-black shrink-0 ml-2 ${
                 activeTab === 'SEARCHING_GROUP' ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-800'
               }`}>
                 {searchingCustomers.length}명
               </span>
             </button>
-          </div>
-
-          {/* 4) 그 밑에: 고객 검색(조건 필터) */}
-          <div className="bg-white/95 p-3 rounded-xl border border-blue-200/90 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 text-slate-700">
-              <span className="text-blue-600 font-black text-xs sm:text-sm">🔍 고객 검색 (조건 필터):</span>
-              <span className="text-slate-500 text-[11px] sm:text-xs">
-                매도/임대인 및 매수/임차인 이름, 연락처, 메모, 전담 권한자 실시간 필터링
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleSelectTabWithScroll(activeTab === 'ALL_PROPERTIES' ? 'RECEIVED_GROUP' : activeTab)}
-                className="w-full sm:w-auto px-3.5 py-1.5 font-black text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer text-center"
-              >
-                고객 조건 필터 즉시 열기 →
-              </button>
-            </div>
           </div>
         </section>
 
