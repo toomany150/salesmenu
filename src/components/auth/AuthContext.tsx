@@ -58,7 +58,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // 초기 로드 시 localStorage에서 세션 복원 및 사용자 목록 조회
+  // 기본 개업공인중개사 (대표) 관리자 계정 정보
+  const DEFAULT_ADMIN_USER: UserItem = {
+    id: 'usr-admin',
+    username: 'admin',
+    name: '개업공인중개사 (대표)',
+    role: 'ADMIN',
+    phone: '010-1234-5678',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  // 초기 로드 시 localStorage에서 세션 복원 (없을 경우 개업공인중개사(대표)를 기본 세션으로 설정)
   useEffect(() => {
     try {
       const stored = localStorage.getItem('cham_real_estate_user');
@@ -66,10 +78,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(stored);
         if (parsed && parsed.id) {
           setCurrentUser(parsed);
+        } else {
+          setCurrentUser(DEFAULT_ADMIN_USER);
         }
+      } else {
+        setCurrentUser(DEFAULT_ADMIN_USER);
       }
     } catch (e) {
-      console.warn('Failed to parse stored user:', e);
+      console.warn('Failed to parse stored user, fallback to default admin:', e);
+      setCurrentUser(DEFAULT_ADMIN_USER);
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // ignore
       }
     }
-    setCurrentUser(null);
+    setCurrentUser(DEFAULT_ADMIN_USER);
     localStorage.removeItem('cham_real_estate_user');
   };
 

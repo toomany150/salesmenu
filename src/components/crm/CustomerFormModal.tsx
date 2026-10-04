@@ -29,7 +29,8 @@ import {
   PropertyType, 
   TransactionType,
   PROPERTY_TYPE_LABELS,
-  PROPERTY_TYPE_ORDER
+  PROPERTY_TYPE_ORDER,
+  CustomerItem
 } from '@/lib/types';
 import { useAuth } from '@/components/auth/AuthContext';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
@@ -40,6 +41,8 @@ interface CustomerFormModalProps {
   onClose: () => void;
   onSuccess: (customer: any) => void;
   defaultGroup?: 'RECEIVED' | 'SEARCHING';
+  mode?: 'CREATE' | 'EDIT';
+  initialData?: CustomerItem | null;
 }
 
 // 금액 한글 변환 헬퍼 (만원 단위 -> 억/만원 표시)
@@ -65,6 +68,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onClose,
   onSuccess,
   defaultGroup = 'RECEIVED',
+  mode = 'CREATE',
+  initialData = null,
 }) => {
   const { currentUser, availableAgents, addCustomAgent } = useAuth();
   
@@ -78,6 +83,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   );
   const [memo, setMemo] = useState('');
   const [managerName, setManagerName] = useState<string>('개업공인중개사 (대표)');
+  const [assignedAgents, setAssignedAgents] = useState<string[]>([]);
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [newAgentInput, setNewAgentInput] = useState('');
 
@@ -198,12 +204,57 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Set default manager to 개업공인중개사 (대표) when modal opens
+  // Set default manager or populate existing data when modal opens
   useEffect(() => {
-    setManagerName('개업공인중개사 (대표)');
+    if (!isOpen) return;
+
+    if (mode === 'EDIT' && initialData) {
+      setName(initialData.name || '');
+      setPhone(initialData.phone || '');
+      setCarrier((initialData.carrier as MobileCarrier) || 'SK');
+      setType((initialData.type as CustomerType) || 'SELLER');
+      setSubType(initialData.subType || (initialData.type === 'SELLER' ? '매도인' : '매수인'));
+      setMemo(initialData.memo || '');
+      setManagerName(initialData.managerName || '개업공인중개사 (대표)');
+      setAssignedAgents(Array.isArray(initialData.assignedAgents) ? initialData.assignedAgents : []);
+
+      if (initialData.demands && initialData.demands.length > 0) {
+        const d = initialData.demands[0];
+        if (d.targetPropertyType) setTargetPropertyType(d.targetPropertyType as PropertyType);
+        if (d.targetTransactionType) setTargetTransactionType(d.targetTransactionType as TransactionType);
+        if (d.targetRegion) setTargetRegion(d.targetRegion);
+        if (d.regionReason) setRegionReason(d.regionReason);
+        if (d.preferredFloor) setPreferredFloor(d.preferredFloor);
+        if (d.preferredArea) setPreferredArea(String(d.preferredArea));
+        if (d.preferredAreaPy) setPreferredAreaPy(String(d.preferredAreaPy));
+        if (d.targetPrice) setTargetPrice(String(d.targetPrice));
+        if (d.targetJeonse) setTargetJeonse(String(d.targetJeonse));
+        if (d.minDeposit) setTargetDeposit(String(d.minDeposit));
+        if (d.minMonthlyRent) setTargetMonthlyRent(String(d.minMonthlyRent));
+        if (d.moveInTiming) setMoveInTiming(d.moveInTiming);
+        if (d.moveInReason) setMoveInReason(d.moveInReason);
+        if (d.nonNegotiableCondition) setNonNegotiableCondition(d.nonNegotiableCondition);
+        if (d.negotiableCondition) setNegotiableCondition(d.negotiableCondition);
+        if (d.requirements) setRequirements(d.requirements);
+      }
+    } else {
+      setName('');
+      setPhone('');
+      setCarrier('SK');
+      setType(defaultGroup === 'RECEIVED' ? 'SELLER' : 'BUYER');
+      setSubType(defaultGroup === 'RECEIVED' ? '매도인' : '매수인');
+      setMemo('');
+      setManagerName(
+        currentUser?.role === 'AGENT' && currentUser?.name 
+          ? currentUser.name 
+          : '개업공인중개사 (대표)'
+      );
+      setAssignedAgents([]);
+    }
+
     setIsAddingAgent(false);
     setNewAgentInput('');
-  }, [isOpen]);
+  }, [isOpen, mode, initialData, currentUser, defaultGroup]);
 
   // 면적 양방향 환산 핸들러 (공통)
   const handleAreaSqmChange = (val: string) => {
@@ -345,7 +396,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       subType,
       group,
       memo: memo.trim() || undefined,
-      managerName: managerName || '사무실',
+      managerName: managerName || '개업공인중개사 (대표)',
+      assignedAgents,
       createdById: currentUser?.id,
       creatorName: currentUser?.name,
       currentUser,
@@ -428,15 +480,19 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       };
     }
 
+    if (mode === 'EDIT' && initialData?.id) {
+      payload.id = initialData.id;
+    }
+
     try {
       const res = await fetch('/api/customers', {
-        method: 'POST',
+        method: mode === 'EDIT' ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || '고객 등록에 실패했습니다.');
+        throw new Error(data.error || '고객 등록 또는 수정에 실패했습니다.');
       }
       onSuccess(data);
       onClose();
@@ -459,13 +515,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                신규 고객 및 심층 상담장 등록
+                {mode === 'EDIT' ? '고객 정보 및 상담 내용 수정' : '신규 고객 및 심층 상담장 등록'}
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
                   {isSearching ? '🎯 매수 / 임차 상담 모드' : '📋 물건 접수 모드'}
                 </span>
               </h2>
               <p className="text-xs text-slate-500">
-                고객 기본 인적사항과 함께 희망 조건, 양보 불가 1순위 조건, 실시간 브리핑 가이드를 작성합니다.
+                {mode === 'EDIT'
+                  ? '지정된 권한자 및 개업공인중개사(대표)만 수정할 수 있습니다.'
+                  : '고객 기본 인적사항과 함께 희망 조건, 양보 불가 1순위 조건, 실시간 브리핑 가이드를 작성합니다.'}
               </p>
             </div>
           </div>
@@ -735,6 +793,93 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   }`}>
                     {managerName === '개업공인중개사 (대표)' ? '👑 개업공인중개사 (대표) [기본값]' : managerName === '사무실' ? '🏢 사무실 (공용)' : `👤 ${managerName} 전담`}
                   </span>
+                </div>
+
+                {/* 추가 지정 권한자 (복수 선택 지원) */}
+                <div className="pt-2 border-t border-slate-200 mt-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <span>👥 함께 관리할 추가 권한자 (복수 지정)</span>
+                    </span>
+                    <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                      {assignedAgents.length > 0 ? `${assignedAgents.length}명 추가 지정됨` : '선택사항'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    개업공인중개사(대표) 및 본인 외에 함께 열람·수정할 수 있는 권한자를 여러 개 추가 지정할 수 있습니다.
+                  </p>
+
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    {/* 대표가 주 담당자가 아닐 경우 대표를 추가 권한자로 지정 가능 */}
+                    {managerName !== '개업공인중개사 (대표)' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignedAgents((prev) => 
+                            prev.includes('개업공인중개사 (대표)') 
+                              ? prev.filter((a) => a !== '개업공인중개사 (대표)') 
+                              : [...prev, '개업공인중개사 (대표)']
+                          );
+                        }}
+                        className={`px-2 py-0.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                          assignedAgents.includes('개업공인중개사 (대표)')
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                            : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'
+                        }`}
+                      >
+                        {assignedAgents.includes('개업공인중개사 (대표)') ? <Check className="w-3 h-3 stroke-[3]" /> : <span>＋</span>}
+                        <span>👑 개업공인중개사 (대표)</span>
+                      </button>
+                    )}
+
+                    {/* 사무실 공용 추가 지정 */}
+                    {managerName !== '사무실' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignedAgents((prev) => 
+                            prev.includes('사무실') 
+                              ? prev.filter((a) => a !== '사무실') 
+                              : [...prev, '사무실']
+                          );
+                        }}
+                        className={`px-2 py-0.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                          assignedAgents.includes('사무실')
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {assignedAgents.includes('사무실') ? <Check className="w-3 h-3 stroke-[3]" /> : <span>＋</span>}
+                        <span>🏢 사무실 (공용)</span>
+                      </button>
+                    )}
+
+                    {/* 사용자가 등록/지정한 추가 권한자 목록 */}
+                    {availableAgents
+                      .filter((a) => a !== '개업공인중개사 (대표)' && a !== '사무실' && a !== managerName)
+                      .map((agent) => {
+                        const isAssigned = assignedAgents.includes(agent);
+                        return (
+                          <button
+                            key={agent}
+                            type="button"
+                            onClick={() => {
+                              setAssignedAgents((prev) => 
+                                prev.includes(agent) ? prev.filter((a) => a !== agent) : [...prev, agent]
+                              );
+                            }}
+                            className={`px-2 py-0.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                              isAssigned
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            {isAssigned ? <Check className="w-3 h-3 stroke-[3]" /> : <span>＋</span>}
+                            <span>👤 {agent}</span>
+                          </button>
+                        );
+                      })}
+                  </div>
                 </div>
               </div>
 
@@ -1985,7 +2130,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               disabled={submitting}
               className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
             >
-              {submitting ? '고객 등록 처리 중...' : '신규 고객 등록 완료'}
+              {submitting ? '처리 중...' : mode === 'EDIT' ? '고객 정보 수정 완료' : '신규 고객 등록 완료'}
             </button>
           </div>
         </div>

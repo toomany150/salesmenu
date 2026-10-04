@@ -71,6 +71,7 @@ model Customer {
 
   // 담당 권한자 및 등록자 정보
   managerName String   @default("사무실") // "사무실" 또는 소속공인중개사 이름
+  assignedAgents String? // 추가 지정 권한자 목록 (JSON 문자열)
   createdById String?
   creatorName String?
   user        User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
@@ -211,6 +212,7 @@ model Property {
 
   // 담당 권한자 및 등록자 정보
   managerName         String    @default("사무실") // "사무실" 또는 소속공인중개사 이름
+  assignedAgents      String?   // 추가 지정 권한자 목록 (JSON 문자열)
   createdById         String?
   creatorName         String?
   user                User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)

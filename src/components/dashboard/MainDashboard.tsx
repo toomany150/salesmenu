@@ -37,6 +37,7 @@ const DashboardContent: React.FC = () => {
   const [isPropertyRegOpen, setIsPropertyRegOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<PropertyItem | null>(null);
   const [isCustomerRegOpen, setIsCustomerRegOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
 
@@ -108,8 +109,27 @@ const DashboardContent: React.FC = () => {
     fetchData();
   };
 
-  const handleCustomerCreated = (newCust: CustomerItem) => {
-    setCustomers((prev) => [newCust, ...prev]);
+  const handleOpenNewCustomer = () => {
+    setEditingCustomer(null);
+    setIsCustomerRegOpen(true);
+  };
+
+  const handleOpenEditCustomer = (cust: CustomerItem) => {
+    setEditingCustomer(cust);
+    setIsCustomerRegOpen(true);
+    setSelectedCustomer(null);
+  };
+
+  const handleCustomerSaved = (savedCust: CustomerItem) => {
+    setCustomers((prev) => {
+      const idx = prev.findIndex((c) => c.id === savedCust.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = savedCust;
+        return next;
+      }
+      return [savedCust, ...prev];
+    });
     fetchData();
   };
 
@@ -135,7 +155,7 @@ const DashboardContent: React.FC = () => {
         receivedCustomerCount={receivedCustomers.length}
         searchingCustomerCount={searchingCustomers.length}
         onOpenNewProperty={handleOpenNewProperty}
-        onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
+        onOpenNewCustomer={handleOpenNewCustomer}
         onOpenAdminLogs={() => setIsAdminLogsOpen(true)}
         onOpenLogin={() => setIsLoginOpen(true)}
         onGoHome={() => setActiveTab('HOME')}
@@ -293,7 +313,7 @@ const DashboardContent: React.FC = () => {
               {/* 고객등록 버튼 (2번째 이미지와 나란히 배치) */}
               <button
                 type="button"
-                onClick={() => setIsCustomerRegOpen(true)}
+                onClick={handleOpenNewCustomer}
                 className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-black text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-xl shadow-md shadow-blue-500/25 transition-all cursor-pointer"
               >
                 <span>＋ 새 고객 등록</span>
@@ -477,11 +497,16 @@ const DashboardContent: React.FC = () => {
         onSuccess={handlePropertySaved}
       />
 
-      {/* 2) 신규 고객 등록 폼 */}
+      {/* 2) 신규 고객 등록 및 수정 폼 */}
       <CustomerFormModal
         isOpen={isCustomerRegOpen}
-        onClose={() => setIsCustomerRegOpen(false)}
-        onSuccess={handleCustomerCreated}
+        initialData={editingCustomer}
+        mode={editingCustomer ? 'EDIT' : 'CREATE'}
+        onClose={() => {
+          setIsCustomerRegOpen(false);
+          setEditingCustomer(null);
+        }}
+        onSuccess={handleCustomerSaved}
         defaultGroup={activeTab === 'SEARCHING_GROUP' ? 'SEARCHING' : 'RECEIVED'}
       />
 
@@ -498,11 +523,12 @@ const DashboardContent: React.FC = () => {
         }}
       />
 
-      {/* 4) 고객 상세 모달 (전화걸기 href="tel:..." + 접수매물/탐색조건 + 삭제) */}
+      {/* 4) 고객 상세 모달 (전화걸기 href="tel:..." + 접수매물/탐색조건 + 수정하기 + 삭제) */}
       <CustomerDetailModal
         customer={selectedCustomer}
         isOpen={!!selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
+        onEditCustomer={handleOpenEditCustomer}
         onSelectProperty={(prop) => {
           setSelectedCustomer(null);
           setSelectedProperty(prop);

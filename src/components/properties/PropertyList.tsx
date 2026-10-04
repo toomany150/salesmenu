@@ -25,6 +25,8 @@ import {
 import { shareViaKakao, generateSmsLink } from '@/lib/kakao';
 import { PropertyMapView } from '../map/PropertyMapView';
 import { PropertyFilterPanel } from './PropertyFilterPanel';
+import { useAuth } from '../auth/AuthContext';
+import { canEditItem } from '@/lib/auth';
 
 interface PropertyListProps {
   properties: PropertyItem[];
@@ -41,6 +43,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   onOpenNewProperty,
   onEditProperty,
 }) => {
+  const { currentUser } = useAuth();
   const [filtered, setFiltered] = useState<PropertyItem[]>(properties);
   const [viewMode, setViewMode] = useState<'SPLIT' | 'GRID' | 'MAP'>('SPLIT');
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | undefined>();
@@ -256,9 +259,14 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                   : `👤 ${property.managerName}`}
                               </span>
                             )}
+                            {Array.isArray(property.assignedAgents) && property.assignedAgents.length > 0 && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                                👥 {property.assignedAgents.join(', ')}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
-                            {onEditProperty && (
+                            {onEditProperty && canEditItem(currentUser, property) && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -471,7 +479,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                         >
                           <Share2 className="w-3.5 h-3.5" />
                         </button>
-                        {onEditProperty && (
+                        {onEditProperty && canEditItem(currentUser, property) && (
                           <button
                             type="button"
                             onClick={(e) => {

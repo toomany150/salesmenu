@@ -474,7 +474,8 @@ export interface PropertyItem {
   factoryWarehouseDetail?: FactoryWarehouseData;
   landDetail?: LandData;
   // 담당 권한자 및 등록자 정보
-  managerName?: string; // '사무실' 또는 소속공인중개사 이름
+  managerName?: string; // 주 담당 권한자 (예: 개업공인중개사(대표) 또는 소속공인중개사)
+  assignedAgents?: string[]; // 추가 지정 권한자 목록 (복수 추가 지정 가능)
   createdById?: string;
   creatorName?: string;
   createdAt: string;
@@ -571,7 +572,8 @@ export interface CustomerItem {
   // [물건 접수] 상세 정보
   receivedDetail?: CustomerReceivedPropertyDetail;
   // 담당 권한자 및 등록자 정보
-  managerName?: string; // '사무실' 또는 소속공인중개사 이름
+  managerName?: string; // 주 담당 권한자 (예: 개업공인중개사(대표) 또는 소속공인중개사)
+  assignedAgents?: string[]; // 추가 지정 권한자 목록 (복수 추가 지정 가능)
   createdById?: string;
   creatorName?: string;
   createdAt: string;
@@ -629,3 +631,7 @@ export interface PublicBuildingLedgerResult {
   isViolation?: boolean; // 위반건축물 여부
   source: 'API' | 'MOCK_DEMO';
 }
+
+// 매물 및 고객의 수정 권한 판별 함수 (auth.ts와 통일)
+export { canEditItem } from './auth';
+

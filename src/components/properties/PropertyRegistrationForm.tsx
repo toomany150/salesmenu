@@ -65,6 +65,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [propertyNumber, setPropertyNumber] = useState('');
   const [receiptDate, setReceiptDate] = useState('');
   const [managerName, setManagerName] = useState<string>('개업공인중개사 (대표)');
+  const [assignedAgents, setAssignedAgents] = useState<string[]>([]);
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [newAgentInput, setNewAgentInput] = useState('');
   const [transactionType, setTransactionType] = useState<TransactionType>('매매');
@@ -163,6 +164,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setIsNoMaintenanceFee(!!initialData.isNoMaintenanceFee);
         setConsultationNotes(initialData.consultationNotes || '');
         setManagerName(initialData.managerName || '개업공인중개사 (대표)');
+        setAssignedAgents(Array.isArray(initialData.assignedAgents) ? initialData.assignedAgents : []);
         setIsAddingAgent(false);
         setNewAgentInput('');
 
@@ -216,7 +218,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setPropertyType('APARTMENT');
         setPropertyNumber(`PROP-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`);
         setReceiptDate(new Date().toISOString().substring(0, 10));
-        setManagerName('개업공인중개사 (대표)');
+        setManagerName(
+          currentUser?.role === 'AGENT' && currentUser?.name 
+            ? currentUser.name 
+            : '개업공인중개사 (대표)'
+        );
+        setAssignedAgents([]);
         setIsAddingAgent(false);
         setNewAgentInput('');
         setTransactionType('매매');
@@ -450,7 +457,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       floorText,
       customerId: finalCustomerId,
       customerInput,
-      managerName: managerName || '사무실',
+      managerName: managerName || '개업공인중개사 (대표)',
+      assignedAgents,
       createdById: isEditMode ? initialData?.createdById : currentUser?.id,
       creatorName: isEditMode ? initialData?.creatorName : currentUser?.name,
       currentUser,
@@ -887,7 +895,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         </select>
 
                         <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium pt-0.5">
-                          <span>현재 지정 권한자:</span>
+                          <span>주 담당 권한자:</span>
                           <span className={`px-2 py-0.5 rounded text-xs font-black border ${
                             managerName === '개업공인중개사 (대표)'
                               ? 'bg-purple-100 text-purple-900 border-purple-300'
@@ -897,6 +905,94 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                           }`}>
                             {managerName === '개업공인중개사 (대표)' ? '👑 개업공인중개사 (대표) [기본값]' : managerName === '사무실' ? '🏢 사무실 (공용)' : `👤 ${managerName}`}
                           </span>
+                        </div>
+
+                        {/* 추가 지정 권한자 (복수 선택 지원) */}
+                        <div className="pt-2.5 border-t border-slate-200 mt-2 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                              <span>👥 함께 관리할 추가 권한자 (복수 지정)</span>
+                            </span>
+                            <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                              {assignedAgents.length > 0 ? `${assignedAgents.length}명 추가 지정됨` : '선택사항'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-tight">
+                            개업공인중개사(대표)와 본인 외에 함께 열람 및 수정 권한을 가질 동료 직원이나 사무실(공용)을 여러 개 추가 지정할 수 있습니다.
+                          </p>
+
+                          {/* 추가 지정 토글 버튼 목록 */}
+                          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                            {/* 대표가 주 담당자가 아닐 경우 대표를 추가 권한자로 지정 가능 */}
+                            {managerName !== '개업공인중개사 (대표)' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAssignedAgents((prev) => 
+                                    prev.includes('개업공인중개사 (대표)') 
+                                      ? prev.filter((a) => a !== '개업공인중개사 (대표)') 
+                                      : [...prev, '개업공인중개사 (대표)']
+                                  );
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                                  assignedAgents.includes('개업공인중개사 (대표)')
+                                    ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                    : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'
+                                }`}
+                              >
+                                {assignedAgents.includes('개업공인중개사 (대표)') ? <Check className="w-3 h-3 stroke-[3]" /> : <span>＋</span>}
+                                <span>👑 개업공인중개사 (대표)</span>
+                              </button>
+                            )}
+
+                            {/* 사무실 공용 추가 지정 */}
+                            {managerName !== '사무실' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAssignedAgents((prev) => 
+                                    prev.includes('사무실') 
+                                      ? prev.filter((a) => a !== '사무실') 
+                                      : [...prev, '사무실']
+                                  );
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                                  assignedAgents.includes('사무실')
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                }`}
+                              >
+                                {assignedAgents.includes('사무실') ? <Check className="w-3 h-3 stroke-[3]" /> : <span>＋</span>}
+                                <span>🏢 사무실 (공용)</span>
+                              </button>
+                            )}
+
+                            {/* 사용자가 등록/지정한 추가 권한자 목록 */}
+                            {availableAgents
+                              .filter((a) => a !== '개업공인중개사 (대표)' && a !== '사무실' && a !== managerName)
+                              .map((agent) => {
+                                const isAssigned = assignedAgents.includes(agent);
+                                return (
+                                  <button
+                                    key={agent}
+                                    type="button"
+                                    onClick={() => {
+                                      setAssignedAgents((prev) => 
+                                        prev.includes(agent) ? prev.filter((a) => a !== agent) : [...prev, agent]
+                                      );
+                                    }}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                                      isAssigned
+                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    {isAssigned ? <Check className="w-3 h-3 stroke-[3]" /> : <span>＋</span>}
+                                    <span>👤 {agent}</span>
+                                  </button>
+                                );
+                              })}
+                          </div>
                         </div>
                       </div>
                     </div>

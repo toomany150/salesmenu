@@ -81,12 +81,30 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 소속공인중개사(AGENT)인 경우, 자신이 담당/등록한 고객이 아니면 연락처 마스킹 처리
-    if (userRole === 'AGENT' && userName) {
+    // assignedAgents JSON 파싱
+    customers = customers.map((c: any) => {
+      let parsedAssignedAgents: string[] = [];
+      if (c.assignedAgents) {
+        try {
+          const p = JSON.parse(c.assignedAgents);
+          parsedAssignedAgents = Array.isArray(p) ? p : [];
+        } catch {
+          parsedAssignedAgents = c.assignedAgents ? c.assignedAgents.split(',').map((s: string) => s.trim()) : [];
+        }
+      }
+      return {
+        ...c,
+        assignedAgents: parsedAssignedAgents,
+      };
+    });
+
+    // 소속공인중개사(AGENT)인 경우, 자신이 담당/등록/추가지정된 고객이 아니면 연락처 마스킹 처리
+    if (userRole === 'AGENT' && userName && !userName.includes('개업공인중개사')) {
       customers = customers.map((cust) => {
         const isMyCustomer = 
           (cust.managerName && cust.managerName === userName) ||
-          (cust.createdById && cust.createdById === userId);
+          (cust.createdById && cust.createdById === userId) ||
+          (Array.isArray(cust.assignedAgents) && (cust.assignedAgents.includes(userName) || cust.assignedAgents.includes('사무실(공용)') || cust.assignedAgents.includes('사무실')));
 
         if (!isMyCustomer) {
           return {
@@ -121,6 +139,7 @@ export async function POST(request: NextRequest) {
       memo, 
       demand, 
       managerName, 
+      assignedAgents,
       createdById, 
       creatorName,
       currentUser
@@ -149,6 +168,7 @@ export async function POST(request: NextRequest) {
         group: finalGroup,
         memo,
         managerName: managerName || '사무실',
+        assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
         createdById: createdById || null,
         creatorName: creatorName || null,
         demands: demand
@@ -224,7 +244,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, carrier, phone, type, group, memo, managerName, currentUser } = body;
+    const { id, name, carrier, phone, type, group, memo, managerName, assignedAgents, currentUser } = body;
 
     if (!id) {
       return NextResponse.json({ error: '고객 ID가 필요합니다.' }, { status: 400 });
@@ -235,13 +255,27 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '고객을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 소속공인중개사 권한 확인
-    if (currentUser && currentUser.role !== 'ADMIN') {
+    // 권한 확인: 개업공인중개사(대표) 및 관리자(ADMIN)는 전체 수정 가능
+    // 그 외 사용자는 본인이 작성/주담당이거나 추가지정 권한자(assignedAgents)에 포함되어야 함.
+    if (currentUser && currentUser.role !== 'ADMIN' && !currentUser.name?.includes('개업공인중개사')) {
       const isCreator = existingCust.createdById && existingCust.createdById === currentUser.id;
       const isManager = existingCust.managerName && existingCust.managerName === currentUser.name;
-      if (!isCreator && !isManager) {
+      let isAssigned = false;
+      if (existingCust.assignedAgents) {
+        try {
+          const parsed = JSON.parse(existingCust.assignedAgents);
+          if (Array.isArray(parsed) && (parsed.includes(currentUser.name) || parsed.includes('사무실(공용)') || parsed.includes('사무실'))) {
+            isAssigned = true;
+          }
+        } catch {
+          if (existingCust.assignedAgents.includes(currentUser.name) || existingCust.assignedAgents.includes('사무실(공용)')) {
+            isAssigned = true;
+          }
+        }
+      }
+      if (!isCreator && !isManager && !isAssigned) {
         return NextResponse.json(
-          { error: '해당 고객의 수정 권한이 없습니다. (작성자 또는 대표 관리자만 수정 가능합니다)' },
+          { error: '해당 고객의 수정 권한이 없습니다. (개업공인중개사(대표) 또는 지정된 권한자만 수정 가능합니다)' },
           { status: 403 }
         );
       }
@@ -257,6 +291,7 @@ export async function PUT(request: NextRequest) {
         group: group || undefined,
         memo: memo !== undefined ? memo : undefined,
         managerName: managerName !== undefined ? managerName : undefined,
+        assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : undefined,
       },
       include: {
         properties: true,
@@ -282,7 +317,17 @@ export async function PUT(request: NextRequest) {
       userAgent,
     });
 
-    return NextResponse.json(updated);
+    let parsedAssignedAgents: string[] = [];
+    if (updated.assignedAgents) {
+      try {
+        const p = JSON.parse(updated.assignedAgents);
+        parsedAssignedAgents = Array.isArray(p) ? p : [];
+      } catch {
+        parsedAssignedAgents = updated.assignedAgents.split(',').map((s: string) => s.trim());
+      }
+    }
+
+    return NextResponse.json({ ...updated, assignedAgents: parsedAssignedAgents });
   } catch (error: any) {
     console.error('Error updating customer:', error);
     return NextResponse.json(

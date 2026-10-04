@@ -170,6 +170,13 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                             ? '🏢 사무실'
                             : `👤 ${managerName}`}
                         </span>
+
+                        {/* 추가 권한자 뱃지 */}
+                        {Array.isArray(customer.assignedAgents) && customer.assignedAgents.length > 0 && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 rounded-md border border-blue-200">
+                            👥 {customer.assignedAgents.join(', ')}
+                          </span>
+                        )}
                       </div>
 
                       {/* 전화번호 & 마스킹 알림 */}

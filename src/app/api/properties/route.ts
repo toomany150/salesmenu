@@ -15,9 +15,19 @@ function formatPropertyOutput(p: any) {
       parsedImages = [];
     }
   }
+  let parsedAssignedAgents: string[] = [];
+  if (p.assignedAgents) {
+    try {
+      const parsed = JSON.parse(p.assignedAgents);
+      parsedAssignedAgents = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      parsedAssignedAgents = p.assignedAgents ? p.assignedAgents.split(',').map((s: string) => s.trim()) : [];
+    }
+  }
   return {
     ...p,
     images: parsedImages,
+    assignedAgents: parsedAssignedAgents,
   };
 }
 
@@ -186,6 +196,7 @@ export async function POST(request: NextRequest) {
       landDetail,
       customerInput,
       managerName,
+      assignedAgents,
       createdById,
       creatorName,
       currentUser,
@@ -292,6 +303,7 @@ export async function POST(request: NextRequest) {
         buildingRegisterUse,
         customerId: finalCustomerId,
         managerName: managerName || '사무실',
+        assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
         createdById: createdById || null,
         creatorName: creatorName || null,
         // 종류별 관계 생성
@@ -583,6 +595,7 @@ export async function PUT(request: NextRequest) {
       factoryWarehouseDetail,
       landDetail,
       managerName,
+      assignedAgents,
       currentUser,
     } = body;
 
@@ -604,13 +617,27 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // 소속공인중개사 권한 확인: 본인이 작성/담당한 매물만 수정 가능 (대표 관리자는 전체 수정 가능)
-    if (currentUser && currentUser.role !== 'ADMIN') {
+    // 권한 확인: 개업공인중개사(대표) 및 관리자(ADMIN)는 전체 수정 가능
+    // 그 외 사용자는 본인이 작성/주담당이거나 추가지정 권한자(assignedAgents)에 포함되어야 함.
+    if (currentUser && currentUser.role !== 'ADMIN' && !currentUser.name?.includes('개업공인중개사')) {
       const isCreator = existingProp.createdById && existingProp.createdById === currentUser.id;
       const isManager = existingProp.managerName && existingProp.managerName === currentUser.name;
-      if (!isCreator && !isManager) {
+      let isAssigned = false;
+      if (existingProp.assignedAgents) {
+        try {
+          const parsed = JSON.parse(existingProp.assignedAgents);
+          if (Array.isArray(parsed) && (parsed.includes(currentUser.name) || parsed.includes('사무실(공용)') || parsed.includes('사무실'))) {
+            isAssigned = true;
+          }
+        } catch {
+          if (existingProp.assignedAgents.includes(currentUser.name) || existingProp.assignedAgents.includes('사무실(공용)')) {
+            isAssigned = true;
+          }
+        }
+      }
+      if (!isCreator && !isManager && !isAssigned) {
         return NextResponse.json(
-          { error: '해당 매물의 수정 권한이 없습니다. (작성자 또는 대표 관리자만 수정 가능합니다)' },
+          { error: '해당 매물의 수정 권한이 없습니다. (개업공인중개사(대표) 또는 지정된 권한자만 수정 가능합니다)' },
           { status: 403 }
         );
       }
@@ -684,6 +711,7 @@ export async function PUT(request: NextRequest) {
         buildingRegisterUse: buildingRegisterUse !== undefined ? buildingRegisterUse : undefined,
         customerId: finalCustomerId,
         managerName: managerName !== undefined ? managerName : undefined,
+        assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : undefined,
 
         // 서브 데이터 업서트
         apartmentDetail:
