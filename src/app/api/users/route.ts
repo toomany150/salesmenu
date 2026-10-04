@@ -1,10 +1,10 @@
-// src/app/api/users/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma';
 import { DEFAULT_USERS, ensureSeedUsers, recordAccessLog } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
+    await ensureDatabaseSchema();
     await ensureSeedUsers();
 
     let users: any[] = [];
@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureDatabaseSchema();
     const body = await request.json();
     const { username, password, name, role, phone, isActive, adminUser } = body;
     const headerRole = request.headers.get('x-user-role');
