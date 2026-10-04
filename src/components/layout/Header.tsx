@@ -19,8 +19,8 @@ interface HeaderProps {
   propertyCount?: number;
   receivedCustomerCount?: number;
   searchingCustomerCount?: number;
-  onOpenNewProperty: () => void;
-  onOpenNewCustomer: () => void;
+  onOpenNewProperty?: () => void;
+  onOpenNewCustomer?: () => void;
   onOpenAdminLogs?: () => void;
   onOpenLogin?: () => void;
   onGoHome?: () => void;
@@ -186,25 +186,21 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Quick Action Buttons (새 매물 등록, 고객 등록) */}
-            <div className="flex items-center space-x-1.5 shrink-0">
-              <button
-                onClick={onOpenNewProperty}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm shadow-blue-500/20 active:scale-95 cursor-pointer"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">새 매물 등록</span>
-                <span className="sm:hidden">매물</span>
-              </button>
-              <button
-                onClick={onOpenNewCustomer}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-2xs cursor-pointer"
-              >
-                <Users className="w-3.5 h-3.5 text-blue-600" />
-                <span className="hidden sm:inline">고객 등록</span>
-                <span className="sm:hidden">고객</span>
-              </button>
-            </div>
+            {/* 상담 메뉴 (신규 상담 및 고객 접수) */}
+            {onOpenNewCustomer && (
+              <div className="flex items-center shrink-0">
+                <button
+                  type="button"
+                  onClick={onOpenNewCustomer}
+                  title="신규 상담 접수 및 고객 상담장 등록"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="hidden sm:inline">상담 접수</span>
+                  <span className="sm:hidden">상담</span>
+                </button>
+              </div>
+            )}
 
           </div>
 
