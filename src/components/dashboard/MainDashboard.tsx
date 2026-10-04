@@ -16,16 +16,17 @@ import { LoginModal } from '../auth/LoginModal';
 import { AdminLogModal } from '../auth/AdminLogModal';
 import { initKakao } from '@/lib/kakao';
 
-type MainViewTab = 'RECEIVED_GROUP' | 'SEARCHING_GROUP' | 'ALL_PROPERTIES';
+type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP';
 
 const DashboardContent: React.FC = () => {
   const { currentUser } = useAuth();
 
   // Main view state:
-  // RECEIVED_GROUP: [물건 접수] 매도인 / 임대인
-  // SEARCHING_GROUP: [물건 찾음] 매수인 / 임차인
-  // ALL_PROPERTIES: 통합 매물장
-  const [activeTab, setActiveTab] = useState<MainViewTab>('RECEIVED_GROUP');
+  // HOME: 깔끔한 대시보드 요약 화면 (중복 목록 미노출)
+  // ALL_PROPERTIES: 자세한 매물현황 (필터 + 목록 + 지도)
+  // RECEIVED_GROUP: 자세한 고객현황 [물건 접수] 매도인 / 임대인
+  // SEARCHING_GROUP: 자세한 고객현황 [물건 찾음] 매수인 / 임차인
+  const [activeTab, setActiveTab] = useState<MainViewTab>('HOME');
 
   // Data States
   const [customers, setCustomers] = useState<CustomerItem[]>(INITIAL_CUSTOMERS);
@@ -137,7 +138,7 @@ const DashboardContent: React.FC = () => {
         onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
         onOpenAdminLogs={() => setIsAdminLogsOpen(true)}
         onOpenLogin={() => setIsLoginOpen(true)}
-        onGoHome={() => setActiveTab('RECEIVED_GROUP')}
+        onGoHome={() => setActiveTab('HOME')}
       />
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-4 sm:space-y-6">
@@ -372,86 +373,135 @@ const DashboardContent: React.FC = () => {
         </section>
 
         {/* ────────────────────────────────────────────────────────── */}
-        {/* 섹션 4. 📋 매물현황과 고객현황 (누를 경우 등록된 현황 상세페이지로 전환 및 스크롤) */}
+        {/* 섹션 4. 📋 매물현황과 고객현황 */}
+        {/* (요청사항: '매물현황', '고객현황'으로 명칭 변경 및 클릭 시 자세한 현황으로 이동) */}
         {/* ────────────────────────────────────────────────────────── */}
-        <section className="bg-white p-3 sm:p-4 rounded-2xl border-2 border-slate-300 shadow-xs">
-          <div className="flex items-center justify-between mb-2.5 px-1">
-            <span className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
-              <span>📑 등록 현황 상세페이지 바로가기</span>
-              <span className="text-[10px] sm:text-xs font-normal text-slate-500">(버튼 클릭 시 등록된 현황 상세페이지로 즉시 이동합니다)</span>
+        <section className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-slate-300 shadow-sm">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="text-sm font-black text-slate-900 flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-slate-100 text-slate-700">📑</span>
+              <span>등록 현황 바로가기</span>
+            </span>
+            <span className="text-[11px] sm:text-xs font-semibold text-slate-500">
+              버튼을 누르면 해당 자세한 현황 페이지로 전환됩니다.
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
-            {/* 매물현황 버튼 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {/* 1) 매물현황 버튼 (요청대로 '매물현황'으로 명칭 변경) */}
             <button
               type="button"
               onClick={() => handleSelectTabWithScroll('ALL_PROPERTIES')}
-              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
+              className={`flex items-center justify-between py-3.5 px-5 rounded-xl font-black text-sm sm:text-base transition-all cursor-pointer border-2 ${
                 activeTab === 'ALL_PROPERTIES'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-md shadow-slate-900/25 ring-2 ring-slate-800'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/25 ring-2 ring-slate-800 scale-[1.01]'
+                  : 'bg-gradient-to-r from-emerald-50/70 to-teal-50/50 hover:from-emerald-100/80 hover:to-teal-100/60 text-slate-900 border-emerald-300 hover:border-emerald-500 shadow-xs'
               }`}
             >
-              <Building2 className="w-4 h-4 text-emerald-400" />
-              <span>매물현황 상세페이지</span>
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                activeTab === 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
-              }`}>
-                {properties.length}건
-              </span>
+              <div className="flex items-center gap-2.5">
+                <Building2 className={`w-5 h-5 ${activeTab === 'ALL_PROPERTIES' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                <span>매물현황</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                  activeTab === 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
+                }`}>
+                  {properties.length}건
+                </span>
+                <span className="text-xs font-semibold opacity-70">자세히 보기 →</span>
+              </div>
             </button>
 
-            {/* 고객현황 버튼 */}
+            {/* 2) 고객현황 버튼 (요청대로 '고객현황'으로 명칭 변경) */}
             <button
               type="button"
-              onClick={() => handleSelectTabWithScroll(activeTab === 'ALL_PROPERTIES' ? 'RECEIVED_GROUP' : activeTab)}
-              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
-                activeTab !== 'ALL_PROPERTIES'
-                  ? 'bg-blue-600 text-white border-blue-700 shadow-md shadow-blue-500/25 ring-2 ring-blue-400'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300'
+              onClick={() => handleSelectTabWithScroll(activeTab === 'SEARCHING_GROUP' ? 'SEARCHING_GROUP' : 'RECEIVED_GROUP')}
+              className={`flex items-center justify-between py-3.5 px-5 rounded-xl font-black text-sm sm:text-base transition-all cursor-pointer border-2 ${
+                activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP'
+                  ? 'bg-blue-600 text-white border-blue-700 shadow-lg shadow-blue-500/25 ring-2 ring-blue-400 scale-[1.01]'
+                  : 'bg-gradient-to-r from-blue-50/70 to-indigo-50/50 hover:from-blue-100/80 hover:to-indigo-100/60 text-slate-900 border-blue-300 hover:border-blue-500 shadow-xs'
               }`}
             >
-              <span className="text-sm">👥</span>
-              <span>고객현황 상세페이지</span>
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                activeTab !== 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
-              }`}>
-                {customers.length}명
-              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-lg">👥</span>
+                <span>고객현황</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                  activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-blue-200/80 text-blue-900'
+                }`}>
+                  {customers.length}명
+                </span>
+                <span className="text-xs font-semibold opacity-70">자세히 보기 →</span>
+              </div>
             </button>
           </div>
         </section>
 
         {/* ────────────────────────────────────────────────────────── */}
-        {/* 섹션 5. 등록된 현황 상세페이지 콘텐츠 영역 */}
-        {/* (중복되는 4번째 이미지 내용은 완전 제거, 단일 상세 뷰어로 렌더링) */}
+        {/* 섹션 5. 자세한 현황 콘텐츠 영역 (버튼 클릭 시에만 노출) */}
+        {/* (첫번째 이미지인 중복 고객목록은 기본 홈화면에서 삭제됨!) */}
         {/* ────────────────────────────────────────────────────────── */}
         <div ref={detailSectionRef} className="scroll-mt-20">
-          {activeTab === 'RECEIVED_GROUP' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <CustomerList
-                customers={customers}
-                activeGroup="RECEIVED"
-                onSelectCustomer={(c) => setSelectedCustomer(c)}
-                onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
-              />
+          
+          {/* A. 자세한 고객현황 (물건 접수 / 물건 찾음) */}
+          {(activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP') && (
+            <div className="space-y-4 animate-in fade-in duration-200 bg-white/70 p-3 sm:p-5 rounded-2xl border-2 border-blue-200 shadow-sm">
+              <div className="flex items-center justify-between bg-blue-50 p-3 rounded-xl border border-blue-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                  <span className="text-xs sm:text-sm font-black text-blue-950">
+                    [자세한 고객현황] {activeTab === 'RECEIVED_GROUP' ? '매도·임대·권리금 접수 고객 관리장' : '매수·임차·권리금 탐색 고객 관리장'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('HOME')}
+                  className="px-3 py-1 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-300 shadow-2xs transition-colors cursor-pointer"
+                >
+                  ✕ 현황판 접기
+                </button>
+              </div>
+
+              {activeTab === 'RECEIVED_GROUP' ? (
+                <CustomerList
+                  customers={customers}
+                  activeGroup="RECEIVED"
+                  onSelectCustomer={(c) => setSelectedCustomer(c)}
+                  onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
+                />
+              ) : (
+                <CustomerList
+                  customers={customers}
+                  activeGroup="SEARCHING"
+                  onSelectCustomer={(c) => setSelectedCustomer(c)}
+                  onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
+                />
+              )}
             </div>
           )}
 
-        {activeTab === 'SEARCHING_GROUP' && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <CustomerList
-              customers={customers}
-              activeGroup="SEARCHING"
-              onSelectCustomer={(c) => setSelectedCustomer(c)}
-              onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
-            />
-          </div>
-        )}
-
+          {/* B. 자세한 매물현황 (통합 매물장 + 실시간 지도) */}
           {activeTab === 'ALL_PROPERTIES' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="space-y-4 animate-in fade-in duration-200 bg-white/70 p-3 sm:p-5 rounded-2xl border-2 border-emerald-300 shadow-sm">
+              <div className="flex items-center justify-between bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                  <span className="text-xs sm:text-sm font-black text-emerald-950">
+                    [자세한 매물현황] 전체 등록 매물 목록 및 실시간 카카오/GIS 지도
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('HOME')}
+                  className="px-3 py-1 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-300 shadow-2xs transition-colors cursor-pointer"
+                >
+                  ✕ 현황판 접기
+                </button>
+              </div>
+
               <PropertyList
                 properties={properties}
                 customers={customers}
@@ -461,6 +511,7 @@ const DashboardContent: React.FC = () => {
               />
             </div>
           )}
+
         </div>
 
       </main>

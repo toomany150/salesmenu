@@ -163,7 +163,6 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                 return (
                   <div
                     key={property.id}
-                    onMouseEnter={() => setHighlightedPropertyId(property.id)}
                     onClick={() => {
                       setHighlightedPropertyId(property.id);
                       onSelectProperty(property);
@@ -255,9 +254,17 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <span>수정</span>
                               </button>
                             )}
-                            <span className="text-blue-600 font-bold hover:underline text-[11px]">
-                              상세보기 →
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHighlightedPropertyId(property.id);
+                                onSelectProperty(property);
+                              }}
+                              className="text-blue-600 font-bold hover:underline text-[11px] flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <span>상세보기 →</span>
+                            </button>
                           </div>
                         </div>
 

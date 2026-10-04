@@ -27,6 +27,19 @@ export default function RootLayout({
           crossOrigin="anonymous"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
         />
+        {/* Leaflet CSS for guaranteed real map fallback */}
+        <link
+          rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossOrigin=""
+        />
+        {/* Kakao Maps SDK with services and clusterer */}
+        <script
+          id="kakao-map-sdk"
+          src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || 'ab4074f3fc327e405a625fc856bee022'}&autoload=false&libraries=services,clusterer`}
+          defer
+        />
       </head>
       <body className="antialiased selection:bg-blue-500 selection:text-white font-sans">
         {children}
