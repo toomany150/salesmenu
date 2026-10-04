@@ -25,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<UserItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [availableAgents, setAvailableAgents] = useState<string[]>([
+    '개업공인중개사 (대표)',
     '김소공 실장',
     '이소공 실장',
     '박소공 실장',
@@ -48,17 +49,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
 
-    // 서버에서 에이전트 목록 가져오기
+    // 서버에서 에이전트 목록 가져오기 (개업공인중개사 포함)
     fetch('/api/users')
       .then((res) => res.json())
       .then((users: UserItem[]) => {
         if (Array.isArray(users) && users.length > 0) {
           const agentNames = users
-            .filter((u) => u.role === 'AGENT' && u.isActive)
-            .map((u) => u.name);
-          if (agentNames.length > 0) {
-            setAvailableAgents(agentNames);
-          }
+            .filter((u) => u.isActive)
+            .map((u) => (u.role === 'ADMIN' ? '개업공인중개사 (대표)' : u.name));
+          const unique = Array.from(new Set(['개업공인중개사 (대표)', ...agentNames]));
+          setAvailableAgents(unique);
         }
       })
       .catch((err) => console.warn('Could not load user list:', err));

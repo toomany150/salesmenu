@@ -523,7 +523,14 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setType('LESSOR'); setSubType('LESSEE_PREMIUM'); }}
+                        onClick={() => {
+                          setType('LESSOR');
+                          setSubType('LESSEE_PREMIUM');
+                          if (recvPropertyType !== 'STORE' && recvPropertyType !== 'OFFICE') {
+                            setRecvPropertyType('STORE');
+                          }
+                          setRecvTransactionType('월세');
+                        }}
                         className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
                           subType === 'LESSEE_PREMIUM'
                             ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
@@ -568,7 +575,14 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setType('LESSEE'); setSubType('LESSEE_PREMIUM_OK'); }}
+                        onClick={() => {
+                          setType('LESSEE');
+                          setSubType('LESSEE_PREMIUM_OK');
+                          if (targetPropertyType !== 'STORE' && targetPropertyType !== 'OFFICE') {
+                            setTargetPropertyType('STORE');
+                          }
+                          setTargetTransactionType('월세');
+                        }}
                         className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
                           subType === 'LESSEE_PREMIUM_OK'
                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
@@ -634,10 +648,13 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         onChange={(e) => setManagerName(e.target.value)}
                         className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
                       >
+                        <option value="개업공인중개사 (대표)">👑 개업공인중개사 (대표)</option>
                         <option value="사무실">🏢 사무실 (공용/워크인)</option>
-                        {availableAgents.map((agent) => (
-                          <option key={agent} value={agent}>👤 {agent}</option>
-                        ))}
+                        {availableAgents
+                          .filter((agent) => !agent.includes('개업공인중개사'))
+                          .map((agent) => (
+                            <option key={agent} value={agent}>👤 {agent}</option>
+                          ))}
                       </select>
                     </div>
                   )}
@@ -649,23 +666,44 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-blue-600" />
                     <span className="text-xs font-bold text-slate-800">고객 담당 권한자:</span>
-                    <span className="text-xs font-extrabold text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
-                      {managerName === '사무실' ? '사무실 전체 공용' : `${managerName} 전담`}
+                    <span className={`text-xs font-extrabold px-2 py-0.5 rounded border ${
+                      managerName.includes('개업공인중개사')
+                        ? 'text-purple-800 bg-purple-100 border-purple-300'
+                        : managerName === '사무실'
+                        ? 'text-slate-800 bg-white border-slate-300'
+                        : 'text-blue-700 bg-white border-blue-200'
+                    }`}>
+                      {managerName.includes('개업공인중개사')
+                        ? '👑 개업공인중개사 (대표)'
+                        : managerName === '사무실'
+                        ? '🏢 사무실 전체 공용'
+                        : `👤 ${managerName} 전담`}
                     </span>
                   </div>
-                  {currentUser && (
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setManagerName('사무실')}
-                        className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors ${
-                          managerName === '사무실'
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-slate-600 border-slate-300'
-                        }`}
-                      >
-                        🏢 사무실
-                      </button>
+                  <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setManagerName('개업공인중개사 (대표)')}
+                      className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors ${
+                        managerName === '개업공인중개사 (대표)'
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'
+                      }`}
+                    >
+                      👑 개업공인중개사
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManagerName('사무실')}
+                      className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors ${
+                        managerName === '사무실'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-600 border-slate-300'
+                      }`}
+                    >
+                      🏢 사무실
+                    </button>
+                    {currentUser && currentUser.name !== '개업공인중개사 (대표)' && (
                       <button
                         type="button"
                         onClick={() => setManagerName(currentUser.name)}
@@ -677,8 +715,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       >
                         👤 본인 ({currentUser.name})
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -720,28 +758,45 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">희망 매물 종류</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        희망 매물 종류 {subType === 'LESSEE_PREMIUM_OK' && <span className="text-indigo-600 font-extrabold">(상가/사무실 전용)</span>}
+                      </label>
                       <select
                         value={targetPropertyType}
                         onChange={(e) => setTargetPropertyType(e.target.value as PropertyType)}
                         className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                       >
-                        {PROPERTY_TYPE_ORDER.map((p) => (
-                          <option key={p} value={p}>{PROPERTY_TYPE_LABELS[p]}</option>
-                        ))}
+                        {subType === 'LESSEE_PREMIUM_OK' ? (
+                          <>
+                            <option value="STORE">상가점포</option>
+                            <option value="OFFICE">사무실</option>
+                          </>
+                        ) : (
+                          PROPERTY_TYPE_ORDER.map((p) => (
+                            <option key={p} value={p}>{PROPERTY_TYPE_LABELS[p]}</option>
+                          ))
+                        )}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">희망 거래 유형</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        희망 거래 유형 {subType === 'LESSEE_PREMIUM_OK' && <span className="text-indigo-600 font-extrabold">(보증금/월세 전용)</span>}
+                      </label>
                       <select
                         value={targetTransactionType}
                         onChange={(e) => setTargetTransactionType(e.target.value as TransactionType)}
                         className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                       >
-                        <option value="월세">월세 (보증금 / 월차임)</option>
-                        <option value="매매">매매</option>
-                        {targetPropertyType !== 'STORE' && <option value="전세">전세</option>}
+                        {subType === 'LESSEE_PREMIUM_OK' ? (
+                          <option value="월세">보증금 / 월세</option>
+                        ) : (
+                          <>
+                            <option value="월세">월세 (보증금 / 월차임)</option>
+                            <option value="매매">매매</option>
+                            {targetPropertyType !== 'STORE' && <option value="전세">전세</option>}
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -792,16 +847,18 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
-                        <span className="text-indigo-600">📍</span>
-                        희망지역/상권을 선정한 이유
+                      <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <span className="text-indigo-600">📍</span>
+                          희망지역/상권을 선정한 이유
+                        </span>
+                        <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-normal">음성 입력 지원</span>
                       </label>
-                      <input
-                        type="text"
+                      <VoiceInput
                         value={regionReason}
-                        onChange={(e) => setRegionReason(e.target.value)}
+                        onChange={setRegionReason}
                         placeholder="예: 기존 단골 고객층 흡수 유리, 배후 3,000세대 대단지 아파트 배후수요, 직장과 도보 10분 이내 등"
-                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-800"
+                        className="text-xs text-slate-800"
                       />
                     </div>
                   </div>
@@ -1184,15 +1241,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                            권리금 상한 설정 이유
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
+                            <span>권리금 상한 설정 이유</span>
+                            <span className="text-[10px] text-amber-700 bg-amber-50 px-1 rounded">음성 지원</span>
                           </label>
-                          <input
-                            type="text"
+                          <VoiceInput
                             value={premiumReason}
-                            onChange={(e) => setPremiumReason(e.target.value)}
+                            onChange={setPremiumReason}
                             placeholder="예: 초기 인테리어 전면 철거 필요, 창업 예산 한도 초과 불가 등"
-                            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                            className="text-xs"
                           />
                         </div>
                       </div>
@@ -1237,15 +1294,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                            최소 면적 요구 이유
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center justify-between">
+                            <span>최소 면적 요구 이유</span>
+                            <span className="text-[10px] text-amber-700 bg-amber-50 px-1 rounded">음성 지원</span>
                           </label>
-                          <input
-                            type="text"
+                          <VoiceInput
                             value={minAreaReason}
-                            onChange={(e) => setMinAreaReason(e.target.value)}
+                            onChange={setMinAreaReason}
                             placeholder="예: 4인 테이블 10개 및 5평 주방 집기 배치 필수"
-                            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                            className="text-xs"
                           />
                         </div>
                       </div>
@@ -1257,12 +1314,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         <AlertTriangle className="w-4 h-4 text-amber-600" />
                         지금까지 둘러본 매물과 계약하지 않은 이유 (필수 질문)
                       </label>
-                      <textarea
+                      <VoiceTextarea
                         rows={2}
                         value={previousVisitedProps}
-                        onChange={(e) => setPreviousVisitedProps(e.target.value)}
+                        onChange={setPreviousVisitedProps}
                         placeholder="예: 인근 ○○빌딩 1층 봤으나 주방 덕트 옥상입상 불가로 탈락, △△상가는 권리금 8천 요구가 과다하여 포기 등"
-                        className="w-full text-xs p-2.5 bg-amber-50/20 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900"
+                        className="text-xs p-2.5 bg-amber-50/20 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:bg-white text-slate-900"
                       />
                       <p className="text-[11px] text-amber-800">
                         ※ 손님이 계약을 포기했던 치명적 원인을 파악하면 부적합한 매물 브리핑으로 인한 시간 낭비를 사전에 100% 방지할 수 있습니다.
@@ -1404,29 +1461,46 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   {/* 3-1. 매물 종류 & 거래 유형 & 층수/동호수 & 입주시기 */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">매물 종류 *</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        매물 종류 * {subType === 'LESSEE_PREMIUM' && <span className="text-blue-600 font-extrabold">(상가/사무실 전용)</span>}
+                      </label>
                       <select
                         value={recvPropertyType}
                         onChange={(e) => setRecvPropertyType(e.target.value as PropertyType)}
                         className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                       >
-                        {PROPERTY_TYPE_ORDER.map((p) => (
-                          <option key={p} value={p}>{PROPERTY_TYPE_LABELS[p]}</option>
-                        ))}
+                        {subType === 'LESSEE_PREMIUM' ? (
+                          <>
+                            <option value="STORE">상가점포</option>
+                            <option value="OFFICE">사무실</option>
+                          </>
+                        ) : (
+                          PROPERTY_TYPE_ORDER.map((p) => (
+                            <option key={p} value={p}>{PROPERTY_TYPE_LABELS[p]}</option>
+                          ))
+                        )}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">거래 유형 *</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        거래 유형 * {subType === 'LESSEE_PREMIUM' && <span className="text-blue-600 font-extrabold">(보증금/월세 전용)</span>}
+                      </label>
                       <select
                         value={recvTransactionType}
                         onChange={(e) => setRecvTransactionType(e.target.value as any)}
                         className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
                       >
-                        <option value="매매">매매</option>
-                        <option value="전세">전세</option>
-                        <option value="월세">월세</option>
-                        <option value="임대">임대 (보증금/월세)</option>
+                        {subType === 'LESSEE_PREMIUM' ? (
+                          <option value="월세">보증금 / 월세</option>
+                        ) : (
+                          <>
+                            <option value="매매">매매</option>
+                            <option value="전세">전세</option>
+                            <option value="월세">월세</option>
+                            <option value="임대">임대 (보증금/월세)</option>
+                          </>
+                        )}
                       </select>
                     </div>
 

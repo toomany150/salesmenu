@@ -23,7 +23,7 @@ interface VoiceTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextA
 }
 
 /**
- * 브라우저 Web Speech API 음성 인식 훅
+ * 브라우저 Web Speech API 음성 인식 훅 (모바일 및 PC 호환, 공공데이터 코드와 완전 분리)
  */
 export function useVoiceRecognition({
   onTranscript,
@@ -38,38 +38,20 @@ export function useVoiceRecognition({
     if (typeof window !== 'undefined') {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        setIsSupported(true);
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'ko-KR';
-        recognition.continuous = false;
-        recognition.interimResults = false;
-
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          if (transcript) {
-            onTranscript(transcript);
-          }
-          setIsListening(false);
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn('Speech recognition error:', event.error);
-          setIsListening(false);
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-
-        recognitionRef.current = recognition;
-      }
+      setIsSupported(!!SpeechRecognition);
     }
-  }, [onTranscript]);
+  }, []);
 
   const toggleListening = () => {
-    if (!isSupported) {
-      alert('현재 브라우저에서는 음성 인식을 지원하지 않습니다. (Chrome, Edge 브라우저 권장)');
+    if (typeof window === 'undefined') return;
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert(
+        '현재 브라우저에서는 음성 인식을 지원하지 않습니다.\n스마트폰 및 PC의 Chrome(크롬), Safari(사파리), Edge 브라우저를 이용해 주시기 바랍니다.'
+      );
       return;
     }
 
@@ -77,17 +59,61 @@ export function useVoiceRecognition({
       try {
         recognitionRef.current?.stop();
       } catch (err) {
-        console.warn(err);
+        console.warn('SpeechRecognition stop error:', err);
       }
       setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current?.start();
+      return;
+    }
+
+    try {
+      // 모바일 브라우저 호환성을 위해 매 녹음 시도마다 신규 인스턴스 생성
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'ko-KR';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
         setIsListening(true);
-      } catch (err) {
-        console.warn(err);
+      };
+
+      recognition.onresult = (event: any) => {
+        if (event.results && event.results[0] && event.results[0][0]) {
+          const transcript = event.results[0][0].transcript;
+          if (transcript && transcript.trim()) {
+            onTranscript(transcript.trim());
+          }
+        }
         setIsListening(false);
-      }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          alert(
+            '【마이크 사용 권한 필요】\n\n' +
+            '스마트폰 또는 브라우저에서 마이크 사용이 차단되어 있습니다.\n' +
+            '1. 브라우저 상단 주소창 좌측의 설정/자물쇠 아이콘을 터치하세요.\n' +
+            '2. "마이크" 항목을 "허용"으로 변경하신 후 다시 눌러주세요.'
+          );
+        } else if (event.error === 'network') {
+          alert('네트워크 연결이 불안정하여 음성 인식 서버에 연결할 수 없습니다. 인터넷 상태를 확인해 주세요.');
+        } else if (event.error === 'no-speech') {
+          // 음성이 감지되지 않고 끝난 경우
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+    } catch (err: any) {
+      console.warn('SpeechRecognition start failed:', err);
+      setIsListening(false);
     }
   };
 
@@ -171,9 +197,9 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         <div className="flex items-center justify-between">
           <label className="block text-xs font-bold text-slate-700">{label}</label>
           {isListening && (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-rose-600"></span>
-              음성을 듣고 있습니다...
+            <span className="flex items-center gap-1.5 text-[11px] font-black text-red-600 animate-pulse bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+              말씀해 주세요 (음성 변환 중...)
             </span>
           )}
         </div>
@@ -184,9 +210,9 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           type="text"
           value={value}
           onChange={(e) => emitChange(e.target.value)}
-          placeholder={isListening ? '말씀해주세요... (음성 인식 중)' : placeholder}
+          placeholder={isListening ? '🎙️ 지금 말씀하세요... (음성이 자동 입력됩니다)' : placeholder}
           className={`w-full pr-10 text-xs sm:text-sm px-3 py-2 bg-white border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all ${
-            isListening ? 'border-rose-400 ring-2 ring-rose-200' : 'border-slate-300'
+            isListening ? 'border-red-500 ring-2 ring-red-300 bg-red-50/30' : 'border-slate-300'
           } ${className}`}
           {...rest}
         />
@@ -196,7 +222,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           title={isListening ? '음성인식 종료' : '마이크로 음성 입력하기'}
           className={`absolute right-1.5 p-1.5 rounded-lg transition-all cursor-pointer ${
             isListening
-              ? 'bg-rose-600 text-white animate-pulse'
+              ? 'bg-red-600 text-white animate-pulse shadow-md shadow-red-500/50 ring-2 ring-red-400'
               : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
           }`}
         >
@@ -246,22 +272,22 @@ export const VoiceTextarea: React.FC<VoiceTextareaProps> = ({
         {label && <label className="block text-xs font-bold text-slate-800">{label}</label>}
         <div className="flex items-center gap-1.5">
           {isListening && (
-            <span className="flex items-center gap-1 text-[11px] font-bold text-rose-600 animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-rose-600"></span>
-              말씀해주세요...
+            <span className="flex items-center gap-1.5 text-[11px] font-black text-red-600 animate-pulse bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+              말씀해 주세요 (음성 자동 입력 중)
             </span>
           )}
           <button
             type="button"
             onClick={toggleListening}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
               isListening
-                ? 'bg-rose-600 text-white border-rose-600 shadow-xs animate-pulse ring-2 ring-rose-300'
+                ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-500/40 animate-pulse ring-4 ring-red-400/50'
                 : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-600 border-slate-300'
             }`}
           >
             <Mic className="w-3.5 h-3.5" />
-            <span>{isListening ? '인식중...' : '음성입력'}</span>
+            <span>{isListening ? '듣는중...' : '음성입력'}</span>
           </button>
         </div>
       </div>
@@ -271,9 +297,9 @@ export const VoiceTextarea: React.FC<VoiceTextareaProps> = ({
           rows={rows}
           value={value}
           onChange={(e) => emitChange(e.target.value)}
-          placeholder={isListening ? '음성을 인식하고 있습니다. 마이크에 대고 편하게 말씀하세요...' : placeholder}
+          placeholder={isListening ? '🎙️ 음성을 실시간 변환 중입니다. 마이크에 편하게 말씀하세요...' : placeholder}
           className={`w-full text-xs sm:text-sm p-3 bg-white border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all ${
-            isListening ? 'border-rose-400 ring-2 ring-rose-200' : 'border-slate-300'
+            isListening ? 'border-red-500 ring-2 ring-red-300 bg-red-50/20' : 'border-slate-300'
           } ${className}`}
           {...rest}
         />

@@ -170,8 +170,16 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                 </span>
 
                 {/* 담당 권한자 뱃지 */}
-                <span className="px-2.5 py-0.5 text-xs font-bold bg-slate-200 text-slate-800 rounded-md">
-                  {managerName === '사무실' ? '🏢 담당: 사무실' : `👤 담당: ${managerName}`}
+                <span className={`px-2.5 py-0.5 text-xs font-bold rounded-md ${
+                  managerName.includes('개업공인중개사')
+                    ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                    : 'bg-slate-200 text-slate-800'
+                }`}>
+                  {managerName.includes('개업공인중개사')
+                    ? '👑 담당: 개업공인중개사 (대표)'
+                    : managerName === '사무실'
+                    ? '🏢 담당: 사무실'
+                    : `👤 담당: ${managerName}`}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

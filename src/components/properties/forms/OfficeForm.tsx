@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { OfficeData } from '@/lib/types';
+import { VoiceTextarea } from '@/components/common/VoiceInput';
 import { 
   Briefcase, 
   Layers, 
@@ -676,15 +677,15 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-blue-700" />
               <label className="text-sm font-bold text-blue-950">
-                원상복구특약 (칸막이/바닥재 승계 여부 분쟁 방지 필수 기재) *
+                원상복구특약 (칸막이/바닥재 승계 여부 분쟁 방지 필수 기재 - 타자 & 음성 지원) *
               </label>
             </div>
-            <textarea
+            <VoiceTextarea
               rows={2}
               value={data.restorationTerms || ''}
-              onChange={(e) => updateField('restorationTerms', e.target.value)}
+              onChange={(val) => updateField('restorationTerms', val)}
               placeholder="예: 유리 칸막이 3개 룸 및 바닥 디럭스타일은 시설 승계 인정하며, 퇴실 시 불필요한 철거 비용 없이 다음 임차인에게 그대로 인계함."
-              className="w-full text-sm p-3 bg-white border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+              className="border-blue-300 focus:ring-blue-500 font-medium text-slate-900"
             />
           </div>
 

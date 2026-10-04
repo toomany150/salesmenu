@@ -30,6 +30,7 @@ import { getCoordinatesFromAddress } from '@/lib/geo';
 import { KakaoAddressMap } from '../map/KakaoAddressMap';
 import { PropertyImageUploader } from './PropertyImageUploader';
 import { useAuth } from '../auth/AuthContext';
+import { VoiceTextarea } from '../common/VoiceInput';
 
 // Subforms
 import { ApartmentForm } from './forms/ApartmentForm';
@@ -813,22 +814,36 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                           onChange={(e) => setManagerName(e.target.value)}
                           className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
                         >
+                          <option value="개업공인중개사 (대표)">👑 개업공인중개사 (대표)</option>
                           <option value="사무실">🏢 사무실 (공용/워크인)</option>
-                          {availableAgents.map((agent) => (
-                            <option key={agent} value={agent}>👤 {agent}</option>
-                          ))}
+                          {availableAgents
+                            .filter((agent) => !agent.includes('개업공인중개사'))
+                            .map((agent) => (
+                              <option key={agent} value={agent}>👤 {agent}</option>
+                            ))}
                         </select>
-                        {currentUser && (
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <button
-                              type="button"
-                              onClick={() => setManagerName('사무실')}
-                              className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
-                                managerName === '사무실' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-200'
-                              }`}
-                            >
-                              🏢 사무실 공용
-                            </button>
+                        <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setManagerName('개업공인중개사 (대표)')}
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
+                              managerName === '개업공인중개사 (대표)'
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-slate-100 text-purple-700 border-purple-200 hover:bg-purple-50'
+                            }`}
+                          >
+                            👑 개업공인중개사
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setManagerName('사무실')}
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
+                              managerName === '사무실' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            🏢 사무실 공용
+                          </button>
+                          {currentUser && currentUser.name !== '개업공인중개사 (대표)' && (
                             <button
                               type="button"
                               onClick={() => setManagerName(currentUser.name)}
@@ -838,8 +853,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             >
                               👤 본인 ({currentUser.name})
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1048,15 +1063,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
                   </div>
 
-                  {/* 상담 내용 및 특이사항 메모 */}
+                  {/* 상담 내용 및 특이사항 메모 (직접 타자 및 스마트폰 마이크 음성 입력 지원) */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">상담내용 및 매물 메모</label>
-                    <textarea
+                    <VoiceTextarea
+                      label="상담내용 및 매물 메모 (타자 & 마이크 음성 입력)"
                       rows={2}
                       value={consultationNotes}
-                      onChange={(e) => setConsultationNotes(e.target.value)}
-                      placeholder="고객 요청사항, 가격 협의 가능 여부, 방문 예약 주의사항 등"
-                      className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      onChange={setConsultationNotes}
+                      placeholder="고객 요청사항, 가격 협의 가능 여부, 방문 예약 주의사항 등 직접 입력하거나 마이크 버튼을 눌러 음성으로 입력하세요."
                     />
                   </div>
 

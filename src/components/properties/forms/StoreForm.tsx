@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { StoreData } from '@/lib/types';
+import { VoiceTextarea } from '@/components/common/VoiceInput';
 import { 
   Store, 
   Layers, 
@@ -856,15 +857,15 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-700" />
               <label className="text-sm font-bold text-amber-950">
-                원상복구특약 (분쟁 방지 필수 기재) *
+                원상복구특약 (분쟁 방지 필수 기재 - 타자 & 음성 지원) *
               </label>
             </div>
-            <textarea
+            <VoiceTextarea
               rows={2}
               value={data.restorationTerms || ''}
-              onChange={(e) => updateField('restorationTerms', e.target.value)}
+              onChange={(val) => updateField('restorationTerms', val)}
               placeholder="예: 현 시설 상태(인테리어 및 바닥/천장/닥트) 그대로 인수하며, 임대차 종료 시 현 상태를 기준으로 원상복구하거나 다음 임차인에게 승계함을 임대인과 합의함."
-              className="w-full text-sm p-3 bg-white border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 font-medium text-slate-900"
+              className="border-amber-300 focus:ring-amber-500 font-medium text-slate-900"
             />
           </div>
 

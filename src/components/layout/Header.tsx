@@ -69,21 +69,21 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 sm:py-0 sm:h-16 gap-2 sm:gap-3">
           
           {/* 1. Logo & Office Brand + admin 버튼 (클릭 시 홈화면 이동) */}
-          <div className="flex items-center space-x-3 shrink-0">
+          <div className="flex items-center justify-between sm:justify-start space-x-2.5 shrink-0">
             <button
               type="button"
               onClick={onGoHome}
               title="참좋은 공인중개사사무소 홈으로 이동"
-              className="flex items-center space-x-3 text-left group cursor-pointer focus:outline-hidden"
+              className="flex items-center space-x-2.5 text-left group cursor-pointer focus:outline-hidden"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform shrink-0">
                 <Building2 className="w-5 h-5" />
               </div>
-              <span className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
+              <span className="font-extrabold text-sm sm:text-base md:text-lg text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors whitespace-nowrap">
                 참좋은 공인중개사사무소
               </span>
             </button>
@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={onOpenAdminLogs}
               title="관리자(Admin) 접속 및 계정·보안로그 관리 (초기비번: 1234)"
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800 shrink-0"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
               <span>admin</span>
@@ -169,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={onOpenAdminLogs}
                     title="접속 로그 및 중개사 계정 관리"
-                    className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-2xs transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
                   >
                     <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
                     <span className="hidden md:inline">관리</span>
@@ -182,22 +182,6 @@ export const Header: React.FC<HeaderProps> = ({
                   className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* 상담 메뉴 (신규 상담 및 고객 접수) */}
-            {onOpenNewCustomer && (
-              <div className="flex items-center shrink-0">
-                <button
-                  type="button"
-                  onClick={onOpenNewCustomer}
-                  title="신규 상담 접수 및 고객 상담장 등록"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
-                >
-                  <Users className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="hidden sm:inline">상담 접수</span>
-                  <span className="sm:hidden">상담</span>
                 </button>
               </div>
             )}

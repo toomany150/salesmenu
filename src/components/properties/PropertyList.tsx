@@ -237,9 +237,26 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                         </div>
 
                         <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                          <span className="text-slate-400 font-mono text-[11px]">
-                            #{property.propertyNumber}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 font-mono text-[11px]">
+                              #{property.propertyNumber}
+                            </span>
+                            {property.managerName && (
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                property.managerName.includes('개업공인중개사')
+                                  ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                                  : property.managerName === '사무실'
+                                  ? 'bg-slate-100 text-slate-600'
+                                  : 'bg-emerald-50 text-emerald-800'
+                              }`}>
+                                {property.managerName.includes('개업공인중개사')
+                                  ? '👑 개업공인중개사'
+                                  : property.managerName === '사무실'
+                                  ? '🏢 사무실'
+                                  : `👤 ${property.managerName}`}
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             {onEditProperty && (
                               <button

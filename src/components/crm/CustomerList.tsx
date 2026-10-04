@@ -158,11 +158,17 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                         )}
                         {/* 담당자 뱃지 */}
                         <span className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${
-                          managerName === '사무실'
+                          managerName.includes('개업공인중개사')
+                            ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                            : managerName === '사무실'
                             ? 'bg-slate-100 text-slate-700 border border-slate-200'
                             : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                         }`}>
-                          {managerName === '사무실' ? '🏢 사무실' : `👤 ${managerName}`}
+                          {managerName.includes('개업공인중개사')
+                            ? '👑 개업공인중개사'
+                            : managerName === '사무실'
+                            ? '🏢 사무실'
+                            : `👤 ${managerName}`}
                         </span>
                       </div>
 
