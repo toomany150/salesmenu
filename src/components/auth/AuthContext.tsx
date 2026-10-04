@@ -11,6 +11,8 @@ interface AuthContextType {
   login: (username: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   availableAgents: string[];
+  addCustomAgent: (name: string) => void;
+  removeCustomAgent: (name: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,7 +20,9 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => ({ success: false }),
   logout: async () => {},
-  availableAgents: [],
+  availableAgents: ['개업공인중개사 (대표)'],
+  addCustomAgent: () => {},
+  removeCustomAgent: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -26,12 +30,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [availableAgents, setAvailableAgents] = useState<string[]>([
     '개업공인중개사 (대표)',
-    '김소공 실장',
-    '이소공 실장',
-    '박소공 실장',
-    '최소공 실장',
-    '정소공 실장',
   ]);
+
+  // 지정된 권한자 추가 함수 (로컬스토리지 영구 보존)
+  const addCustomAgent = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === '개업공인중개사 (대표)' || trimmed === '사무실') return;
+    setAvailableAgents((prev) => {
+      const next = Array.from(new Set([...prev, trimmed]));
+      try {
+        const customOnly = next.filter((a) => a !== '개업공인중개사 (대표)' && a !== '사무실');
+        localStorage.setItem('cham_custom_agents', JSON.stringify(customOnly));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  // 지정된 권한자 삭제 함수
+  const removeCustomAgent = (name: string) => {
+    setAvailableAgents((prev) => {
+      const next = prev.filter((a) => a !== name || a === '개업공인중개사 (대표)');
+      try {
+        const customOnly = next.filter((a) => a !== '개업공인중개사 (대표)' && a !== '사무실');
+        localStorage.setItem('cham_custom_agents', JSON.stringify(customOnly));
+      } catch (e) {}
+      return next;
+    });
+  };
 
   // 초기 로드 시 localStorage에서 세션 복원 및 사용자 목록 조회
   useEffect(() => {
@@ -49,19 +74,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
 
-    // 서버에서 에이전트 목록 가져오기 (개업공인중개사 포함)
+    // 사용자가 직접 등록/지정한 권한자 목록 로컬스토리지에서 복원
+    let customAgents: string[] = [];
+    try {
+      const savedCustom = localStorage.getItem('cham_custom_agents');
+      if (savedCustom) {
+        const parsed = JSON.parse(savedCustom);
+        if (Array.isArray(parsed)) {
+          customAgents = parsed.filter(Boolean);
+        }
+      }
+    } catch (e) {}
+
+    // 서버에서 활성 사용자 목록 가져와 합치기 (더미 실장 제외, 지정된 실제 유저만)
     fetch('/api/users')
       .then((res) => res.json())
       .then((users: UserItem[]) => {
         if (Array.isArray(users) && users.length > 0) {
-          const agentNames = users
+          const validAgentNames = users
             .filter((u) => u.isActive)
-            .map((u) => (u.role === 'ADMIN' ? '개업공인중개사 (대표)' : u.name));
-          const unique = Array.from(new Set(['개업공인중개사 (대표)', ...agentNames]));
+            .map((u) => (u.role === 'ADMIN' ? '개업공인중개사 (대표)' : u.name))
+            .filter((name) => !name.includes('소공 실장')); // 임의의 더미 실장 필터링
+          const unique = Array.from(new Set(['개업공인중개사 (대표)', ...customAgents, ...validAgentNames]));
           setAvailableAgents(unique);
+        } else {
+          setAvailableAgents(Array.from(new Set(['개업공인중개사 (대표)', ...customAgents])));
         }
       })
-      .catch((err) => console.warn('Could not load user list:', err));
+      .catch((err) => {
+        console.warn('Could not load user list:', err);
+        setAvailableAgents(Array.from(new Set(['개업공인중개사 (대표)', ...customAgents])));
+      });
   }, []);
 
   const login = async (username: string, password?: string): Promise<{ success: boolean; error?: string }> => {
@@ -113,6 +156,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         availableAgents,
+        addCustomAgent,
+        removeCustomAgent,
       }}
     >
       {children}

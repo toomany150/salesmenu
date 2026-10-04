@@ -57,14 +57,16 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   initialData,
   mode = 'CREATE',
 }) => {
-  const { currentUser, availableAgents } = useAuth();
+  const { currentUser, availableAgents, addCustomAgent } = useAuth();
   const isEditMode = mode === 'EDIT' || !!initialData;
 
   // Common Form States
   const [propertyType, setPropertyType] = useState<PropertyType>('APARTMENT');
   const [propertyNumber, setPropertyNumber] = useState('');
   const [receiptDate, setReceiptDate] = useState('');
-  const [managerName, setManagerName] = useState<string>('사무실');
+  const [managerName, setManagerName] = useState<string>('개업공인중개사 (대표)');
+  const [isAddingAgent, setIsAddingAgent] = useState(false);
+  const [newAgentInput, setNewAgentInput] = useState('');
   const [transactionType, setTransactionType] = useState<TransactionType>('매매');
   const [roadAddress, setRoadAddress] = useState('');
   const [jibunAddress, setJibunAddress] = useState('');
@@ -160,7 +162,9 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setMonthlyRent(initialData.monthlyRent !== undefined && initialData.monthlyRent !== null ? String(initialData.monthlyRent) : '');
         setIsNoMaintenanceFee(!!initialData.isNoMaintenanceFee);
         setConsultationNotes(initialData.consultationNotes || '');
-        setManagerName(initialData.managerName || (currentUser?.role === 'AGENT' ? currentUser.name : '사무실'));
+        setManagerName(initialData.managerName || '개업공인중개사 (대표)');
+        setIsAddingAgent(false);
+        setNewAgentInput('');
 
         // Customer
         if (initialData.customer) {
@@ -212,6 +216,9 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setPropertyType('APARTMENT');
         setPropertyNumber(`PROP-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`);
         setReceiptDate(new Date().toISOString().substring(0, 10));
+        setManagerName('개업공인중개사 (대표)');
+        setIsAddingAgent(false);
+        setNewAgentInput('');
         setTransactionType('매매');
         setRoadAddress('');
         setJibunAddress('');
@@ -798,55 +805,98 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                        담당 권한자 (관리 주체) *
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-sm font-bold text-slate-800">
+                          담당 권한자 (관리 주체) *
+                        </label>
+                        {!isAddingAgent && (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingAgent(true)}
+                            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <span>＋ 새 권한자 지정/추가</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 인라인 새 담당 권한자 직접 추가 폼 */}
+                      {isAddingAgent && (
+                        <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl space-y-2 mb-2 animate-in fade-in duration-150">
+                          <div className="text-xs font-bold text-blue-900">지정할 담당 권한자명 입력:</div>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={newAgentInput}
+                              onChange={(e) => setNewAgentInput(e.target.value)}
+                              placeholder="권한자 이름 (예: 박소공 실장, 김과장)"
+                              className="flex-1 text-xs px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (newAgentInput.trim()) {
+                                    addCustomAgent(newAgentInput.trim());
+                                    setManagerName(newAgentInput.trim());
+                                    setNewAgentInput('');
+                                    setIsAddingAgent(false);
+                                  }
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (newAgentInput.trim()) {
+                                  addCustomAgent(newAgentInput.trim());
+                                  setManagerName(newAgentInput.trim());
+                                  setNewAgentInput('');
+                                  setIsAddingAgent(false);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-2xs cursor-pointer"
+                            >
+                              지정
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAddingAgent(false);
+                                setNewAgentInput('');
+                              }}
+                              className="px-2.5 py-1.5 bg-white border border-slate-300 text-slate-600 text-xs font-bold rounded-lg cursor-pointer"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-1.5">
                         <select
                           value={managerName}
                           onChange={(e) => setManagerName(e.target.value)}
-                          className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+                          className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 cursor-pointer"
                         >
                           <option value="개업공인중개사 (대표)">👑 개업공인중개사 (대표)</option>
                           <option value="사무실">🏢 사무실 (공용/워크인)</option>
                           {availableAgents
-                            .filter((agent) => !agent.includes('개업공인중개사'))
+                            .filter((agent) => agent !== '개업공인중개사 (대표)' && agent !== '사무실')
                             .map((agent) => (
                               <option key={agent} value={agent}>👤 {agent}</option>
                             ))}
                         </select>
-                        <div className="flex items-center gap-1.5 text-xs flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => setManagerName('개업공인중개사 (대표)')}
-                            className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
-                              managerName === '개업공인중개사 (대표)'
-                                ? 'bg-purple-600 text-white border-purple-600'
-                                : 'bg-slate-100 text-purple-700 border-purple-200 hover:bg-purple-50'
-                            }`}
-                          >
-                            👑 개업공인중개사
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setManagerName('사무실')}
-                            className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
-                              managerName === '사무실' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            🏢 사무실 공용
-                          </button>
-                          {currentUser && currentUser.name !== '개업공인중개사 (대표)' && (
-                            <button
-                              type="button"
-                              onClick={() => setManagerName(currentUser.name)}
-                              className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
-                                managerName === currentUser.name ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-200'
-                              }`}
-                            >
-                              👤 본인 ({currentUser.name})
-                            </button>
-                          )}
+
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium pt-0.5">
+                          <span>현재 지정 권한자:</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-black border ${
+                            managerName === '개업공인중개사 (대표)'
+                              ? 'bg-purple-100 text-purple-900 border-purple-300'
+                              : managerName === '사무실'
+                              ? 'bg-slate-100 text-slate-800 border-slate-300'
+                              : 'bg-blue-100 text-blue-900 border-blue-300'
+                          }`}>
+                            {managerName === '개업공인중개사 (대표)' ? '👑 개업공인중개사 (대표) [기본값]' : managerName === '사무실' ? '🏢 사무실 (공용)' : `👤 ${managerName}`}
+                          </span>
                         </div>
                       </div>
                     </div>

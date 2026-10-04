@@ -66,7 +66,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onSuccess,
   defaultGroup = 'RECEIVED',
 }) => {
-  const { currentUser, availableAgents } = useAuth();
+  const { currentUser, availableAgents, addCustomAgent } = useAuth();
   
   // 1. 고객 기본 정보
   const [name, setName] = useState('');
@@ -77,7 +77,9 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     defaultGroup === 'RECEIVED' ? '매도인' : '매수인'
   );
   const [memo, setMemo] = useState('');
-  const [managerName, setManagerName] = useState<string>('사무실');
+  const [managerName, setManagerName] = useState<string>('개업공인중개사 (대표)');
+  const [isAddingAgent, setIsAddingAgent] = useState(false);
+  const [newAgentInput, setNewAgentInput] = useState('');
 
   // 1-2. [물건 접수] 매도인/임대인/임차인(권리금) 물건 상세 정보 상태
   const [recvPropertyType, setRecvPropertyType] = useState<PropertyType>('APARTMENT');
@@ -196,14 +198,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Set default manager to current user name when modal opens
+  // Set default manager to 개업공인중개사 (대표) when modal opens
   useEffect(() => {
-    if (currentUser?.name) {
-      setManagerName(currentUser.name);
-    } else {
-      setManagerName('사무실');
-    }
-  }, [currentUser, isOpen]);
+    setManagerName('개업공인중개사 (대표)');
+    setIsAddingAgent(false);
+    setNewAgentInput('');
+  }, [isOpen]);
 
   // 면적 양방향 환산 핸들러 (공통)
   const handleAreaSqmChange = (val: string) => {
@@ -638,87 +638,105 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         ))}
                       </select>
                     </>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        담당 관리 주체
-                      </label>
-                      <select
-                        value={managerName}
-                        onChange={(e) => setManagerName(e.target.value)}
-                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
-                      >
-                        <option value="개업공인중개사 (대표)">👑 개업공인중개사 (대표)</option>
-                        <option value="사무실">🏢 사무실 (공용/워크인)</option>
-                        {availableAgents
-                          .filter((agent) => !agent.includes('개업공인중개사'))
-                          .map((agent) => (
-                            <option key={agent} value={agent}>👤 {agent}</option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
-              {!isSearching && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+              {/* 담당 권한자 (관리 주체) 공통 섹션 */}
+              <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <UserCheck className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-slate-800">고객 담당 권한자:</span>
-                    <span className={`text-xs font-extrabold px-2 py-0.5 rounded border ${
-                      managerName.includes('개업공인중개사')
-                        ? 'text-purple-800 bg-purple-100 border-purple-300'
-                        : managerName === '사무실'
-                        ? 'text-slate-800 bg-white border-slate-300'
-                        : 'text-blue-700 bg-white border-blue-200'
-                    }`}>
-                      {managerName.includes('개업공인중개사')
-                        ? '👑 개업공인중개사 (대표)'
-                        : managerName === '사무실'
-                        ? '🏢 사무실 전체 공용'
-                        : `👤 ${managerName} 전담`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                    <span>고객 담당 권한자 (관리 주체) *</span>
+                  </label>
+                  {!isAddingAgent && (
                     <button
                       type="button"
-                      onClick={() => setManagerName('개업공인중개사 (대표)')}
-                      className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors ${
-                        managerName === '개업공인중개사 (대표)'
-                          ? 'bg-purple-600 text-white border-purple-600'
-                          : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'
-                      }`}
+                      onClick={() => setIsAddingAgent(true)}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
                     >
-                      👑 개업공인중개사
+                      <span>＋ 새 권한자 지정/추가</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setManagerName('사무실')}
-                      className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors ${
-                        managerName === '사무실'
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-slate-600 border-slate-300'
-                      }`}
-                    >
-                      🏢 사무실
-                    </button>
-                    {currentUser && currentUser.name !== '개업공인중개사 (대표)' && (
+                  )}
+                </div>
+
+                {/* 인라인 새 담당 권한자 직접 추가 폼 */}
+                {isAddingAgent && (
+                  <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+                    <div className="text-[11px] font-bold text-blue-900">지정할 담당 권한자명:</div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={newAgentInput}
+                        onChange={(e) => setNewAgentInput(e.target.value)}
+                        placeholder="권한자 이름 (예: 박소공 실장, 김과장)"
+                        className="flex-1 text-xs px-2.5 py-1.5 bg-white border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (newAgentInput.trim()) {
+                              addCustomAgent(newAgentInput.trim());
+                              setManagerName(newAgentInput.trim());
+                              setNewAgentInput('');
+                              setIsAddingAgent(false);
+                            }
+                          }
+                        }}
+                      />
                       <button
                         type="button"
-                        onClick={() => setManagerName(currentUser.name)}
-                        className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors ${
-                          managerName === currentUser.name
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-slate-600 border-slate-300'
-                        }`}
+                        onClick={() => {
+                          if (newAgentInput.trim()) {
+                            addCustomAgent(newAgentInput.trim());
+                            setManagerName(newAgentInput.trim());
+                            setNewAgentInput('');
+                            setIsAddingAgent(false);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-md cursor-pointer"
                       >
-                        👤 본인 ({currentUser.name})
+                        지정
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingAgent(false);
+                          setNewAgentInput('');
+                        }}
+                        className="px-2.5 py-1.5 bg-white border border-slate-300 text-slate-600 text-xs font-bold rounded-md cursor-pointer"
+                      >
+                        취소
+                      </button>
+                    </div>
                   </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <select
+                    value={managerName}
+                    onChange={(e) => setManagerName(e.target.value)}
+                    className="flex-1 text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 cursor-pointer"
+                  >
+                    <option value="개업공인중개사 (대표)">👑 개업공인중개사 (대표)</option>
+                    <option value="사무실">🏢 사무실 (공용/워크인)</option>
+                    {availableAgents
+                      .filter((agent) => agent !== '개업공인중개사 (대표)' && agent !== '사무실')
+                      .map((agent) => (
+                        <option key={agent} value={agent}>👤 {agent}</option>
+                      ))}
+                  </select>
+
+                  <span className={`px-2.5 py-1 rounded text-xs font-black border shrink-0 text-center ${
+                    managerName === '개업공인중개사 (대표)'
+                      ? 'bg-purple-100 text-purple-900 border-purple-300'
+                      : managerName === '사무실'
+                      ? 'bg-slate-100 text-slate-800 border-slate-300'
+                      : 'bg-blue-100 text-blue-900 border-blue-300'
+                  }`}>
+                    {managerName === '개업공인중개사 (대표)' ? '👑 개업공인중개사 (대표) [기본값]' : managerName === '사무실' ? '🏢 사무실 (공용)' : `👤 ${managerName} 전담`}
+                  </span>
                 </div>
-              )}
+              </div>
 
               {/* 상담 메모 및 고객 특이사항 (직접 타자 또는 마이크 음성 입력 가능) */}
               <div>

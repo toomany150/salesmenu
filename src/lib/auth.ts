@@ -2,60 +2,15 @@
 // 참좋은 공인중개사사무소 계정 인증 및 접근 제어 모듈
 import { UserItem, UserRole } from './types';
 
-// 기본 사전 등록 계정 목록 (개발자/대표 관리자 1명 + 소속공인중개사 5명)
+// 기본 사전 등록 계정 목록 (대표 공인중개사)
 export const DEFAULT_USERS: Array<Omit<UserItem, 'createdAt' | 'updatedAt'> & { password: string }> = [
   {
     id: 'usr-admin',
     username: 'admin',
     password: '1234',
-    name: '대표 공인중개사 (관리자)',
+    name: '개업공인중개사 (대표)',
     role: 'ADMIN',
     phone: '010-1234-5678',
-    isActive: true,
-  },
-  {
-    id: 'usr-agent1',
-    username: 'agent1',
-    password: '1234',
-    name: '김소공 실장',
-    role: 'AGENT',
-    phone: '010-2345-6789',
-    isActive: true,
-  },
-  {
-    id: 'usr-agent2',
-    username: 'agent2',
-    password: '1234',
-    name: '이소공 실장',
-    role: 'AGENT',
-    phone: '010-3456-7890',
-    isActive: true,
-  },
-  {
-    id: 'usr-agent3',
-    username: 'agent3',
-    password: '1234',
-    name: '박소공 실장',
-    role: 'AGENT',
-    phone: '010-4567-8901',
-    isActive: true,
-  },
-  {
-    id: 'usr-agent4',
-    username: 'agent4',
-    password: '1234',
-    name: '최소공 실장',
-    role: 'AGENT',
-    phone: '010-5678-9012',
-    isActive: true,
-  },
-  {
-    id: 'usr-agent5',
-    username: 'agent5',
-    password: '1234',
-    name: '정소공 실장',
-    role: 'AGENT',
-    phone: '010-6789-0123',
     isActive: true,
   },
 ];
