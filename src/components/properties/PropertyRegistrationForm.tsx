@@ -613,13 +613,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   </div>
                 </div>
 
-                {/* 3-1. 매물 현장 사진 (최대 20장 등록) */}
-                <PropertyImageUploader
-                  images={images}
-                  onChange={setImages}
-                  maxImages={20}
-                />
-
                 {/* 4. 접수 고객 (매도/임대인 연동) (요청 2) */}
                 <div className="bg-slate-50/90 p-4 rounded-xl border border-slate-200 space-y-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1101,6 +1094,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   )}
                 </div>
 
+                {/* 7. 매물 현장 사진 등록 (최대 20장 - 맨 밑으로 배치) */}
+                <div className="pt-2">
+                  <PropertyImageUploader
+                    images={images}
+                    onChange={setImages}
+                    maxImages={20}
+                  />
+                </div>
               </div>
 
               {/* Right: Sticky Fixed Checklist Panel (상가, 사무실, 공장, 토지) */}

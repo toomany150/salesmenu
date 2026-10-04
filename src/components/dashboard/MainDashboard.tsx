@@ -273,7 +273,7 @@ const DashboardContent: React.FC = () => {
         {/* ────────────────────────────────────────────────────────── */}
         {/* 섹션 3. 👥 고객 관리 및 실시간 조건 검색 (매물 관리와 1:1 완벽 통일) */}
         {/* ────────────────────────────────────────────────────────── */}
-        <section className="bg-gradient-to-r from-blue-50 via-sky-50/70 to-blue-50/40 p-3.5 sm:p-4 rounded-2xl border-2 border-blue-300/90 shadow-2xs space-y-3">
+        <section className="bg-gradient-to-r from-blue-50 via-sky-50/70 to-blue-50/40 p-3.5 sm:p-4 rounded-2xl border-2 border-blue-300/90 shadow-2xs">
           
           {/* 상단 통일 헤더 (2번째 매물 관리 이미지와 완벽히 동일한 구조/위치/높이/버튼 구성) */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -316,55 +316,6 @@ const DashboardContent: React.FC = () => {
                 </span>
               </button>
             </div>
-          </div>
-
-          {/* 고객 분류 바로가기 (물건 접수 / 물건 찾음) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-blue-200/70">
-            {/* [물건 접수] 매도인 / 임대인 / 임차인(권리금 원함) */}
-            <button
-              type="button"
-              onClick={() => handleSelectTabWithScroll('RECEIVED_GROUP')}
-              className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
-                activeTab === 'RECEIVED_GROUP'
-                  ? 'bg-blue-600 text-white border-blue-700 shadow-md shadow-blue-500/30 ring-2 ring-blue-400'
-                  : 'bg-white hover:bg-blue-50/80 text-blue-950 border-blue-300 shadow-2xs'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 text-left truncate">
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeTab === 'RECEIVED_GROUP' ? 'bg-white' : 'bg-blue-600'}`}></span>
-                <span className="leading-tight truncate">
-                  [물건 접수] 매도인 / 임대인 / 임차인(권리금 원함)
-                </span>
-              </div>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-black shrink-0 ml-2 ${
-                activeTab === 'RECEIVED_GROUP' ? 'bg-white/25 text-white' : 'bg-blue-100 text-blue-800'
-              }`}>
-                {receivedCustomers.length}명
-              </span>
-            </button>
-
-            {/* [물건 찾음] 매수인 / 임차인 / 임차인(권리금 가능) */}
-            <button
-              type="button"
-              onClick={() => handleSelectTabWithScroll('SEARCHING_GROUP')}
-              className={`w-full flex items-center justify-between py-2.5 px-4 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 ${
-                activeTab === 'SEARCHING_GROUP'
-                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-md shadow-indigo-500/30 ring-2 ring-indigo-400'
-                  : 'bg-white hover:bg-indigo-50/80 text-indigo-950 border-indigo-300 shadow-2xs'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 text-left truncate">
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeTab === 'SEARCHING_GROUP' ? 'bg-white' : 'bg-indigo-600'}`}></span>
-                <span className="leading-tight truncate">
-                  [물건 찾음] 매수인 / 임차인 / 임차인(권리금 가능)
-                </span>
-              </div>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-black shrink-0 ml-2 ${
-                activeTab === 'SEARCHING_GROUP' ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-800'
-              }`}>
-                {searchingCustomers.length}명
-              </span>
-            </button>
           </div>
         </section>
 
