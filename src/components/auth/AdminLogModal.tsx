@@ -29,7 +29,7 @@ interface AdminLogModalProps {
 }
 
 export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, login, addCustomAgent } = useAuth();
+  const { currentUser, login, addCustomAgent, removeCustomAgent } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN';
 
   const [activeTab, setActiveTab] = useState<'LOGS' | 'USERS' | 'PASSWORD'>('LOGS');
@@ -154,7 +154,27 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
         throw new Error(data.error || '계정 생성에 실패했습니다.');
       }
 
-      // 새 권한자 목록에도 자동 반영
+      // 새 권한자 목록 및 로컬 계정 저장소에 백업 반영 (오프라인/동기화 시에도 로그인 보장)
+      try {
+        const storedUsersRaw = localStorage.getItem('cham_custom_users');
+        const customUsersList = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
+        const newUserObj = {
+          id: data.id || `usr-${newUsername.trim()}`,
+          username: newUsername.trim(),
+          password: newPassword.trim(),
+          name: newName.trim(),
+          phone: newPhone.trim() || null,
+          role: newRole,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        const updatedUsersList = [
+          ...customUsersList.filter((u: any) => u.username.toLowerCase() !== newUsername.trim().toLowerCase()),
+          newUserObj
+        ];
+        localStorage.setItem('cham_custom_users', JSON.stringify(updatedUsersList));
+      } catch (e) {}
+
       if (newName.trim()) {
         addCustomAgent(newName.trim());
       }
@@ -188,6 +208,17 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
       if (!res.ok) {
         alert(data.error || '계정 삭제에 실패했습니다.');
         return;
+      }
+      try {
+        const storedUsersRaw = localStorage.getItem('cham_custom_users');
+        if (storedUsersRaw) {
+          const list = JSON.parse(storedUsersRaw);
+          const updated = list.filter((u: any) => u.id !== userToDelete.id && u.username !== userToDelete.username);
+          localStorage.setItem('cham_custom_users', JSON.stringify(updated));
+        }
+      } catch (e) {}
+      if (userToDelete.name) {
+        removeCustomAgent(userToDelete.name);
       }
       fetchUsers();
     } catch (err) {

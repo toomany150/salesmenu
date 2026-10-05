@@ -10,7 +10,8 @@ import {
   Users, 
   Check, 
   Edit3,
-  Building
+  Building,
+  Sparkles
 } from 'lucide-react';
 import { 
   PropertyType, 
@@ -57,7 +58,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   initialData,
   mode = 'CREATE',
 }) => {
-  const { currentUser, availableAgents, addCustomAgent } = useAuth();
+  const { currentUser, availableAgents, addCustomAgent, removeCustomAgent } = useAuth();
   const isEditMode = mode === 'EDIT' || !!initialData;
 
   // Common Form States
@@ -86,10 +87,19 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [availableDate, setAvailableDate] = useState('');
   const [isImmediateAvailable, setIsImmediateAvailable] = useState<boolean>(false); // 즉시가능
   const [price, setPrice] = useState<string>('');
+  const [negotiablePrice, setNegotiablePrice] = useState<string>(''); // 조정 가능한 매매가액 (만원)
   const [deposit, setDeposit] = useState<string>('');
+  const [negotiableDeposit, setNegotiableDeposit] = useState<string>(''); // 조정 가능한 전세/보증금 (만원)
   const [monthlyRent, setMonthlyRent] = useState<string>('');
+  const [negotiableMonthlyRent, setNegotiableMonthlyRent] = useState<string>(''); // 조정 가능한 월 임대료 (만원)
   const [isNoMaintenanceFee, setIsNoMaintenanceFee] = useState<boolean>(false); // 관리비 없음
   const [consultationNotes, setConsultationNotes] = useState('');
+
+  // 기타 특이 옵션 직접 추가 상태 (사진등록 상단 위치)
+  const [extraCustomOption, setExtraCustomOption] = useState<string>('');
+
+  // 권한자 삭제 모드 상태
+  const [isDeletingAgent, setIsDeletingAgent] = useState<boolean>(false);
 
   // Customer Link States (요청 2: 접수 고객 매도/임대인 연동)
   const [customerMode, setCustomerMode] = useState<'DIRECT' | 'SELECT'>('DIRECT');
@@ -159,8 +169,11 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setAvailableDate(initialData.availableDate ? initialData.availableDate.substring(0, 10) : '');
         setIsImmediateAvailable(!!initialData.isImmediateAvailable);
         setPrice(initialData.price !== undefined && initialData.price !== null ? String(initialData.price) : '');
+        setNegotiablePrice(initialData.negotiablePrice !== undefined && initialData.negotiablePrice !== null ? String(initialData.negotiablePrice) : '');
         setDeposit(initialData.deposit !== undefined && initialData.deposit !== null ? String(initialData.deposit) : '');
+        setNegotiableDeposit(initialData.negotiableDeposit !== undefined && initialData.negotiableDeposit !== null ? String(initialData.negotiableDeposit) : '');
         setMonthlyRent(initialData.monthlyRent !== undefined && initialData.monthlyRent !== null ? String(initialData.monthlyRent) : '');
+        setNegotiableMonthlyRent(initialData.negotiableMonthlyRent !== undefined && initialData.negotiableMonthlyRent !== null ? String(initialData.negotiableMonthlyRent) : '');
         setIsNoMaintenanceFee(!!initialData.isNoMaintenanceFee);
         setConsultationNotes(initialData.consultationNotes || '');
         setManagerName(initialData.managerName || '개업공인중개사 (대표)');
@@ -240,8 +253,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setAvailableDate('');
         setIsImmediateAvailable(false);
         setPrice('');
+        setNegotiablePrice('');
         setDeposit('');
+        setNegotiableDeposit('');
         setMonthlyRent('');
+        setNegotiableMonthlyRent('');
+        setExtraCustomOption('');
         setIsNoMaintenanceFee(false);
         setConsultationNotes('');
         setCustomerMode('DIRECT');
@@ -386,6 +403,55 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     }
   };
 
+  // 기타 특이 옵션 직접 추가 핸들러 (매물 사진 등록 바로 위에 위치)
+  const handleApplyExtraCustomOption = () => {
+    const trimmed = extraCustomOption.trim();
+    if (!trimmed) return;
+
+    if (propertyType === 'APARTMENT') {
+      setApartmentData((prev: any) => {
+        const curOpts = prev.otherOptions ? prev.otherOptions.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+        if (!curOpts.includes(trimmed)) {
+          const nextOpts = [...curOpts, trimmed].join(', ');
+          return { ...prev, otherOptions: nextOpts };
+        }
+        return prev;
+      });
+    } else if (propertyType === 'HOUSE') {
+      setHouseData((prev: any) => {
+        const curOpts = prev.options ? prev.options.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+        if (!curOpts.includes(trimmed)) {
+          const nextOpts = [...curOpts, trimmed].join(', ');
+          return { ...prev, options: nextOpts };
+        }
+        return prev;
+      });
+    } else {
+      // 상가, 사무실 등: 상담메모에 반영
+      setConsultationNotes((prev) => {
+        const prefix = prev ? `${prev}\n[기타옵션] ` : '[기타옵션] ';
+        return `${prefix}${trimmed}`;
+      });
+    }
+    setExtraCustomOption('');
+  };
+
+  const handleRemoveExtraOption = (itemToRemove: string) => {
+    if (propertyType === 'APARTMENT') {
+      setApartmentData((prev: any) => {
+        const curOpts = prev.otherOptions ? prev.otherOptions.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+        const nextOpts = curOpts.filter((o: string) => o !== itemToRemove).join(', ');
+        return { ...prev, otherOptions: nextOpts || undefined };
+      });
+    } else if (propertyType === 'HOUSE') {
+      setHouseData((prev: any) => {
+        const curOpts = prev.options ? prev.options.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+        const nextOpts = curOpts.filter((o: string) => o !== itemToRemove).join(', ');
+        return { ...prev, options: nextOpts || undefined };
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!propertyNumber.trim()) {
@@ -410,15 +476,47 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       finalLng = fallback.lng;
     }
 
-    // Customer payload
+    // Customer payload (요구사항 10: 고객 등록 자동 연계 및 매핑)
     let finalCustomerId = customerMode === 'SELECT' ? (customerId || undefined) : undefined;
     let customerInput = undefined;
 
     if (customerMode === 'DIRECT' && (customerName.trim() || customerPhone.trim())) {
+      // 거래유형 자동 선택:
+      // 매매 -> 매도인 (SELLER)
+      // 전세, 월세 -> 임대인 (LESSOR)
+      // 상가점포에 권리금 있는 물건 -> 임차인(권리금) (LESSEE)
+      let autoCustomerType: 'SELLER' | 'LESSOR' | 'LESSEE' = 'SELLER';
+      let autoCustomerSubType = '매도인';
+
+      const storePremiumVal = propertyType === 'STORE' ? (storeData?.premium || 0) : 0;
+      if (propertyType === 'STORE' && storePremiumVal > 0) {
+        autoCustomerType = 'LESSEE';
+        autoCustomerSubType = '임차인(권리금)';
+      } else if (transactionType === '매매') {
+        autoCustomerType = 'SELLER';
+        autoCustomerSubType = '매도인';
+      } else {
+        autoCustomerType = 'LESSOR';
+        autoCustomerSubType = '임대인';
+      }
+
       customerInput = {
         name: customerName.trim() || '접수 의뢰고객',
-        phone: customerPhone.trim() || '연락처 미등록',
+        phone: customerPhone.trim() || '010-0000-0000',
         carrier: customerCarrier.trim() || undefined,
+        type: autoCustomerType,
+        subType: autoCustomerSubType,
+        group: 'RECEIVED', // [물건 접수] 매도인/임대인/임차인란에 연계
+        memo: consultationNotes.trim() || undefined, // 상담내용 및 매물 메모 -> 상담 메모 및 고객 특이사항
+        price: price ? parseFloat(price) : undefined, // 희망 매매가액
+        negotiablePrice: negotiablePrice ? parseFloat(negotiablePrice) : undefined, // 조정할 수 있는 매매가액
+        deposit: deposit ? parseFloat(deposit) : undefined,
+        negotiableDeposit: negotiableDeposit ? parseFloat(negotiableDeposit) : undefined,
+        monthlyRent: monthlyRent ? parseFloat(monthlyRent) : undefined,
+        negotiableMonthlyRent: negotiableMonthlyRent ? parseFloat(negotiableMonthlyRent) : undefined,
+        premium: storePremiumVal || undefined,
+        managerName: managerName || '개업공인중개사 (대표)',
+        assignedAgents,
       };
     }
 
@@ -441,8 +539,11 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       availableDate: availableDate || undefined,
       isImmediateAvailable,
       price: price ? parseFloat(price) : undefined,
+      negotiablePrice: negotiablePrice ? parseFloat(negotiablePrice) : undefined,
       deposit: deposit ? parseFloat(deposit) : undefined,
+      negotiableDeposit: negotiableDeposit ? parseFloat(negotiableDeposit) : undefined,
       monthlyRent: monthlyRent ? parseFloat(monthlyRent) : undefined,
+      negotiableMonthlyRent: negotiableMonthlyRent ? parseFloat(negotiableMonthlyRent) : undefined,
       isNoMaintenanceFee,
       consultationNotes: consultationNotes.trim() || undefined,
       landArea,
@@ -817,15 +918,32 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         <label className="text-sm font-bold text-slate-800">
                           담당 권한자 (관리 주체) *
                         </label>
-                        {!isAddingAgent && (
+                        <div className="flex items-center gap-2">
+                          {!isAddingAgent && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAddingAgent(true);
+                                setIsDeletingAgent(false);
+                              }}
+                              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <span>＋ 새 권한자 지정/추가</span>
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => setIsAddingAgent(true)}
-                            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                            onClick={() => {
+                              setIsDeletingAgent(!isDeletingAgent);
+                              setIsAddingAgent(false);
+                            }}
+                            className={`text-[11px] font-bold flex items-center gap-0.5 cursor-pointer ${
+                              isDeletingAgent ? 'text-rose-600 font-black' : 'text-slate-500 hover:text-rose-600'
+                            }`}
                           >
-                            <span>＋ 새 권한자 지정/추가</span>
+                            <span>{isDeletingAgent ? '✕ 닫기' : '− 권한자 삭제'}</span>
                           </button>
-                        )}
+                        </div>
                       </div>
 
                       {/* 인라인 새 담당 권한자 직접 추가 폼 */}
@@ -879,6 +997,39 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         </div>
                       )}
 
+                      {/* 권한자 삭제 모드 패널 */}
+                      {isDeletingAgent && (
+                        <div className="p-3 bg-rose-50/80 border border-rose-200 rounded-xl space-y-2 mb-2 animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-rose-900">삭제할 권한자를 클릭하세요:</span>
+                            <span className="text-[10px] text-rose-600">대표 및 사무실(공용)은 삭제 불가</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {availableAgents
+                              .filter((a) => a !== '개업공인중개사 (대표)' && a !== '사무실')
+                              .map((agent) => (
+                                <button
+                                  key={agent}
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm(`'${agent}' 권한자를 삭제하시겠습니까?`)) {
+                                      removeCustomAgent(agent);
+                                      if (managerName === agent) {
+                                        setManagerName('개업공인중개사 (대표)');
+                                      }
+                                      setAssignedAgents((prev) => prev.filter((a) => a !== agent));
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-white text-rose-700 border border-rose-300 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <span>👤 {agent}</span>
+                                  <span className="text-rose-500 font-extrabold text-[13px] ml-0.5">✕</span>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-1.5">
                         <select
                           value={managerName}
@@ -893,19 +1044,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                               <option key={agent} value={agent}>👤 {agent}</option>
                             ))}
                         </select>
-
-                        <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium pt-0.5">
-                          <span>주 담당 권한자:</span>
-                          <span className={`px-2 py-0.5 rounded text-xs font-black border ${
-                            managerName === '개업공인중개사 (대표)'
-                              ? 'bg-purple-100 text-purple-900 border-purple-300'
-                              : managerName === '사무실'
-                              ? 'bg-slate-100 text-slate-800 border-slate-300'
-                              : 'bg-blue-100 text-blue-900 border-blue-300'
-                          }`}>
-                            {managerName === '개업공인중개사 (대표)' ? '👑 개업공인중개사 (대표)' : managerName === '사무실' ? '🏢 사무실 (공용)' : `👤 ${managerName}`}
-                          </span>
-                        </div>
 
                         {/* 추가 지정 권한자 (복수 선택 지원) */}
                         <div className="pt-2.5 border-t border-slate-200 mt-2 space-y-1.5">
@@ -1029,61 +1167,119 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     </div>
                   </div>
 
-                  {/* 가격 조건 */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-xl border border-slate-200">
+                  {/* 가격 조건 및 조정가능한 금액 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
                     {transactionType === '매매' && (
-                      <div className="sm:col-span-3">
-                        <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                          매매가액 (만원) *
-                        </label>
-                        <input
-                          type="number"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          placeholder="예: 185000 (18억 5천만원)"
-                          className="w-full text-base px-3.5 py-2.5 bg-blue-50/50 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-950"
-                        />
-                      </div>
-                    )}
-                    {transactionType === '전세' && (
-                      <div className="sm:col-span-3">
-                        <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                          전세 보증금 (만원) *
-                        </label>
-                        <input
-                          type="number"
-                          value={deposit}
-                          onChange={(e) => setDeposit(e.target.value)}
-                          placeholder="예: 95000 (9억 5천만원)"
-                          className="w-full text-base px-3.5 py-2.5 bg-blue-50/50 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-950"
-                        />
-                      </div>
-                    )}
-                    {transactionType === '월세' && (
                       <>
                         <div className="sm:col-span-1">
                           <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                            보증금 (만원) *
+                            매매가액 (만원) *
+                          </label>
+                          <input
+                            type="number"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            placeholder="예: 185000 (18억 5천만원)"
+                            className="w-full text-base px-3.5 py-2.5 bg-blue-50/50 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-950"
+                          />
+                        </div>
+                        <div className="sm:col-span-1">
+                          <label className="block text-sm font-bold text-indigo-900 mb-1.5 flex items-center justify-between">
+                            <span>조정가능한 매매가액 (만원)</span>
+                            <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">협의 가능선</span>
+                          </label>
+                          <input
+                            type="number"
+                            value={negotiablePrice}
+                            onChange={(e) => setNegotiablePrice(e.target.value)}
+                            placeholder="예: 180000 (18억원 협의선)"
+                            className="w-full text-base px-3.5 py-2.5 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
+                          />
+                        </div>
+                      </>
+                    )}
+                    {transactionType === '전세' && (
+                      <>
+                        <div className="sm:col-span-1">
+                          <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                            전세 보증금 (만원) *
                           </label>
                           <input
                             type="number"
                             value={deposit}
                             onChange={(e) => setDeposit(e.target.value)}
-                            placeholder="예: 5000"
+                            placeholder="예: 95000 (9억 5천만원)"
                             className="w-full text-base px-3.5 py-2.5 bg-blue-50/50 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-950"
                           />
                         </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                            월 임대료 (만원) *
+                        <div className="sm:col-span-1">
+                          <label className="block text-sm font-bold text-indigo-900 mb-1.5 flex items-center justify-between">
+                            <span>조정가능한 전세 보증금 (만원)</span>
+                            <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">협의 가능선</span>
                           </label>
                           <input
                             type="number"
-                            value={monthlyRent}
-                            onChange={(e) => setMonthlyRent(e.target.value)}
-                            placeholder="예: 350"
-                            className="w-full text-base px-3.5 py-2.5 bg-blue-50/50 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-950"
+                            value={negotiableDeposit}
+                            onChange={(e) => setNegotiableDeposit(e.target.value)}
+                            placeholder="예: 90000 (9억원 협의선)"
+                            className="w-full text-base px-3.5 py-2.5 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
                           />
+                        </div>
+                      </>
+                    )}
+                    {transactionType === '월세' && (
+                      <>
+                        <div className="sm:col-span-1 space-y-3">
+                          <div>
+                            <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                              보증금 (만원) *
+                            </label>
+                            <input
+                              type="number"
+                              value={deposit}
+                              onChange={(e) => setDeposit(e.target.value)}
+                              placeholder="예: 5000"
+                              className="w-full text-base px-3.5 py-2.5 bg-blue-50/50 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-950"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-indigo-900 mb-1">
+                              조정가능한 보증금 (만원)
+                            </label>
+                            <input
+                              type="number"
+                              value={negotiableDeposit}
+                              onChange={(e) => setNegotiableDeposit(e.target.value)}
+                              placeholder="예: 4000"
+                              className="w-full text-sm px-3.5 py-2 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
+                            />
+                          </div>
+                        </div>
+                        <div className="sm:col-span-1 space-y-3">
+                          <div>
+                            <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                              월 임대료 (만원) *
+                            </label>
+                            <input
+                              type="number"
+                              value={monthlyRent}
+                              onChange={(e) => setMonthlyRent(e.target.value)}
+                              placeholder="예: 350"
+                              className="w-full text-base px-3.5 py-2.5 bg-blue-50/50 border border-blue-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-extrabold text-blue-950"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-indigo-900 mb-1">
+                              조정가능한 월 임대료 (만원)
+                            </label>
+                            <input
+                              type="number"
+                              value={negotiableMonthlyRent}
+                              onChange={(e) => setNegotiableMonthlyRent(e.target.value)}
+                              placeholder="예: 320"
+                              className="w-full text-sm px-3.5 py-2 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
+                            />
+                          </div>
                         </div>
                       </>
                     )}
@@ -1236,6 +1432,69 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   {propertyType === 'ETC' && (
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
                       기타 매물은 공통 정보 및 상담 메모란을 활용하여 등록해 주세요.
+                    </div>
+                  )}
+                </div>
+
+                {/* 6.5 기타 특이 옵션 직접 추가 (매물사진등록 바로 위 위치) */}
+                <div className="p-4 bg-slate-50/90 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      <span>기타 특이 옵션 직접 추가</span>
+                    </label>
+                    <span className="text-[11px] text-slate-500">
+                      엔터 또는 [추가] 클릭 시 매물 옵션에 즉시 반영됩니다
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={extraCustomOption}
+                      onChange={(e) => setExtraCustomOption(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleApplyExtraCustomOption();
+                        }
+                      }}
+                      placeholder="예: 반려동물 가능, 외국인 가능, 단기임대 협의, 복층구조, 탄성코트 시공 등"
+                      className="flex-1 text-xs px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyExtraCustomOption}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-2xs shrink-0"
+                    >
+                      옵션 추가
+                    </button>
+                  </div>
+
+                  {/* 현재 등록된 커스텀 특이 옵션 태그 목록 */}
+                  {((propertyType === 'APARTMENT' && apartmentData?.otherOptions) ||
+                    (propertyType === 'HOUSE' && houseData?.options)) && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      <span className="text-[11px] font-bold text-slate-500 mr-1">반영된 옵션:</span>
+                      {(propertyType === 'APARTMENT'
+                        ? apartmentData.otherOptions.split(',').map((s: string) => s.trim()).filter(Boolean)
+                        : houseData.options.split(',').map((s: string) => s.trim()).filter(Boolean)
+                      ).map((opt: string) => (
+                        <span
+                          key={opt}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-800 border border-slate-300 shadow-2xs"
+                        >
+                          <span>{opt}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExtraOption(opt)}
+                            className="text-slate-400 hover:text-rose-600 font-bold ml-0.5 cursor-pointer"
+                            title="옵션 삭제"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>

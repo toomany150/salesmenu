@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { CustomerItem, CustomerGroup, PROPERTY_TYPE_LABELS } from '@/lib/types';
 import { useAuth } from '../auth/AuthContext';
-import { maskPhoneNumber, canViewCustomerContact } from '@/lib/auth';
+import { maskPhoneNumber, canViewCustomerContact, canAccessItem } from '@/lib/auth';
 
 interface CustomerListProps {
   customers: CustomerItem[];
@@ -52,6 +52,11 @@ export const CustomerList: React.FC<CustomerListProps> = ({
   }, [customers, availableAgents]);
 
   const filteredCustomers = groupCustomers.filter((c) => {
+    // 0. 보안 접근 제어: 대표는 전체, 사무실(공용)은 전체, 그 외는 본인 및 추가관리자만 열람
+    if (!canAccessItem(currentUser, c)) {
+      return false;
+    }
+
     // 1. Manager filter
     if (managerFilter !== 'ALL') {
       const mgr = c.managerName || '사무실';

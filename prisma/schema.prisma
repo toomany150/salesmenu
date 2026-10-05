@@ -67,7 +67,19 @@ model Customer {
   type      String   
   // 메인 그룹 구분: RECEIVED([물건 접수] 매도인/임대인), SEARCHING([물건 찾음] 매수인/임차인)
   group     String   @default("RECEIVED")
+  subType   String?  // 세부 구분: 매도인, 임대인, 임차인(권리금) 등
   memo      String?  // 특이사항 및 상담 메모
+
+  // [물건 접수] 매도/임대/임차(권리금) 가격 정보 연계
+  price                 Float?   // 희망 매매가액 (만원)
+  negotiablePrice       Float?   // 조정할 수 있는 매매가액 (만원)
+  deposit               Float?   // 희망 보증금 / 전세가액 (만원)
+  negotiableDeposit     Float?   // 조정할 수 있는 보증금 / 전세가액 (만원)
+  monthlyRent           Float?   // 희망 월세 (만원)
+  negotiableMonthlyRent Float?   // 조정할 수 있는 월세 (만원)
+  premium               Float?   // 권리금 (만원)
+  negotiablePremium     Float?   // 조정할 수 있는 권리금 (만원)
+  transactionType       String?  // 접수 거래유형 (매매, 전세, 월세)
 
   // 담당 권한자 및 등록자 정보
   managerName String   @default("사무실") // "사무실" 또는 소속공인중개사 이름
@@ -185,9 +197,12 @@ model Property {
   // 일정 및 가격 (단위: 만원)
   availableDate       DateTime? // 입주가능일 (즉시입주 가능 여부 포함)
   isImmediateAvailable Boolean  @default(false) // 즉시가능 여부
-  price               Float?    // 매매가 (만원)
-  deposit             Float?    // 보증금 (만원)
-  monthlyRent         Float?    // 월세 (만원)
+  price                 Float?    // 매매가 (만원)
+  negotiablePrice       Float?    // 조정 가능한 매매가 (만원)
+  deposit               Float?    // 보증금 (만원)
+  negotiableDeposit     Float?    // 조정 가능한 보증금 (만원)
+  monthlyRent           Float?    // 월세 (만원)
+  negotiableMonthlyRent Float?    // 조정 가능한 월세 (만원)
   isNoMaintenanceFee  Boolean   @default(false) // 관리비 없음 여부
   
   consultationNotes   String?   // 상담내용(메모)

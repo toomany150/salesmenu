@@ -95,22 +95,79 @@ export function maskPhoneNumber(phone?: string | null): string {
 }
 
 /**
- * 고객 연락처 열람 권한 판별
- * - 관리자(ADMIN) 또는 개업공인중개사(대표): 항상 모든 고객 연락처 열람 가능
- * - 소속 권한자: 주 담당자, 추가 지정 권한자(assignedAgents), 공용 매물, 본인 등록 항목 열람 가능
+ * 매물 및 고객 정보 열람 권한 판별
+ * - 다른 사람(개업공인중개사 / 타계정 추가자)이 등록한 정보도 기본 물건 스펙/가격/메모 등은 열람 가능 ("다른 것은 열람 가능하나")
+ * - 비로그인 상태에서는 사무실 공용 정보만 열람 가능
+ */
+export function canAccessItem(
+  user: { id: string; name: string; role: UserRole } | null,
+  item: { managerName?: string; assignedAgents?: string[]; createdById?: string } | null | undefined
+): boolean {
+  if (!item) return false;
+
+  // 로그인 상태인 사용자는 모든 매물 및 고객의 기본 정보(스펙, 가격, 메모 등) 열람 가능
+  if (user) {
+    return true;
+  }
+
+  // 비로그인 상태에서는 사무실(공용) 정보만 열람 가능
+  const isOfficeShared = 
+    item.managerName === '사무실' ||
+    item.managerName === '사무실 (공용)' ||
+    item.managerName === '사무실 (공용/워크인)' ||
+    Boolean(item.managerName?.includes('사무실')) ||
+    (Array.isArray(item.assignedAgents) && (item.assignedAgents.includes('사무실') || item.assignedAgents.includes('사무실 (공용)')));
+
+  return isOfficeShared;
+}
+
+/**
+ * 고객 연락처 열람 권한 판별 (사용자 지정 보안 규칙)
+ * 1. 개업공인중개사(대표): 모든 매물 및 고객등록장의 고객 연락처 열람 가능
+ * 2. 소속공인중개사(계정 추가자):
+ *    - 자기가 등록한 매물 고객연락처와 고객등록장의 고객 연락처 열람 가능
+ *    - 사무실로 분류된 연락처만 열람 가능
+ * 3. 이외 다른 사람(개업공인중개사/타계정추가한자)이 등록한 연락처는 열람 불가능 (마스킹 처리 및 통화버튼 제한)
  */
 export function canViewCustomerContact(
   user: { id: string; name: string; role: UserRole } | null,
-  customer: { managerName?: string; assignedAgents?: string[]; createdById?: string }
+  item: { managerName?: string; assignedAgents?: string[]; createdById?: string; [key: string]: any } | null | undefined
 ): boolean {
-  if (!user) return false;
-  if (user.role === 'ADMIN' || user.name.includes('개업공인중개사') || user.name.includes('대표')) return true;
-  if (customer.managerName && customer.managerName === user.name) return true;
-  if (customer.createdById && customer.createdById === user.id) return true;
-  if (Array.isArray(customer.assignedAgents)) {
-    if (customer.assignedAgents.includes(user.name)) return true;
-    if (customer.assignedAgents.includes('사무실(공용)') || customer.assignedAgents.includes('사무실')) return true;
+  if (!user || !item) return false;
+
+  // 1. 개업공인중개사 (대표) / 관리자는 모든 고객 연락처 열람 가능
+  if (user.role === 'ADMIN' || user.name.includes('개업공인중개사') || user.name.includes('대표')) {
+    return true;
   }
+
+  // 2. 사무실로 분류된 연락처는 모든 직원이 열람 가능
+  const isOffice = 
+    item.managerName === '사무실' ||
+    item.managerName === '사무실 (공용)' ||
+    item.managerName === '사무실 (공용/워크인)' ||
+    Boolean(item.managerName?.includes('사무실')) ||
+    (Array.isArray(item.assignedAgents) && (item.assignedAgents.includes('사무실') || item.assignedAgents.includes('사무실 (공용)')));
+
+  if (isOffice) {
+    return true;
+  }
+
+  // 3. 자기가 등록한 매물 및 고객 (createdById 일치)
+  if (item.createdById && item.createdById === user.id) {
+    return true;
+  }
+
+  // 4. 본인이 주 담당권한자인 경우 (managerName 일치)
+  if (item.managerName && (item.managerName === user.name || item.managerName.includes(user.name))) {
+    return true;
+  }
+
+  // 5. 함께 관리할 추가 권한자에 본인이 포함된 경우
+  if (Array.isArray(item.assignedAgents) && item.assignedAgents.includes(user.name)) {
+    return true;
+  }
+
+  // 그 외: 다른 사람(개업공인중개사 / 타계정추가한자)이 등록한 연락처는 열람 불가능
   return false;
 }
 

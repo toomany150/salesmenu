@@ -159,6 +159,7 @@ export const HOUSE_OPTION_CATEGORIES: HouseOptionGroup[] = [
       '보일러(개별난방)',
       '주차가능',
       '반려동물가능',
+      '외국인 가능',
       '단기임대가능',
     ],
   },
@@ -214,6 +215,14 @@ export const APARTMENT_OPTION_CATEGORIES: ApartmentOptionGroup[] = [
       '드레스룸 시스템장',
       '신발장',
       '현관창고',
+    ],
+  },
+  {
+    category: '기타 특이 옵션',
+    items: [
+      '반려동물 가능',
+      '외국인 가능',
+      '단기임대 가능',
     ],
   },
 ];
@@ -445,8 +454,11 @@ export interface PropertyItem {
   availableDate?: string;
   isImmediateAvailable?: boolean; // 즉시가능
   price?: number;
+  negotiablePrice?: number; // 조정 가능한 매매가액 (만원)
   deposit?: number;
+  negotiableDeposit?: number; // 조정 가능한 보증금/전세금 (만원)
   monthlyRent?: number;
+  negotiableMonthlyRent?: number; // 조정 가능한 월 임대료 (만원)
   isNoMaintenanceFee?: boolean; // 관리비 없음
   consultationNotes?: string;
   landArea?: number;
@@ -569,7 +581,16 @@ export interface CustomerItem {
   subType?: string; // '매도인' | '임대인' | '임차인(권리금)' | '매수인' | '임차인' | '임차인(권리금가능)'
   group: CustomerGroup;
   memo?: string;
-  // [물건 접수] 상세 정보
+  // [물건 접수] 상세 정보 및 가격 연계
+  price?: number; // 희망 매매가액
+  negotiablePrice?: number; // 조정할 수 있는 매매가액
+  deposit?: number; // 희망 보증금 / 전세가액
+  negotiableDeposit?: number; // 조정할 수 있는 보증금 / 전세가액
+  monthlyRent?: number; // 희망 월세
+  negotiableMonthlyRent?: number; // 조정할 수 있는 월세
+  premium?: number; // 권리금
+  negotiablePremium?: number; // 조정할 수 있는 권리금
+  transactionType?: string; // 거래유형
   receivedDetail?: CustomerReceivedPropertyDetail;
   // 담당 권한자 및 등록자 정보
   managerName?: string; // 주 담당 권한자 (예: 개업공인중개사(대표) 또는 소속공인중개사)

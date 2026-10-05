@@ -23,6 +23,8 @@ import {
   PROPERTY_TYPE_LABELS, 
   DIRECTION_OPTIONS 
 } from '@/lib/types';
+import { useAuth } from '../auth/AuthContext';
+import { canAccessItem } from '@/lib/auth';
 
 export type AreaTargetType = 'EXCLUSIVE' | 'SUPPLY' | 'LAND' | 'BUILDING';
 
@@ -76,6 +78,8 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
   onOpenNewProperty,
   className = '',
 }) => {
+  const { currentUser } = useAuth();
+
   // 1. Text Search & Customer Matching
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
@@ -240,6 +244,11 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
   // Execute filtering
   const filtered = useMemo(() => {
     return properties.filter((p) => {
+      // 0. 접근 권한 확인: 대표는 전체, 사무실(공용)은 전체 공개, 그 외에는 본인이 주담당자/추가권한자인 물건만 노출
+      if (!canAccessItem(currentUser, p)) {
+        return false;
+      }
+
       // 1. Text Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();

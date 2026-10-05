@@ -54,7 +54,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const canEdit = canEditItem(currentUser, property);
   const canDelete = canDeleteItem(currentUser);
-  const canViewContact = canViewCustomerContact(currentUser, property);
+  const canViewContact = canViewCustomerContact(currentUser, property) || (property.customer ? canViewCustomerContact(currentUser, property.customer as any) : false);
   const managerName = property.managerName || '사무실';
 
   const handleDeleteProperty = async () => {
@@ -101,6 +101,17 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     priceText = property.deposit ? `${property.deposit.toLocaleString()} 만원` : '협의';
   } else {
     priceText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}`;
+  }
+
+  let negotiablePriceText = '';
+  if (property.transactionType === '매매') {
+    negotiablePriceText = property.negotiablePrice ? `${property.negotiablePrice.toLocaleString()} 만원` : '';
+  } else if (property.transactionType === '전세') {
+    negotiablePriceText = property.negotiableDeposit ? `${property.negotiableDeposit.toLocaleString()} 만원` : '';
+  } else {
+    if (property.negotiableDeposit || property.negotiableMonthlyRent) {
+      negotiablePriceText = `보증금 ${property.negotiableDeposit ? property.negotiableDeposit.toLocaleString() + '만' : '협의'} / 월세 ${property.negotiableMonthlyRent ? property.negotiableMonthlyRent.toLocaleString() + '만' : '협의'}`;
+    }
   }
 
   const smsLink = generateSmsLink({
@@ -282,6 +293,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <div className="text-2xl font-black text-blue-900 mt-0.5">
                 {priceText}
               </div>
+              {negotiablePriceText && (
+                <div className="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1 inline-block">
+                  조정가능가: {negotiablePriceText}
+                </div>
+              )}
             </div>
           </div>
 

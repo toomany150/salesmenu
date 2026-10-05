@@ -42,7 +42,7 @@ function ensureDatabaseUrl(): string {
     return vercelDbUrl;
   }
 
-  // 로컬 개발 환경: prisma/dev.db 가 없으면 prisma/seed.db 에서 복사
+  // 로컬 개발 환경: prisma/dev.db 가 없으면 prisma/seed.db 에서 복사 및 절대 경로 반환
   try {
     const fs = eval("require('fs')");
     const path = eval("require('path')");
@@ -50,9 +50,16 @@ function ensureDatabaseUrl(): string {
     if (!fs.existsSync(localDevDb)) {
       const seedPath = path.join(process.cwd(), 'prisma', 'seed.db');
       if (fs.existsSync(seedPath)) {
-        fs.copyFileSync(seedPath, localDevDb);
+        try {
+          fs.copyFileSync(seedPath, localDevDb);
+        } catch (copyErr) {
+          console.warn('Failed to copy seed.db:', copyErr);
+        }
       }
     }
+    const absoluteDbUrl = `file:${localDevDb.replace(/\\/g, '/')}`;
+    process.env.DATABASE_URL = absoluteDbUrl;
+    return absoluteDbUrl;
   } catch (e) {}
 
   const localUrl = currentUrl || 'file:./dev.db';
@@ -162,19 +169,30 @@ export async function ensureDatabaseSchema(): Promise<void> {
         `);
       }
 
-      // 3. Customer & Property 테이블의 assignedAgents 컬럼 자동 보정
+      // 3. Customer & Property 테이블의 추가 컬럼 자동 보정
       try {
         const custCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("Customer");`).catch(() => []);
-        if (custCols && !custCols.some((col: any) => col.name === 'assignedAgents')) {
-          await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "assignedAgents" TEXT;`);
-        }
+        const existingCustCols = new Set(custCols ? custCols.map((c: any) => c.name) : []);
+        if (!existingCustCols.has('assignedAgents')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "assignedAgents" TEXT;`);
+        if (!existingCustCols.has('subType')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "subType" TEXT;`);
+        if (!existingCustCols.has('price')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "price" REAL;`);
+        if (!existingCustCols.has('negotiablePrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "negotiablePrice" REAL;`);
+        if (!existingCustCols.has('deposit')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "deposit" REAL;`);
+        if (!existingCustCols.has('negotiableDeposit')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "negotiableDeposit" REAL;`);
+        if (!existingCustCols.has('monthlyRent')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "monthlyRent" REAL;`);
+        if (!existingCustCols.has('negotiableMonthlyRent')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "negotiableMonthlyRent" REAL;`);
+        if (!existingCustCols.has('premium')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "premium" REAL;`);
+        if (!existingCustCols.has('negotiablePremium')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "negotiablePremium" REAL;`);
+        if (!existingCustCols.has('transactionType')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "transactionType" TEXT;`);
       } catch (colErr) {}
 
       try {
         const propCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("Property");`).catch(() => []);
-        if (propCols && !propCols.some((col: any) => col.name === 'assignedAgents')) {
-          await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "assignedAgents" TEXT;`);
-        }
+        const existingPropCols = new Set(propCols ? propCols.map((c: any) => c.name) : []);
+        if (!existingPropCols.has('assignedAgents')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "assignedAgents" TEXT;`);
+        if (!existingPropCols.has('negotiablePrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiablePrice" REAL;`);
+        if (!existingPropCols.has('negotiableDeposit')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiableDeposit" REAL;`);
+        if (!existingPropCols.has('negotiableMonthlyRent')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiableMonthlyRent" REAL;`);
       } catch (colErr) {}
     }
 

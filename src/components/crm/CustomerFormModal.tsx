@@ -237,6 +237,41 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         if (d.negotiableCondition) setNegotiableCondition(d.negotiableCondition);
         if (d.requirements) setRequirements(d.requirements);
       }
+
+      // 접수 물건 가격 및 조정가능 가격 로드 (매도인/임대인/임차인(권리금))
+      const linkedProp = initialData.properties && initialData.properties.length > 0 ? initialData.properties[0] : null;
+      const effectiveTxType = initialData.transactionType || linkedProp?.transactionType || (initialData.type === 'SELLER' ? '매매' : '월세');
+      setRecvTransactionType(effectiveTxType);
+
+      const effectivePrice = initialData.price !== undefined && initialData.price !== null ? initialData.price : linkedProp?.price;
+      if (effectivePrice !== undefined && effectivePrice !== null) setRecvPrice(String(effectivePrice));
+
+      const effectiveNegoPrice = initialData.negotiablePrice !== undefined && initialData.negotiablePrice !== null ? initialData.negotiablePrice : linkedProp?.negotiablePrice;
+      if (effectiveNegoPrice !== undefined && effectiveNegoPrice !== null) setRecvNegoPrice(String(effectiveNegoPrice));
+
+      const effectiveDeposit = initialData.deposit !== undefined && initialData.deposit !== null ? initialData.deposit : linkedProp?.deposit;
+      if (effectiveDeposit !== undefined && effectiveDeposit !== null) {
+        if (effectiveTxType === '전세') setRecvJeonse(String(effectiveDeposit));
+        else setRecvDeposit(String(effectiveDeposit));
+      }
+
+      const effectiveNegoDeposit = initialData.negotiableDeposit !== undefined && initialData.negotiableDeposit !== null ? initialData.negotiableDeposit : linkedProp?.negotiableDeposit;
+      if (effectiveNegoDeposit !== undefined && effectiveNegoDeposit !== null) {
+        if (effectiveTxType === '전세') setRecvNegoJeonse(String(effectiveNegoDeposit));
+        else setRecvNegoDeposit(String(effectiveNegoDeposit));
+      }
+
+      const effectiveMonthlyRent = initialData.monthlyRent !== undefined && initialData.monthlyRent !== null ? initialData.monthlyRent : linkedProp?.monthlyRent;
+      if (effectiveMonthlyRent !== undefined && effectiveMonthlyRent !== null) setRecvMonthlyRent(String(effectiveMonthlyRent));
+
+      const effectiveNegoMonthlyRent = initialData.negotiableMonthlyRent !== undefined && initialData.negotiableMonthlyRent !== null ? initialData.negotiableMonthlyRent : linkedProp?.negotiableMonthlyRent;
+      if (effectiveNegoMonthlyRent !== undefined && effectiveNegoMonthlyRent !== null) setRecvNegoMonthlyRent(String(effectiveNegoMonthlyRent));
+
+      const effectivePremium = initialData.premium !== undefined && initialData.premium !== null ? initialData.premium : (linkedProp?.storeDetail?.premium || undefined);
+      if (effectivePremium !== undefined && effectivePremium !== null) setRecvPremium(String(effectivePremium));
+
+      const effectiveNegoPremium = initialData.negotiablePremium !== undefined && initialData.negotiablePremium !== null ? initialData.negotiablePremium : undefined;
+      if (effectiveNegoPremium !== undefined && effectiveNegoPremium !== null) setRecvNegoPremium(String(effectiveNegoPremium));
     } else {
       setName('');
       setPhone('');
@@ -404,6 +439,16 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     };
 
     if (!isSearching) {
+      payload.transactionType = recvTransactionType;
+      payload.price = recvPrice ? parseFloat(recvPrice) : undefined;
+      payload.negotiablePrice = recvNegoPrice ? parseFloat(recvNegoPrice) : undefined;
+      payload.deposit = recvTransactionType === '전세' ? (recvJeonse ? parseFloat(recvJeonse) : undefined) : (recvDeposit ? parseFloat(recvDeposit) : undefined);
+      payload.negotiableDeposit = recvTransactionType === '전세' ? (recvNegoJeonse ? parseFloat(recvNegoJeonse) : undefined) : (recvNegoDeposit ? parseFloat(recvNegoDeposit) : undefined);
+      payload.monthlyRent = recvMonthlyRent ? parseFloat(recvMonthlyRent) : undefined;
+      payload.negotiableMonthlyRent = recvNegoMonthlyRent ? parseFloat(recvNegoMonthlyRent) : undefined;
+      payload.premium = recvPremium ? parseFloat(recvPremium) : undefined;
+      payload.negotiablePremium = recvNegoPremium ? parseFloat(recvNegoPremium) : undefined;
+
       payload.receivedDetail = {
         propertyType: recvPropertyType,
         transactionType: recvTransactionType,

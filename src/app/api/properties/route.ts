@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { INITIAL_PROPERTIES } from '@/lib/mockData';
-import { recordAccessLog } from '@/lib/auth';
+import { recordAccessLog, maskPhoneNumber } from '@/lib/auth';
 
 function formatPropertyOutput(p: any) {
   if (!p) return p;
@@ -34,6 +34,9 @@ function formatPropertyOutput(p: any) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const userRole = request.headers.get('x-user-role') || searchParams.get('role');
+    const userId = request.headers.get('x-user-id') || searchParams.get('userId');
+    const userName = request.headers.get('x-user-name') || searchParams.get('userName');
     const propertyType = searchParams.get('propertyType');
     const transactionType = searchParams.get('transactionType');
     const status = searchParams.get('status');
@@ -152,7 +155,42 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(properties.map(formatPropertyOutput));
+    let formattedProperties = properties.map(formatPropertyOutput);
+
+    // 소속공인중개사(AGENT)인 경우, 자신이 등록/담당한 매물 또는 사무실 매물이 아니면 고객 연락처 마스킹
+    if (userRole === 'AGENT' && userName && !userName.includes('개업공인중개사')) {
+      formattedProperties = formattedProperties.map((p: any) => {
+        if (!p.customer || !p.customer.phone) return p;
+
+        const isOffice = 
+          (p.managerName && p.managerName.includes('사무실')) ||
+          (p.customer.managerName && p.customer.managerName.includes('사무실')) ||
+          (Array.isArray(p.assignedAgents) && (p.assignedAgents.includes('사무실') || p.assignedAgents.includes('사무실 (공용)'))) ||
+          (Array.isArray(p.customer.assignedAgents) && (p.customer.assignedAgents.includes('사무실') || p.customer.assignedAgents.includes('사무실 (공용)')));
+
+        const isMine =
+          (p.managerName && (p.managerName === userName || p.managerName.includes(userName))) ||
+          (p.createdById && p.createdById === userId) ||
+          (p.customer.managerName && (p.customer.managerName === userName || p.customer.managerName.includes(userName))) ||
+          (p.customer.createdById && p.customer.createdById === userId) ||
+          (Array.isArray(p.assignedAgents) && p.assignedAgents.includes(userName)) ||
+          (Array.isArray(p.customer.assignedAgents) && p.customer.assignedAgents.includes(userName));
+
+        if (!isOffice && !isMine) {
+          return {
+            ...p,
+            customer: {
+              ...p.customer,
+              phone: maskPhoneNumber(p.customer.phone),
+              isMasked: true,
+            },
+          };
+        }
+        return p;
+      });
+    }
+
+    return NextResponse.json(formattedProperties);
   } catch (error: any) {
     console.error('Error fetching properties:', error);
     return NextResponse.json(INITIAL_PROPERTIES);
@@ -220,55 +258,91 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 접수 고객 직접 입력 시 고객 DB 자동 등록/연동
+    // 접수 고객 직접 입력 시 고객 DB 자동 등록/연동 (요구사항 10: 매도인/임대인/임차인(권리금) 자동 연계 및 가격/메모 매핑)
     let finalCustomerId = customerId || null;
     if (!finalCustomerId && customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {
       const custName = customerInput.name?.trim() || '접수 의뢰고객';
       const custPhone = customerInput.phone?.trim() || '010-0000-0000';
       const custCarrier = customerInput.carrier?.trim() || null;
-      const custType = transactionType === '매매' ? 'SELLER' : 'LESSOR';
+      
+      const storePremiumVal = propertyType === 'STORE' ? (storeDetail?.premium || 0) : 0;
+      let autoCustomerType = customerInput.type;
+      let autoCustomerSubType = customerInput.subType;
+      if (!autoCustomerType) {
+        if (propertyType === 'STORE' && storePremiumVal > 0) {
+          autoCustomerType = 'LESSEE';
+          autoCustomerSubType = '임차인(권리금)';
+        } else if (transactionType === '매매') {
+          autoCustomerType = 'SELLER';
+          autoCustomerSubType = '매도인';
+        } else {
+          autoCustomerType = 'LESSOR';
+          autoCustomerSubType = '임대인';
+        }
+      }
+
+      const custMemo = customerInput.memo?.trim() || consultationNotes?.trim() || `매물 #${propertyNumber} (${address}) 접수 고객`;
+      const custPrice = customerInput.price !== undefined ? customerInput.price : (price ? parseFloat(price) : null);
+      const custNegoPrice = customerInput.negotiablePrice !== undefined ? customerInput.negotiablePrice : (body.negotiablePrice ? parseFloat(body.negotiablePrice) : null);
+      const custDeposit = customerInput.deposit !== undefined ? customerInput.deposit : (deposit ? parseFloat(deposit) : null);
+      const custNegoDeposit = customerInput.negotiableDeposit !== undefined ? customerInput.negotiableDeposit : (body.negotiableDeposit ? parseFloat(body.negotiableDeposit) : null);
+      const custMonthlyRent = customerInput.monthlyRent !== undefined ? customerInput.monthlyRent : (monthlyRent ? parseFloat(monthlyRent) : null);
+      const custNegoMonthlyRent = customerInput.negotiableMonthlyRent !== undefined ? customerInput.negotiableMonthlyRent : (body.negotiableMonthlyRent ? parseFloat(body.negotiableMonthlyRent) : null);
+      const custPremium = customerInput.premium !== undefined ? customerInput.premium : (storePremiumVal ? parseFloat(storePremiumVal) : null);
+
+      const customerDataToSave = {
+        name: custName,
+        phone: custPhone,
+        carrier: custCarrier,
+        type: autoCustomerType,
+        subType: autoCustomerSubType,
+        group: 'RECEIVED',
+        memo: custMemo,
+        price: custPrice,
+        negotiablePrice: custNegoPrice,
+        deposit: custDeposit,
+        negotiableDeposit: custNegoDeposit,
+        monthlyRent: custMonthlyRent,
+        negotiableMonthlyRent: custNegoMonthlyRent,
+        premium: custPremium,
+        transactionType: transactionType || null,
+        managerName: managerName || '사무실',
+        assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
+        createdById: createdById || null,
+        creatorName: creatorName || null,
+      };
 
       if (customerInput.phone?.trim()) {
         const existingCust = await prisma.customer.findFirst({
           where: { phone: customerInput.phone.trim() },
         });
         if (existingCust) {
-          if (custCarrier && !existingCust.carrier) {
-            await prisma.customer.update({
-              where: { id: existingCust.id },
-              data: { carrier: custCarrier },
-            });
-          }
+          await prisma.customer.update({
+            where: { id: existingCust.id },
+            data: {
+              carrier: custCarrier || existingCust.carrier,
+              subType: autoCustomerSubType || existingCust.subType,
+              memo: custMemo || existingCust.memo,
+              price: custPrice !== null ? custPrice : existingCust.price,
+              negotiablePrice: custNegoPrice !== null ? custNegoPrice : existingCust.negotiablePrice,
+              deposit: custDeposit !== null ? custDeposit : existingCust.deposit,
+              negotiableDeposit: custNegoDeposit !== null ? custNegoDeposit : existingCust.negotiableDeposit,
+              monthlyRent: custMonthlyRent !== null ? custMonthlyRent : existingCust.monthlyRent,
+              negotiableMonthlyRent: custNegoMonthlyRent !== null ? custNegoMonthlyRent : existingCust.negotiableMonthlyRent,
+              premium: custPremium !== null ? custPremium : existingCust.premium,
+              transactionType: transactionType || existingCust.transactionType,
+            },
+          });
           finalCustomerId = existingCust.id;
         } else {
           const newCust = await prisma.customer.create({
-            data: {
-              name: custName,
-              phone: custPhone,
-              carrier: custCarrier,
-              type: custType,
-              group: 'RECEIVED',
-              managerName: managerName || '사무실',
-              createdById: createdById || null,
-              creatorName: creatorName || null,
-              memo: `매물 #${propertyNumber} (${address}) 접수 고객으로 자동 등록됨`,
-            },
+            data: customerDataToSave,
           });
           finalCustomerId = newCust.id;
         }
       } else {
         const newCust = await prisma.customer.create({
-          data: {
-            name: custName,
-            phone: custPhone,
-            carrier: custCarrier,
-            type: custType,
-            group: 'RECEIVED',
-            managerName: managerName || '사무실',
-            createdById: createdById || null,
-            creatorName: creatorName || null,
-            memo: `매물 #${propertyNumber} (${address}) 접수 고객으로 자동 등록됨`,
-          },
+          data: customerDataToSave,
         });
         finalCustomerId = newCust.id;
       }
@@ -293,8 +367,11 @@ export async function POST(request: NextRequest) {
         availableDate: availableDate ? new Date(availableDate) : null,
         isImmediateAvailable: !!body.isImmediateAvailable,
         price: price ? parseFloat(price) : null,
+        negotiablePrice: body.negotiablePrice ? parseFloat(body.negotiablePrice) : null,
         deposit: deposit ? parseFloat(deposit) : null,
+        negotiableDeposit: body.negotiableDeposit ? parseFloat(body.negotiableDeposit) : null,
         monthlyRent: monthlyRent ? parseFloat(monthlyRent) : null,
+        negotiableMonthlyRent: body.negotiableMonthlyRent ? parseFloat(body.negotiableMonthlyRent) : null,
         isNoMaintenanceFee: !!body.isNoMaintenanceFee,
         consultationNotes,
         landArea: landArea ? parseFloat(landArea) : null,
@@ -645,25 +722,60 @@ export async function PUT(request: NextRequest) {
 
     const targetId = existingProp.id;
 
-    // 접수 고객 직접 입력 시 처리
+    // 접수 고객 직접 입력 시 처리 (요구사항 10)
     let finalCustomerId = customerId !== undefined ? customerId : existingProp.customerId;
     if (customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {
       const custName = customerInput.name?.trim() || '접수 의뢰고객';
       const custPhone = customerInput.phone?.trim() || '010-0000-0000';
       const custCarrier = customerInput.carrier?.trim() || null;
-      const custType = transactionType === '매매' ? 'SELLER' : 'LESSOR';
+      
+      const storePremiumVal = propertyType === 'STORE' ? (storeDetail?.premium || 0) : 0;
+      let autoCustomerType = customerInput.type;
+      let autoCustomerSubType = customerInput.subType;
+      if (!autoCustomerType) {
+        if (propertyType === 'STORE' && storePremiumVal > 0) {
+          autoCustomerType = 'LESSEE';
+          autoCustomerSubType = '임차인(권리금)';
+        } else if (transactionType === '매매') {
+          autoCustomerType = 'SELLER';
+          autoCustomerSubType = '매도인';
+        } else {
+          autoCustomerType = 'LESSOR';
+          autoCustomerSubType = '임대인';
+        }
+      }
+
+      const custMemo = customerInput.memo?.trim() || consultationNotes?.trim() || `매물 #${propertyNumber || existingProp.propertyNumber} 접수 고객`;
+      const custPrice = customerInput.price !== undefined ? customerInput.price : (price !== undefined ? (price ? parseFloat(price) : null) : undefined);
+      const custNegoPrice = customerInput.negotiablePrice !== undefined ? customerInput.negotiablePrice : (body.negotiablePrice !== undefined ? (body.negotiablePrice ? parseFloat(body.negotiablePrice) : null) : undefined);
+      const custDeposit = customerInput.deposit !== undefined ? customerInput.deposit : (deposit !== undefined ? (deposit ? parseFloat(deposit) : null) : undefined);
+      const custNegoDeposit = customerInput.negotiableDeposit !== undefined ? customerInput.negotiableDeposit : (body.negotiableDeposit !== undefined ? (body.negotiableDeposit ? parseFloat(body.negotiableDeposit) : null) : undefined);
+      const custMonthlyRent = customerInput.monthlyRent !== undefined ? customerInput.monthlyRent : (monthlyRent !== undefined ? (monthlyRent ? parseFloat(monthlyRent) : null) : undefined);
+      const custNegoMonthlyRent = customerInput.negotiableMonthlyRent !== undefined ? customerInput.negotiableMonthlyRent : (body.negotiableMonthlyRent !== undefined ? (body.negotiableMonthlyRent ? parseFloat(body.negotiableMonthlyRent) : null) : undefined);
+      const custPremium = customerInput.premium !== undefined ? customerInput.premium : (storePremiumVal ? parseFloat(storePremiumVal) : undefined);
 
       if (customerInput.phone?.trim()) {
         const existingCust = await prisma.customer.findFirst({
           where: { phone: customerInput.phone.trim() },
         });
         if (existingCust) {
-          if (custCarrier && !existingCust.carrier) {
-            await prisma.customer.update({
-              where: { id: existingCust.id },
-              data: { carrier: custCarrier },
-            });
-          }
+          await prisma.customer.update({
+            where: { id: existingCust.id },
+            data: {
+              carrier: custCarrier || existingCust.carrier,
+              type: autoCustomerType || existingCust.type,
+              subType: autoCustomerSubType || existingCust.subType,
+              memo: custMemo || existingCust.memo,
+              price: custPrice !== undefined ? custPrice : existingCust.price,
+              negotiablePrice: custNegoPrice !== undefined ? custNegoPrice : existingCust.negotiablePrice,
+              deposit: custDeposit !== undefined ? custDeposit : existingCust.deposit,
+              negotiableDeposit: custNegoDeposit !== undefined ? custNegoDeposit : existingCust.negotiableDeposit,
+              monthlyRent: custMonthlyRent !== undefined ? custMonthlyRent : existingCust.monthlyRent,
+              negotiableMonthlyRent: custNegoMonthlyRent !== undefined ? custNegoMonthlyRent : existingCust.negotiableMonthlyRent,
+              premium: custPremium !== undefined ? custPremium : existingCust.premium,
+              transactionType: transactionType || existingCust.transactionType,
+            },
+          });
           finalCustomerId = existingCust.id;
         } else {
           const newCust = await prisma.customer.create({
@@ -671,9 +783,20 @@ export async function PUT(request: NextRequest) {
               name: custName,
               phone: custPhone,
               carrier: custCarrier,
-              type: custType,
+              type: autoCustomerType || 'SELLER',
+              subType: autoCustomerSubType || '매도인',
               group: 'RECEIVED',
-              memo: `매물 #${propertyNumber || existingProp.propertyNumber} 접수 고객으로 등록됨`,
+              memo: custMemo,
+              price: custPrice || null,
+              negotiablePrice: custNegoPrice || null,
+              deposit: custDeposit || null,
+              negotiableDeposit: custNegoDeposit || null,
+              monthlyRent: custMonthlyRent || null,
+              negotiableMonthlyRent: custNegoMonthlyRent || null,
+              premium: custPremium || null,
+              transactionType: transactionType || null,
+              managerName: managerName || '사무실',
+              assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
             },
           });
           finalCustomerId = newCust.id;
@@ -701,8 +824,11 @@ export async function PUT(request: NextRequest) {
         availableDate: availableDate !== undefined ? (availableDate ? new Date(availableDate) : null) : undefined,
         isImmediateAvailable: body.isImmediateAvailable !== undefined ? !!body.isImmediateAvailable : undefined,
         price: price !== undefined ? (price ? parseFloat(price) : null) : undefined,
+        negotiablePrice: body.negotiablePrice !== undefined ? (body.negotiablePrice ? parseFloat(body.negotiablePrice) : null) : undefined,
         deposit: deposit !== undefined ? (deposit ? parseFloat(deposit) : null) : undefined,
+        negotiableDeposit: body.negotiableDeposit !== undefined ? (body.negotiableDeposit ? parseFloat(body.negotiableDeposit) : null) : undefined,
         monthlyRent: monthlyRent !== undefined ? (monthlyRent ? parseFloat(monthlyRent) : null) : undefined,
+        negotiableMonthlyRent: body.negotiableMonthlyRent !== undefined ? (body.negotiableMonthlyRent ? parseFloat(body.negotiableMonthlyRent) : null) : undefined,
         isNoMaintenanceFee: body.isNoMaintenanceFee !== undefined ? !!body.isNoMaintenanceFee : undefined,
         consultationNotes: consultationNotes !== undefined ? consultationNotes : undefined,
         landArea: landArea !== undefined ? (landArea ? parseFloat(landArea) : null) : undefined,

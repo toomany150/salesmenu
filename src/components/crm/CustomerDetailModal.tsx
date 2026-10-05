@@ -318,13 +318,68 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Group 1: [물건 접수] 매도인/임대인이 내놓은 매물 목록 */}
+          {/* Group 1: [물건 접수] 매도인/임대인 의뢰 조건 & 내놓은 매물 목록 */}
           {isReceived && (
-            <div>
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <Building className="w-4 h-4 text-blue-600" />
-                내놓은 매물 목록 ({customer.properties?.length || 0}건)
-              </h4>
+            <div className="space-y-4">
+              {(customer.price || customer.negotiablePrice || customer.deposit || customer.monthlyRent || customer.subType) && (
+                <div className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-blue-600" />
+                      [물건 접수] {customer.subType || typeKorean} 의뢰 희망가 및 조정가능 가격
+                    </span>
+                    {customer.transactionType && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                        {customer.transactionType}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {customer.price && (
+                      <div className="p-2 bg-white rounded-lg border border-blue-100 flex justify-between">
+                        <span className="text-slate-500">희망 매매가액:</span>
+                        <span className="font-black text-blue-900">{customer.price.toLocaleString()} 만원</span>
+                      </div>
+                    )}
+                    {customer.negotiablePrice && (
+                      <div className="p-2 bg-white rounded-lg border border-amber-200 flex justify-between">
+                        <span className="text-amber-700 font-semibold">조정할 수 있는 매매가액:</span>
+                        <span className="font-black text-amber-800">{customer.negotiablePrice.toLocaleString()} 만원</span>
+                      </div>
+                    )}
+                    {customer.deposit && (
+                      <div className="p-2 bg-white rounded-lg border border-blue-100 flex justify-between">
+                        <span className="text-slate-500">희망 보증금/전세:</span>
+                        <span className="font-black text-blue-900">{customer.deposit.toLocaleString()} 만원</span>
+                      </div>
+                    )}
+                    {customer.negotiableDeposit && (
+                      <div className="p-2 bg-white rounded-lg border border-amber-200 flex justify-between">
+                        <span className="text-amber-700 font-semibold">조정할 수 있는 보증금/전세:</span>
+                        <span className="font-black text-amber-800">{customer.negotiableDeposit.toLocaleString()} 만원</span>
+                      </div>
+                    )}
+                    {customer.monthlyRent && (
+                      <div className="p-2 bg-white rounded-lg border border-blue-100 flex justify-between">
+                        <span className="text-slate-500">희망 월세:</span>
+                        <span className="font-black text-blue-900">{customer.monthlyRent.toLocaleString()} 만원</span>
+                      </div>
+                    )}
+                    {customer.negotiableMonthlyRent && (
+                      <div className="p-2 bg-white rounded-lg border border-amber-200 flex justify-between">
+                        <span className="text-amber-700 font-semibold">조정할 수 있는 월세:</span>
+                        <span className="font-black text-amber-800">{customer.negotiableMonthlyRent.toLocaleString()} 만원</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Building className="w-4 h-4 text-blue-600" />
+                  내놓은 매물 목록 ({customer.properties?.length || 0}건)
+                </h4>
 
               {customer.properties && customer.properties.length > 0 ? (
                 <div className="space-y-2.5">
@@ -359,6 +414,11 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                             ? prop.deposit ? `${prop.deposit.toLocaleString()} 만원` : '협의'
                             : `${prop.deposit || 0}만 / ${prop.monthlyRent || 0}만`}
                         </span>
+                        {prop.negotiablePrice ? (
+                          <span className="block text-[11px] font-bold text-amber-700 mt-0.5">
+                            조정: {prop.negotiablePrice.toLocaleString()}만
+                          </span>
+                        ) : null}
                         <span className="block text-[11px] text-slate-400 mt-0.5">
                           상세보기 →
                         </span>
@@ -371,6 +431,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                   아직 접수 등록된 매물이 없습니다.
                 </div>
               )}
+              </div>
             </div>
           )}
 

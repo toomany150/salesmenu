@@ -55,11 +55,17 @@ export const PropertyList: React.FC<PropertyListProps> = ({
 
   const getPriceDisplay = (p: PropertyItem) => {
     if (p.transactionType === '매매') {
-      return p.price ? `${p.price.toLocaleString()} 만원` : '협의';
+      const base = p.price ? `${p.price.toLocaleString()} 만원` : '협의';
+      return p.negotiablePrice ? `${base} (조정: ${p.negotiablePrice.toLocaleString()}만)` : base;
     } else if (p.transactionType === '전세') {
-      return p.deposit ? `${p.deposit.toLocaleString()} 만원` : '협의';
+      const base = p.deposit ? `${p.deposit.toLocaleString()} 만원` : '협의';
+      return p.negotiableDeposit ? `${base} (조정: ${p.negotiableDeposit.toLocaleString()}만)` : base;
     } else {
-      return `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}`;
+      const base = `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}`;
+      if (p.negotiableDeposit || p.negotiableMonthlyRent) {
+        return `${base} (조정: ${p.negotiableDeposit || 0}만/${p.negotiableMonthlyRent || 0}만)`;
+      }
+      return base;
     }
   };
 

@@ -102,8 +102,9 @@ export async function GET(request: NextRequest) {
     if (userRole === 'AGENT' && userName && !userName.includes('개업공인중개사')) {
       customers = customers.map((cust) => {
         const isMyCustomer = 
-          (cust.managerName && cust.managerName === userName) ||
+          (cust.managerName && (cust.managerName === userName || cust.managerName.includes(userName))) ||
           (cust.createdById && cust.createdById === userId) ||
+          (cust.managerName && cust.managerName.includes('사무실')) ||
           (Array.isArray(cust.assignedAgents) && (cust.assignedAgents.includes(userName) || cust.assignedAgents.includes('사무실(공용)') || cust.assignedAgents.includes('사무실')));
 
         if (!isMyCustomer) {
@@ -135,8 +136,19 @@ export async function POST(request: NextRequest) {
       carrier, 
       phone, 
       type, 
+      subType,
       group, 
       memo, 
+      price,
+      negotiablePrice,
+      deposit,
+      negotiableDeposit,
+      monthlyRent,
+      negotiableMonthlyRent,
+      premium,
+      negotiablePremium,
+      transactionType,
+      receivedDetail,
       demand, 
       managerName, 
       assignedAgents,
@@ -159,14 +171,35 @@ export async function POST(request: NextRequest) {
     // group 결정 (SELLER/LESSOR -> RECEIVED, BUYER/LESSEE -> SEARCHING)
     const finalGroup = group || (!isSearching ? 'RECEIVED' : 'SEARCHING');
 
+    const finalSubType = subType || (receivedDetail ? (receivedDetail.transactionType === '매매' ? '매도인' : '임대인') : (type === 'SELLER' ? '매도인' : type === 'BUYER' ? '매수인' : '임대인'));
+    const finalPrice = price !== undefined && price !== null ? parseFloat(price) : (receivedDetail?.price ? parseFloat(receivedDetail.price) : null);
+    const finalNegoPrice = negotiablePrice !== undefined && negotiablePrice !== null ? parseFloat(negotiablePrice) : (receivedDetail?.negotiablePrice ? parseFloat(receivedDetail.negotiablePrice) : null);
+    const finalDeposit = deposit !== undefined && deposit !== null ? parseFloat(deposit) : (receivedDetail?.deposit ? parseFloat(receivedDetail.deposit) : (receivedDetail?.jeonse ? parseFloat(receivedDetail.jeonse) : null));
+    const finalNegoDeposit = negotiableDeposit !== undefined && negotiableDeposit !== null ? parseFloat(negotiableDeposit) : (receivedDetail?.negotiableDeposit ? parseFloat(receivedDetail.negotiableDeposit) : (receivedDetail?.negotiableJeonse ? parseFloat(receivedDetail.negotiableJeonse) : null));
+    const finalMonthlyRent = monthlyRent !== undefined && monthlyRent !== null ? parseFloat(monthlyRent) : (receivedDetail?.monthlyRent ? parseFloat(receivedDetail.monthlyRent) : null);
+    const finalNegoMonthlyRent = negotiableMonthlyRent !== undefined && negotiableMonthlyRent !== null ? parseFloat(negotiableMonthlyRent) : (receivedDetail?.negotiableMonthlyRent ? parseFloat(receivedDetail.negotiableMonthlyRent) : null);
+    const finalPremium = premium !== undefined && premium !== null ? parseFloat(premium) : (receivedDetail?.premium ? parseFloat(receivedDetail.premium) : null);
+    const finalNegoPremium = negotiablePremium !== undefined && negotiablePremium !== null ? parseFloat(negotiablePremium) : (receivedDetail?.negotiablePremium ? parseFloat(receivedDetail.negotiablePremium) : null);
+    const finalTxType = transactionType || receivedDetail?.transactionType || null;
+
     const customer = await prisma.customer.create({
       data: {
         name,
         carrier: finalCarrier,
         phone,
         type,
+        subType: finalSubType,
         group: finalGroup,
         memo,
+        price: finalPrice,
+        negotiablePrice: finalNegoPrice,
+        deposit: finalDeposit,
+        negotiableDeposit: finalNegoDeposit,
+        monthlyRent: finalMonthlyRent,
+        negotiableMonthlyRent: finalNegoMonthlyRent,
+        premium: finalPremium,
+        negotiablePremium: finalNegoPremium,
+        transactionType: finalTxType,
         managerName: managerName || '사무실',
         assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
         createdById: createdById || null,
@@ -244,7 +277,28 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, carrier, phone, type, group, memo, managerName, assignedAgents, currentUser } = body;
+    const { 
+      id, 
+      name, 
+      carrier, 
+      phone, 
+      type, 
+      subType,
+      group, 
+      memo, 
+      price,
+      negotiablePrice,
+      deposit,
+      negotiableDeposit,
+      monthlyRent,
+      negotiableMonthlyRent,
+      premium,
+      negotiablePremium,
+      transactionType,
+      managerName, 
+      assignedAgents, 
+      currentUser 
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: '고객 ID가 필요합니다.' }, { status: 400 });
@@ -288,8 +342,18 @@ export async function PUT(request: NextRequest) {
         carrier: carrier !== undefined ? carrier : undefined,
         phone: phone || undefined,
         type: type || undefined,
+        subType: subType !== undefined ? subType : undefined,
         group: group || undefined,
         memo: memo !== undefined ? memo : undefined,
+        price: price !== undefined ? (price !== null ? parseFloat(price) : null) : undefined,
+        negotiablePrice: negotiablePrice !== undefined ? (negotiablePrice !== null ? parseFloat(negotiablePrice) : null) : undefined,
+        deposit: deposit !== undefined ? (deposit !== null ? parseFloat(deposit) : null) : undefined,
+        negotiableDeposit: negotiableDeposit !== undefined ? (negotiableDeposit !== null ? parseFloat(negotiableDeposit) : null) : undefined,
+        monthlyRent: monthlyRent !== undefined ? (monthlyRent !== null ? parseFloat(monthlyRent) : null) : undefined,
+        negotiableMonthlyRent: negotiableMonthlyRent !== undefined ? (negotiableMonthlyRent !== null ? parseFloat(negotiableMonthlyRent) : null) : undefined,
+        premium: premium !== undefined ? (premium !== null ? parseFloat(premium) : null) : undefined,
+        negotiablePremium: negotiablePremium !== undefined ? (negotiablePremium !== null ? parseFloat(negotiablePremium) : null) : undefined,
+        transactionType: transactionType !== undefined ? transactionType : undefined,
         managerName: managerName !== undefined ? managerName : undefined,
         assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : undefined,
       },

