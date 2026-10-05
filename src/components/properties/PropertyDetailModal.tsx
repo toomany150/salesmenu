@@ -29,6 +29,7 @@ import { shareViaKakao, generateSmsLink } from '@/lib/kakao';
 import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
 import { useAuth } from '../auth/AuthContext';
 import { maskPhoneNumber, canViewCustomerContact, canDeleteItem, canEditItem } from '@/lib/auth';
+import { KakaoAddressMap } from '../map/KakaoAddressMap';
 
 interface PropertyDetailModalProps {
   property: PropertyItem | null;
@@ -436,6 +437,24 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <span>등록된 매물 사진이 없습니다. [수정] 버튼을 눌러 사진(최대 20장)을 등록할 수 있습니다.</span>
             </div>
           )}
+
+          {/* 소재지 위치 및 실시간 카카오지도 (7대 매물 종류 공통 연동) */}
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                <span>소재지 위치 및 실시간 카카오지도</span>
+              </h4>
+              <span className="text-[11px] text-slate-500 font-medium">
+                {property.roadAddress || property.address} {property.detailAddress || ''}
+              </span>
+            </div>
+            <KakaoAddressMap
+              address={property.roadAddress || property.jibunAddress || property.address}
+              detailAddress={property.detailAddress}
+              height="h-60"
+            />
+          </div>
 
           {/* Key Specs Grid */}
           <div>

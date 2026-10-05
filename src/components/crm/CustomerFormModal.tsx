@@ -539,6 +539,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       if (!res.ok) {
         throw new Error(data.error || '고객 등록 또는 수정에 실패했습니다.');
       }
+      alert(mode === 'EDIT' ? '고객 정보가 성공적으로 수정되었습니다.' : '신규 고객이 성공적으로 등록되었습니다.');
       onSuccess(data);
       onClose();
     } catch (err: any) {
@@ -581,8 +582,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <form id="customer-form" onSubmit={handleSubmit} className="space-y-6">
+        <form id="customer-form" onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
             
             {/* ────────────────────────────────────────────────────────── */}
             {/* 섹션 1. 고객 구분 및 기본 정보 */}
@@ -2147,38 +2148,40 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 {errorMsg}
               </div>
             )}
-          </form>
-        </div>
+          </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <div className="text-xs text-slate-500">
-            {isSearching ? (
-              <span className="font-semibold text-indigo-700">
-                ✨ 희망조건 및 브리핑 카드가 함께 저장되어 매칭과 재상담에 활용됩니다.
-              </span>
-            ) : (
-              <span>매도/임대 고객 기본 인적사항이 등록됩니다.</span>
-            )}
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+            <div className="text-xs text-slate-500">
+              {isSearching ? (
+                <span className="font-semibold text-indigo-700">
+                  ✨ 희망조건 및 브리핑 카드가 함께 저장되어 매칭과 재상담에 활용됩니다.
+                </span>
+              ) : (
+                <span>매도/임대 고객 기본 인적사항이 등록됩니다.</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => {
+                  handleSubmit(e);
+                }}
+                disabled={submitting}
+                className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+              >
+                {submitting ? '처리 중...' : mode === 'EDIT' ? '고객 정보 수정 완료' : '신규 고객 등록 완료'}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              form="customer-form"
-              disabled={submitting}
-              className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all"
-            >
-              {submitting ? '처리 중...' : mode === 'EDIT' ? '고객 정보 수정 완료' : '신규 고객 등록 완료'}
-            </button>
-          </div>
-        </div>
+        </form>
 
       </div>
     </div>

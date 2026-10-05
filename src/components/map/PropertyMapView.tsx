@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { PropertyItem, PropertyType, PROPERTY_TYPE_LABELS } from '@/lib/types';
 import { getCoordinatesFromAddress, getKakaoMapUrl, getNaverMapUrl, DEFAULT_CENTER } from '@/lib/geo';
+import { loadKakaoServicesScript } from '@/lib/address';
 
 declare global {
   interface Window {
@@ -100,24 +101,38 @@ export const PropertyMapView: React.FC<PropertyMapViewProps> = ({
     }
   };
 
-  // 1. Check Kakao Map Availability
+  // 1. Check and Load Kakao Map Availability
   useEffect(() => {
+    let isMounted = true;
     const checkKakao = () => {
       if (typeof window !== 'undefined' && window.kakao && window.kakao.maps) {
         try {
           window.kakao.maps.load(() => {
-            setKakaoAvailable(true);
+            if (isMounted) {
+              setKakaoAvailable(true);
+              setMapEngine('KAKAO');
+            }
           });
-        } catch (e) {
-          if (window.kakao.maps.Map) {
+        } catch {
+          if (window.kakao.maps.Map && isMounted) {
             setKakaoAvailable(true);
+            setMapEngine('KAKAO');
           }
         }
       }
     };
-    checkKakao();
+
+    loadKakaoServicesScript().then((ok) => {
+      if (ok && isMounted) {
+        checkKakao();
+      }
+    });
+
     const timer = setTimeout(checkKakao, 1500);
-    return () => clearTimeout(timer);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   // 2. Initialize Leaflet Map (Real Interactive Zoom/Pan Engine)

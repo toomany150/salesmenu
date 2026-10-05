@@ -15,6 +15,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { getCoordinatesFromAddress, getKakaoMapUrl, getNaverMapUrl, DEFAULT_CENTER, Coordinates } from '@/lib/geo';
+import { loadKakaoServicesScript } from '@/lib/address';
 
 declare global {
   interface Window {
@@ -51,53 +52,24 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
   const [isExactLocation, setIsExactLocation] = useState(false);
   const [geocodedAddress, setGeocodedAddress] = useState<string>('');
 
-  // 1. Try loading Kakao Map SDK in the background
+  // 1. Load Kakao Map SDK reliably
   useEffect(() => {
-    const kakaoKey =
-      process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ||
-      process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY ||
-      DEFAULT_KAKAO_KEY;
-
-    if (!kakaoKey || kakaoKey === 'your-kakao-map-key') {
-      return;
-    }
-
-    if (window.kakao && window.kakao.maps) {
-      try {
-        window.kakao.maps.load(() => {
-          setKakaoLoaded(true);
-        });
-      } catch (e) {
-        setKakaoLoaded(true);
-      }
-      return;
-    }
-
-    let script = document.getElementById('kakao-maps-sdk') as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement('script');
-      script.id = 'kakao-maps-sdk';
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&autoload=false&libraries=services`;
-      script.async = true;
-      document.head.appendChild(script);
-    }
-
-    const handleLoad = () => {
-      if (window.kakao?.maps) {
+    let isMounted = true;
+    loadKakaoServicesScript().then((loaded) => {
+      if (!isMounted) return;
+      if (loaded && window.kakao?.maps) {
         try {
           window.kakao.maps.load(() => {
-            setKakaoLoaded(true);
+            if (isMounted) setKakaoLoaded(true);
           });
-        } catch (e) {
-          setKakaoLoaded(true);
+        } catch {
+          if (isMounted) setKakaoLoaded(true);
         }
       }
-    };
-
-    script.addEventListener('load', handleLoad);
+    });
 
     return () => {
-      script?.removeEventListener('load', handleLoad);
+      isMounted = false;
     };
   }, []);
 
@@ -328,43 +300,63 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
 
       {/* 2. Pure Map Canvas (No search bar, no portal header, clean pin only) */}
       <div 
-        className={`w-full ${height} relative bg-slate-200 overflow-hidden`}
+        className={`w-full ${height} relative bg-slate-100 overflow-hidden`}
         style={{ minHeight: '300px' }}
       >
-        {/* Pure Kakao Map Native SDK Canvas */}
+        {/* Layer A: Pure Kakao Map Native SDK Canvas (when SDK is ready) */}
         <div 
           ref={mapContainerRef} 
-          className="w-full h-full block"
+          className={`w-full h-full ${kakaoLoaded ? 'block' : 'hidden'}`}
           style={{ width: '100%', height: '100%', minHeight: '300px' }}
         />
 
-        {/* Floating Controls */}
-        <div className="absolute bottom-2.5 right-2.5 flex flex-col gap-1 z-10">
-          <button
-            type="button"
-            onClick={() => handleZoom(-1)}
-            title="지도 확대"
-            className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleZoom(1)}
-            title="지도 축소"
-            className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleCenter}
-            title="매물 위치로 중심 이동"
-            className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-colors cursor-pointer"
-          >
-            <Navigation className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        {/* Layer B: Seamless Clean Pinpoint View (Cropped to hide portal header & search bar completely) */}
+        {!kakaoLoaded && (
+          <div className="w-full h-full relative overflow-hidden" style={{ minHeight: '300px' }}>
+            <iframe
+              title="카카오 지도 위치 연동"
+              src={`https://map.kakao.com/?q=${encodeURIComponent(`${address}${detailAddress ? ' ' + detailAddress : ''}`.trim())}`}
+              className="w-full border-0 pointer-events-auto"
+              style={{
+                position: 'absolute',
+                top: '-118px', // Cleanly removes the blue header (= kakaomap, 검색, 길찾기 etc.)
+                left: '0',
+                width: '100%',
+                height: 'calc(100% + 118px)',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Floating Controls (available in SDK mode) */}
+        {kakaoLoaded && (
+          <div className="absolute bottom-2.5 right-2.5 flex flex-col gap-1 z-10">
+            <button
+              type="button"
+              onClick={() => handleZoom(-1)}
+              title="지도 확대"
+              className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleZoom(1)}
+              title="지도 축소"
+              className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleCenter}
+              title="매물 위치로 중심 이동"
+              className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-colors cursor-pointer"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 3. Coordinate Badge at bottom-left */}

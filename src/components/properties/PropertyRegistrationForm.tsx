@@ -760,6 +760,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         throw new Error(data.error || `${isEditMode ? '매물 수정' : '매물 등록'}에 실패했습니다.`);
       }
 
+      alert(isEditMode ? '매물 정보가 성공적으로 수정되었습니다.' : '매물이 성공적으로 등록되었습니다.');
       onSuccess(data);
       onClose();
     } catch (err: any) {
@@ -799,8 +800,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         </div>
 
         {/* Content Area with Split Layout for Checklist */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <form id="property-reg-form" onSubmit={handleSubmit} className="space-y-6">
+        <form id="property-reg-form" onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
             
             {/* 1. 7가지 매물 종류 선택 탭 */}
             <div>
@@ -1712,36 +1713,38 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                 {errorMsg}
               </div>
             )}
-          </form>
-        </div>
+          </div>
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
-          <div className="text-xs text-slate-500">
-            * 필수 입력: 매물번호, 매물종류, 거래유형, 소재지 주소
+          {/* Footer Actions */}
+          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 shrink-0">
+            <div className="text-xs text-slate-500">
+              * 필수 입력: 매물번호, 매물종류, 거래유형, 소재지 주소
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                onClick={(e) => {
+                  handleSubmit(e);
+                }}
+                disabled={submitting}
+                className={`px-5 py-2 text-xs font-bold text-white rounded-lg shadow-sm cursor-pointer ${
+                  isEditMode
+                    ? 'bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 shadow-indigo-500/20'
+                    : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 shadow-blue-500/20'
+                }`}
+              >
+                {submitting ? '저장 처리 중...' : isEditMode ? '수정 내용 저장' : '매물 등록 완료'}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              form="property-reg-form"
-              disabled={submitting}
-              className={`px-5 py-2 text-xs font-bold text-white rounded-lg shadow-sm ${
-                isEditMode
-                  ? 'bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 shadow-indigo-500/20'
-                  : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 shadow-blue-500/20'
-              }`}
-            >
-              {submitting ? '저장 처리 중...' : isEditMode ? '수정 내용 저장' : '매물 등록 완료'}
-            </button>
-          </div>
-        </div>
+        </form>
 
       </div>
     </div>
