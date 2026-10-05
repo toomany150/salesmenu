@@ -1824,12 +1824,44 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">매물 층수나 동호수</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-700">매물 층수나 동호수</label>
+                        {recvLedgerData?.isCollectiveBuilding && recvLedgerData.unitList && (
+                          <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1 rounded">
+                            집합건물 전유부
+                          </span>
+                        )}
+                      </div>
+                      {recvLedgerData?.isCollectiveBuilding && recvLedgerData.unitList && recvLedgerData.unitList.length > 0 && (
+                        <div className="mb-1">
+                          <select
+                            value={recvLedgerData.unitList.some(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === recvFloorAndUnit) ? recvFloorAndUnit : ''}
+                            onChange={(e) => {
+                              const found = recvLedgerData.unitList?.find(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === e.target.value);
+                              if (found) {
+                                const val = `${found.dong ? found.dong + ' ' : ''}${found.ho}`;
+                                setRecvFloorAndUnit(val);
+                                const unitTag = `[전유부: ${val} / ${found.floor} / 전용: ${found.exclusiveArea}㎡ / 용도: ${found.mainUse}${found.ownerName ? ` / 소유: ${found.ownerName}` : ''}]`;
+                                setMemo((prev) => (prev ? `${prev}\n${unitTag}` : unitTag));
+                              }
+                            }}
+                            className="w-full text-xs font-bold px-2 py-1 bg-blue-50/80 border border-blue-300 rounded-md text-blue-900 cursor-pointer"
+                          >
+                            <option value="">▼ 호수 바로 선택 (동/호수/전용면적)</option>
+                            {recvLedgerData.unitList.map((u, i) => {
+                              const val = `${u.dong ? u.dong + ' ' : ''}${u.ho}`;
+                              return (
+                                <option key={i} value={val}>{val} ({u.floor}, 전용 {u.exclusiveArea}㎡)</option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
                       <input
                         type="text"
                         value={recvFloorAndUnit}
                         onChange={(e) => setRecvFloorAndUnit(e.target.value)}
-                        placeholder="예: 3층 301호 / 1층 전면"
+                        placeholder="예: 3층 301호 / 가동 201호"
                         className="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-lg"
                       />
                     </div>

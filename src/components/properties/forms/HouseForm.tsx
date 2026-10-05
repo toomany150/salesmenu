@@ -64,6 +64,54 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
     onChange({ ...data, [field]: value });
   };
 
+  // 대장상면적(㎡) 변경 시 평수 자동 계산
+  const handleBuildingAreaSqm = (val: string) => {
+    if (!val) {
+      onChange({ ...data, buildingArea: undefined, buildingAreaPyeong: undefined });
+      return;
+    }
+    const sqm = parseFloat(val);
+    const py = +(sqm * 0.3025).toFixed(2);
+    onChange({ 
+      ...data, 
+      buildingArea: sqm, 
+      buildingAreaPyeong: py,
+      actualArea: data.actualArea !== undefined ? data.actualArea : sqm,
+      actualAreaPyeong: data.actualAreaPyeong !== undefined ? data.actualAreaPyeong : py,
+    });
+  };
+
+  const handleBuildingAreaPyeong = (val: string) => {
+    if (!val) {
+      onChange({ ...data, buildingAreaPyeong: undefined });
+      return;
+    }
+    const py = parseFloat(val);
+    const sqm = +(py / 0.3025).toFixed(2);
+    onChange({ ...data, buildingArea: sqm, buildingAreaPyeong: py });
+  };
+
+  // 실평수(전용㎡) 변경 시 평수 자동 계산
+  const handleActualAreaSqm = (val: string) => {
+    if (!val) {
+      onChange({ ...data, actualArea: undefined, actualAreaPyeong: undefined });
+      return;
+    }
+    const sqm = parseFloat(val);
+    const py = +(sqm * 0.3025).toFixed(2);
+    onChange({ ...data, actualArea: sqm, actualAreaPyeong: py });
+  };
+
+  const handleActualAreaPyeong = (val: string) => {
+    if (!val) {
+      onChange({ ...data, actualAreaPyeong: undefined });
+      return;
+    }
+    const py = parseFloat(val);
+    const sqm = +(py / 0.3025).toFixed(2);
+    onChange({ ...data, actualArea: sqm, actualAreaPyeong: py });
+  };
+
   // 종합 옵션 동기화 함수
   const syncOptions = (type: string, rooms: string[], opts: string[], custom: string) => {
     const optionSummaryParts: string[] = [];
@@ -253,28 +301,86 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
         </div>
       </div>
 
+      {/* 대장상면적(㎡) -> 대장상면적(평) -> 실평수(전용㎡)* -> 실평수(평) -> 대장상주용도 */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {/* 1. 대장상 면적 (㎡) */}
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">건축면적 (㎡)</label>
+          <label className="block text-xs font-bold text-slate-800 mb-1">
+            대장상 면적 (㎡)
+          </label>
           <input
             type="number"
             step="0.01"
-            value={data.buildingArea || ''}
-            onChange={(e) => updateField('buildingArea', e.target.value ? parseFloat(e.target.value) : undefined)}
-            placeholder="예: 116.56"
-            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+            value={data.buildingArea !== undefined && data.buildingArea !== null ? data.buildingArea : ''}
+            onChange={(e) => handleBuildingAreaSqm(e.target.value)}
+            placeholder="예: 78.2"
+            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900"
           />
         </div>
+
+        {/* 2. 대장상 면적 (평) */}
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">대장상 주용도</label>
+          <label className="block text-xs font-bold text-slate-800 mb-1">
+            대장상 면적 (평)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={data.buildingAreaPyeong !== undefined && data.buildingAreaPyeong !== null ? data.buildingAreaPyeong : (data.buildingArea ? +(data.buildingArea * 0.3025).toFixed(2) : '')}
+            onChange={(e) => handleBuildingAreaPyeong(e.target.value)}
+            placeholder="예: 23.6"
+            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-bold text-slate-700"
+          />
+        </div>
+
+        {/* 3. 실평수 (전용 ㎡) * */}
+        <div>
+          <label className="block text-xs font-bold text-emerald-900 mb-1 flex items-center justify-between">
+            <span>실평수 (전용 ㎡) *</span>
+            <span className="text-[10px] text-emerald-600 font-normal">수정가능</span>
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={data.actualArea !== undefined && data.actualArea !== null ? data.actualArea : (data.buildingArea || '')}
+            onChange={(e) => handleActualAreaSqm(e.target.value)}
+            placeholder="예: 59.84"
+            className="w-full text-xs px-3 py-2 bg-emerald-50/80 border-2 border-emerald-400 rounded-lg focus:ring-2 focus:ring-emerald-500 font-extrabold text-emerald-950"
+          />
+        </div>
+
+        {/* 4. 실평수 (평) */}
+        <div>
+          <label className="block text-xs font-bold text-emerald-900 mb-1">
+            실평수 (평)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={data.actualAreaPyeong !== undefined && data.actualAreaPyeong !== null ? data.actualAreaPyeong : (data.actualArea ? +(data.actualArea * 0.3025).toFixed(2) : '')}
+            onChange={(e) => handleActualAreaPyeong(e.target.value)}
+            placeholder="예: 18.1"
+            className="w-full text-xs px-3 py-2 bg-emerald-50/40 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-900"
+          />
+        </div>
+
+        {/* 5. 대장상 주용도 */}
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs font-bold text-slate-800 mb-1">
+            대장상 주용도
+          </label>
           <input
             type="text"
             value={data.buildingUse || ''}
             onChange={(e) => updateField('buildingUse', e.target.value)}
-            placeholder="예: 다가구주택, 근린생활시설"
-            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+            placeholder="예: 다세대주택, 다가구주택"
+            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-medium text-slate-900"
           />
         </div>
+      </div>
+
+      {/* 지역 / 주구조 / 사용승인일 */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">지역 (용도지역)</label>
           <input

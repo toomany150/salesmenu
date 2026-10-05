@@ -14,35 +14,63 @@ import {
   Calendar,
   Check
 } from 'lucide-react';
-import { PublicBuildingLedgerResult, PublicBuildingFloorInfo } from '@/lib/types';
+import { PublicBuildingLedgerResult, PublicBuildingFloorInfo, PublicBuildingUnitInfo } from '@/lib/types';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
 
 interface PublicDataFetcherProps {
   roadAddress: string;
   jibunAddress: string;
   propertyType?: string;
+  detailAddress?: string;
   onAddressChange: (road: string, jibun: string) => void;
   onApplyData: (data: PublicBuildingLedgerResult) => void;
   onSelectFloor?: (floor: PublicBuildingFloorInfo) => void;
+  onSelectUnit?: (unit: PublicBuildingUnitInfo) => void;
 }
 
 export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   roadAddress,
   jibunAddress,
   propertyType,
+  detailAddress,
   onAddressChange,
   onApplyData,
   onSelectFloor,
+  onSelectUnit,
 }) => {
   const [loading, setLoading] = useState(false);
   const [converting, setConverting] = useState(false);
   const [fetchedData, setFetchedData] = useState<PublicBuildingLedgerResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedFloorName, setSelectedFloorName] = useState<string | null>(null);
+  // 집합건물 전유부(동/호수) 선택 상태
+  const [selectedDong, setSelectedDong] = useState<string>('ALL');
+  const [selectedUnitKey, setSelectedUnitKey] = useState<string | null>(null);
   // 주소 입력창 접힘/펼침 상태 (주소 입력 완료 시 자동 접힘)
   const [isEditingAddress, setIsEditingAddress] = useState<boolean>(false);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 외부 상세주소(detailAddress) 또는 대장 데이터 변경 시 선택된 전유부 동기화
+  React.useEffect(() => {
+    if (!detailAddress) {
+      setSelectedUnitKey(null);
+      return;
+    }
+    if (fetchedData?.unitList && fetchedData.unitList.length > 0) {
+      const cleanDetail = detailAddress.trim().replace(/\s+/g, '');
+      const found = fetchedData.unitList.find((u) => {
+        const fullKey = `${u.dong || ''}${u.ho}`.replace(/\s+/g, '');
+        return cleanDetail.includes(fullKey) || fullKey.includes(cleanDetail) || (cleanDetail.includes(u.ho) && (!u.dong || cleanDetail.includes(u.dong)));
+      });
+      if (found) {
+        setSelectedUnitKey(`${found.dong || ''}_${found.ho}`);
+        if (found.dong && selectedDong !== 'ALL' && selectedDong !== found.dong) {
+          setSelectedDong(found.dong);
+        }
+      }
+    }
+  }, [detailAddress, fetchedData, selectedDong]);
 
   // 주소가 비어있거나 달라질 때 이전 대장 정보 초기화
   React.useEffect(() => {
@@ -149,6 +177,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setFetchedData(null);
     setErrorMsg(null);
     setSelectedFloorName(null);
+    setSelectedUnitKey(null);
     onAddressChange(road, jibun);
     setIsEditingAddress(false);
   };
@@ -157,6 +186,14 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setSelectedFloorName(floorInfo.floor);
     if (onSelectFloor) {
       onSelectFloor(floorInfo);
+    }
+  };
+
+  const handleUnitClick = (unit: PublicBuildingUnitInfo) => {
+    const key = `${unit.dong || ''}_${unit.ho}`;
+    setSelectedUnitKey(key);
+    if (onSelectUnit) {
+      onSelectUnit(unit);
     }
   };
 
@@ -182,8 +219,22 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
         </div>
 
         {/* Quick Sample Links */}
-        <div className="flex items-center gap-1 text-[11px] text-slate-500 self-start sm:self-center">
+        <div className="flex items-center gap-1 text-[11px] text-slate-500 self-start sm:self-center flex-wrap">
           <span className="text-slate-400">예시:</span>
+          <button
+            type="button"
+            onClick={() => setExampleAddress('부산 사상구 백양대로703번길 53-11', '부산 사상구 덕포동 104-4')}
+            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-blue-100/70 text-blue-900 font-extrabold rounded-md border border-blue-300"
+          >
+            백양대로 53-11 (가·나동 빌라)
+          </button>
+          <button
+            type="button"
+            onClick={() => setExampleAddress('부산 사상구 사상로 300', '부산 사상구 덕포동 795')}
+            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+          >
+            사상강변동원
+          </button>
           <button
             type="button"
             onClick={() => setExampleAddress('부산 사상구 백양대로 707', '부산 사상구 덕포동 788-8')}
@@ -197,13 +248,6 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
             className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200"
           >
             역삼동 아파트
-          </button>
-          <button
-            type="button"
-            onClick={() => setExampleAddress('서울특별시 서초구 서초대로 350', '서울특별시 서초구 서초동 1685-8')}
-            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200"
-          >
-            서초 상가
           </button>
         </div>
       </div>
@@ -464,49 +508,235 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
             <span className="text-emerald-700 font-medium">위반건축물: <strong>{fetchedData.isViolation ? '위반 건축물' : '정상 (위반 없음)'}</strong></span>
           </div>
 
-          {/* 2. 대장상 소유주 정보 및 소유권 변동일 (2번째 이미지 완벽 연동) */}
-          <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-3.5 space-y-2">
-            <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/70">
-              <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                <UserCheck className="w-4 h-4 text-amber-700" />
-                대장상 소유자 정보 (소유권 현황)
-              </span>
-              <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded font-bold border border-amber-200">
-                건축물대장(갑) 소유자란
-              </span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs pt-0.5">
-              <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
-                <span className="text-[10px] text-slate-500 block font-medium">성명 (명칭)</span>
-                <span className="font-black text-slate-900 text-sm mt-0.5 block">
-                  {fetchedData.ownerName || '임정원'}
-                </span>
-              </div>
-              <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
-                <span className="text-[10px] text-slate-500 block font-medium">주민(법인)등록번호</span>
-                <span className="font-bold text-slate-800 text-xs mt-0.5 block tracking-wide">
-                  {fetchedData.ownerRegNo || '590917-1******'}
-                </span>
-              </div>
-              <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
-                <span className="text-[10px] text-slate-500 block font-medium flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-blue-600" />
-                  소유권 변동일
-                </span>
-                <span className="font-black text-blue-900 text-xs mt-0.5 block">
-                  {fetchedData.ownershipChangeDate || '2015-04-20'}
-                </span>
-              </div>
-              <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
-                <span className="text-[10px] text-slate-500 block font-medium">변동원인</span>
-                <span className="font-bold text-slate-800 text-xs mt-0.5 block">
-                  {fetchedData.ownershipChangeReason || '매매 (소유권이전)'}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* 2. 🏢 집합건축물 전유부(각 동·호수) 선택 섹션 (사용자 요청: 집합건물일 경우 전유부를 선택할수 있게 각 동호수를 선택) */}
+          {fetchedData.isCollectiveBuilding && fetchedData.unitList && fetchedData.unitList.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-sky-50/80 border-2 border-blue-400 rounded-xl p-4 space-y-3.5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-blue-200">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-2xs">
+                    <Building className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black text-blue-950 flex items-center gap-1.5 flex-wrap">
+                      🏢 집합건축물 전유부(각 동·호수) 선택
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-600 text-white rounded-md shadow-2xs">
+                        {fetchedData.buildingCategoryName || '집합건축물'}
+                      </span>
+                      <span className="px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800 rounded-md border border-blue-300">
+                        총 {fetchedData.unitList.length}개 호실
+                      </span>
+                    </h5>
+                    <p className="text-[11px] text-blue-800 font-medium mt-0.5">
+                      💡 원하시는 동·호수를 클릭하시면 상세주소(동호수) 및 해당 호실의 층수, 전용면적(실평수), 대장상면적, 주용도, 소유자 정보가 폼에 자동 입력됩니다.
+                    </p>
+                  </div>
+                </div>
 
-          {/* 3. 층수에 따른 용도 및 면적 전체 표시 (층별개요) */}
+                {/* 동 선택 탭 (가동, 나동 / 101동, 102동 등) */}
+                {fetchedData.dongList && fetchedData.dongList.length > 1 && (
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-200 shadow-2xs self-start sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDong('ALL')}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                        selectedDong === 'ALL'
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      전체 ({fetchedData.unitList.length})
+                    </button>
+                    {fetchedData.dongList.map((d) => {
+                      const count = fetchedData.unitList?.filter((u) => u.dong === d).length || 0;
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setSelectedDong(d)}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            selectedDong === d
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {d} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 전유부 호수 목록 그리드 (호수 카드) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                {fetchedData.unitList
+                  .filter((unit) => selectedDong === 'ALL' || unit.dong === selectedDong)
+                  .map((unit, idx) => {
+                    const unitKey = `${unit.dong || ''}_${unit.ho}`;
+                    const isSelected = selectedUnitKey === unitKey;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleUnitClick(unit)}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between group ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-400 shadow-md scale-[1.02]'
+                            : 'bg-white hover:bg-blue-50/80 border-slate-200 hover:border-blue-300 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className={`text-xs font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900 group-hover:text-blue-700'}`}>
+                            {unit.dong ? `${unit.dong} ` : ''}{unit.ho}
+                          </span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                            isSelected ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {unit.floor.replace('지상 ', '')}
+                          </span>
+                        </div>
+
+                        <div className="space-y-0.5 mt-1">
+                          <div className={`text-[11px] font-extrabold flex items-center justify-between ${
+                            isSelected ? 'text-blue-100' : 'text-blue-700'
+                          }`}>
+                            <span>전용</span>
+                            <span>{unit.exclusiveArea}㎡</span>
+                          </div>
+                          <div className={`text-[10px] flex items-center justify-between ${
+                            isSelected ? 'text-blue-200' : 'text-slate-500'
+                          }`}>
+                            <span>실평수</span>
+                            <span>{unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평</span>
+                          </div>
+                          {unit.ownerName && (
+                            <div className={`text-[10px] truncate pt-1 border-t ${
+                              isSelected ? 'text-white/90 border-blue-500' : 'text-slate-600 border-slate-100'
+                            }`}>
+                              소유: {unit.ownerName}
+                            </div>
+                          )}
+                        </div>
+
+                        {isSelected && (
+                          <div className="mt-1.5 pt-1 border-t border-blue-400 flex items-center justify-center gap-1 text-[10px] font-bold text-yellow-300">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>선택됨</span>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+              </div>
+
+              {/* 선택된 호수 상세 안내 바 */}
+              {selectedUnitKey && (() => {
+                const currentSelected = fetchedData.unitList?.find((u) => `${u.dong || ''}_${u.ho}` === selectedUnitKey);
+                if (!currentSelected) return null;
+                return (
+                  <div className="p-3 bg-white rounded-xl border border-blue-300 shadow-2xs flex flex-wrap items-center justify-between gap-2 animate-in fade-in">
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-extrabold flex items-center gap-1 shadow-2xs">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                        선택된 전유부: {currentSelected.dong ? `${currentSelected.dong} ` : ''}{currentSelected.ho}
+                      </span>
+                      <span className="text-slate-700 font-semibold">
+                        층수: <strong className="text-slate-900">{currentSelected.floor}</strong>
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span className="text-slate-700 font-semibold">
+                        전용(실평수): <strong className="text-blue-700">{currentSelected.exclusiveArea}㎡ ({currentSelected.exclusiveAreaPyeong || +(currentSelected.exclusiveArea * 0.3025).toFixed(1)}평)</strong>
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span className="text-slate-700 font-semibold">
+                        공급(대장상): <strong className="text-slate-900">{currentSelected.supplyArea || currentSelected.exclusiveArea}㎡ ({currentSelected.supplyAreaPyeong || +((currentSelected.supplyArea || currentSelected.exclusiveArea) * 0.3025).toFixed(1)}평)</strong>
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span className="text-slate-700 font-semibold">
+                        주용도: <strong className="text-slate-900">{currentSelected.mainUse}</strong>
+                      </span>
+                      {currentSelected.ownerName && (
+                        <>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-slate-700 font-semibold">
+                            소유자: <strong className="text-purple-700">{currentSelected.ownerName}</strong> ({currentSelected.ownerRegNo || '-'})
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedUnitKey(null);
+                      }}
+                      className="text-[11px] text-slate-500 hover:text-rose-600 underline font-medium cursor-pointer"
+                    >
+                      호수 선택 해제
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* 3. 대장상 소유주 정보 및 소유권 변동일 (2번째 이미지 완벽 연동, 선택된 전유부 소유자 자동 반영) */}
+          {(() => {
+            const currentSelected = fetchedData.unitList?.find((u) => `${u.dong || ''}_${u.ho}` === selectedUnitKey);
+            const activeOwnerName = currentSelected?.ownerName || fetchedData.ownerName || '임정원';
+            const activeOwnerRegNo = currentSelected?.ownerRegNo || fetchedData.ownerRegNo || '590917-1******';
+            const activeChangeDate = currentSelected?.ownershipChangeDate || fetchedData.ownershipChangeDate || '2015-04-20';
+            const activeChangeReason = currentSelected?.ownershipChangeReason || fetchedData.ownershipChangeReason || '매매 (소유권이전)';
+
+            return (
+              <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/70">
+                  <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-amber-700" />
+                    대장상 소유자 정보 (소유권 현황)
+                    {currentSelected && (
+                      <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold">
+                        {currentSelected.dong ? `${currentSelected.dong} ` : ''}{currentSelected.ho} 전유부 소유권
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded font-bold border border-amber-200">
+                    건축물대장(갑) 소유자란
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs pt-0.5">
+                  <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 block font-medium">성명 (명칭)</span>
+                    <span className="font-black text-slate-900 text-sm mt-0.5 block">
+                      {activeOwnerName}
+                    </span>
+                  </div>
+                  <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 block font-medium">주민(법인)등록번호</span>
+                    <span className="font-bold text-slate-800 text-xs mt-0.5 block tracking-wide">
+                      {activeOwnerRegNo}
+                    </span>
+                  </div>
+                  <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 block font-medium flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-blue-600" />
+                      소유권 변동일
+                    </span>
+                    <span className="font-black text-blue-900 text-xs mt-0.5 block">
+                      {activeChangeDate}
+                    </span>
+                  </div>
+                  <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 block font-medium">변동원인</span>
+                    <span className="font-bold text-slate-800 text-xs mt-0.5 block">
+                      {activeChangeReason}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 4. 층수에 따른 용도 및 면적 전체 표시 (층별개요) */}
           {fetchedData.floorList && fetchedData.floorList.length > 0 && (
             <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 flex-wrap gap-1">

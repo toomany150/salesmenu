@@ -259,7 +259,12 @@ export interface HouseData {
   currentFloor?: string;
   landArea?: number;
   totalFloorArea?: number;
-  buildingArea?: number;
+  buildingArea?: number; // 대장상 면적 (㎡)
+  buildingAreaPyeong?: number; // 대장상 면적 (평)
+  actualArea?: number; // 실평수 (전용 ㎡)
+  actualAreaPyeong?: number; // 실평수 (평)
+  exclusiveArea?: number;
+  exclusiveAreaPyeong?: number;
   buildingUse?: string;
   zoningArea?: string;
   structure?: string;
@@ -649,6 +654,22 @@ export interface PublicBuildingFloorInfo {
   etcUse?: string; // 세부/기타용도 (예: "소매점, 일반음식점")
 }
 
+// 집합건물 전유부(각 동/호수) 정보 규격
+export interface PublicBuildingUnitInfo {
+  dong?: string; // 예: "가동", "101동"
+  ho: string; // 예: "101호", "201호"
+  floor: string; // 예: "지상 2층", "2층"
+  exclusiveArea: number; // 전유(전용)면적 (㎡)
+  exclusiveAreaPyeong?: number; // 전유(전용)면적 (평)
+  supplyArea?: number; // 공급/공용합산면적 (㎡)
+  supplyAreaPyeong?: number; // 공급면적 (평)
+  mainUse: string; // 전유부 주용도 (예: "다세대주택", "공동주택(아파트)", "제1종근린생활시설")
+  ownerName?: string; // 소유자명 (예: "김철수")
+  ownerRegNo?: string; // 주민(법인)등록번호 마스킹
+  ownershipChangeDate?: string; // 소유권 변동일 (예: "2021-03-15")
+  ownershipChangeReason?: string; // 소유권 변동원인 (예: "매매")
+}
+
 // 공공데이터 API 응답 규격
 export interface PublicBuildingLedgerResult {
   address: string;
@@ -690,6 +711,11 @@ export interface PublicBuildingLedgerResult {
   heatingType?: string; // 난방방식
   // 층수별 용도 및 면적
   floorList?: PublicBuildingFloorInfo[];
+  // 집합건물(아파트, 다세대, 연립, 구분상가 등) 여부 및 전유부(각 동호수) 목록
+  isCollectiveBuilding?: boolean;
+  buildingCategoryName?: '일반건축물' | '집합건축물';
+  dongList?: string[];
+  unitList?: PublicBuildingUnitInfo[];
 }
 
 // 매물 및 고객의 수정 권한 판별 함수 (auth.ts와 통일)

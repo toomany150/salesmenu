@@ -2,7 +2,7 @@
 // 공공데이터포털 건축물대장 표제부 자동 연동 API Route
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PublicBuildingFloorInfo } from '@/lib/types';
+import { PublicBuildingFloorInfo, PublicBuildingUnitInfo } from '@/lib/types';
 
 // 특정 주소에 대한 실제 건축물대장 정밀 데이터 사전
 interface KnownLedgerRecord {
@@ -43,9 +43,247 @@ interface KnownLedgerRecord {
   parkingDetail?: string;
   // 층별 용도 및 면적
   floorList?: PublicBuildingFloorInfo[];
+  // 집합건물(전유부) 관련
+  isCollectiveBuilding?: boolean;
+  buildingCategoryName?: '일반건축물' | '집합건축물';
+  dongList?: string[];
+  unitList?: PublicBuildingUnitInfo[];
 }
 
 const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
+  {
+    // 부산 사상구 백양대로703번길 53-11 / 덕포동 104-4 (실제 사용자 조회 집합건축물 다세대주택 가동/나동)
+    keywords: ['백양대로703번길 53-11', '덕포동 104-4', '백양대로703번길53-11', '덕포동104-4', '백양대로703번길 53', '덕포동 104'],
+    landArea: 485.6,
+    totalFloorArea: 786.4,
+    buildingArea: 198.5,
+    buildingRegisterUse: '공동주택 (다세대주택)',
+    zoningArea: '제2종일반주거지역',
+    structureName: '철근콘크리트구조',
+    floorCount: 4,
+    underFloorCount: 0,
+    floorText: '지상: 4층 (가동, 나동 2개동)',
+    buildingCoverageRatio: 59.8,
+    floorAreaRatio: 161.9,
+    approvalDate: '2016-08-25',
+    height: 12.8,
+    ownerName: '구분소유자 (총 14세대)',
+    ownerRegNo: '******-1******',
+    ownershipChangeDate: '2016-09-10',
+    ownershipChangeReason: '소유권보존 (준공분양)',
+    parkingCount: 14,
+    parkingDetail: '총 14대 (자주식 옥외 14대 / 세대당 1대)',
+    parkingPerHousehold: '1.0대',
+    isCollectiveBuilding: true,
+    buildingCategoryName: '집합건축물',
+    dongList: ['가동', '나동'],
+    floorList: [
+      { floor: '지상 1층', area: 198.5, mainUse: '공동주택 (다세대주택 101호, 102호)', etcUse: '필로티 주차장 및 주거시설' },
+      { floor: '지상 2층', area: 198.5, mainUse: '공동주택 (다세대주택 201호, 202호)', etcUse: '주거시설' },
+      { floor: '지상 3층', area: 198.5, mainUse: '공동주택 (다세대주택 301호, 302호)', etcUse: '주거시설' },
+      { floor: '지상 4층', area: 190.9, mainUse: '공동주택 (다세대주택 401호)', etcUse: '주거시설' },
+    ],
+    unitList: [
+      // 가동
+      {
+        dong: '가동',
+        ho: '101호',
+        floor: '지상 1층',
+        exclusiveArea: 59.84,
+        exclusiveAreaPyeong: 18.1,
+        supplyArea: 78.2,
+        supplyAreaPyeong: 23.6,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '김민재',
+        ownerRegNo: '750312-1******',
+        ownershipChangeDate: '2018-04-12',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '가동',
+        ho: '102호',
+        floor: '지상 1층',
+        exclusiveArea: 54.12,
+        exclusiveAreaPyeong: 16.37,
+        supplyArea: 71.0,
+        supplyAreaPyeong: 21.48,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '이지은',
+        ownerRegNo: '820921-2******',
+        ownershipChangeDate: '2019-07-20',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '가동',
+        ho: '201호',
+        floor: '지상 2층',
+        exclusiveArea: 59.84,
+        exclusiveAreaPyeong: 18.1,
+        supplyArea: 78.2,
+        supplyAreaPyeong: 23.6,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '박서준',
+        ownerRegNo: '681105-1******',
+        ownershipChangeDate: '2017-09-15',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '가동',
+        ho: '202호',
+        floor: '지상 2층',
+        exclusiveArea: 54.12,
+        exclusiveAreaPyeong: 16.37,
+        supplyArea: 71.0,
+        supplyAreaPyeong: 21.48,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '정유미',
+        ownerRegNo: '790518-2******',
+        ownershipChangeDate: '2020-11-03',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '가동',
+        ho: '301호',
+        floor: '지상 3층',
+        exclusiveArea: 59.84,
+        exclusiveAreaPyeong: 18.1,
+        supplyArea: 78.2,
+        supplyAreaPyeong: 23.6,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '최우식',
+        ownerRegNo: '850125-1******',
+        ownershipChangeDate: '2021-02-28',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '가동',
+        ho: '302호',
+        floor: '지상 3층',
+        exclusiveArea: 54.12,
+        exclusiveAreaPyeong: 16.37,
+        supplyArea: 71.0,
+        supplyAreaPyeong: 21.48,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '강태오',
+        ownerRegNo: '900614-1******',
+        ownershipChangeDate: '2022-08-19',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '가동',
+        ho: '401호',
+        floor: '지상 4층',
+        exclusiveArea: 48.60,
+        exclusiveAreaPyeong: 14.7,
+        supplyArea: 65.4,
+        supplyAreaPyeong: 19.78,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '윤아름',
+        ownerRegNo: '881202-2******',
+        ownershipChangeDate: '2023-01-10',
+        ownershipChangeReason: '매매',
+      },
+      // 나동
+      {
+        dong: '나동',
+        ho: '101호',
+        floor: '지상 1층',
+        exclusiveArea: 62.30,
+        exclusiveAreaPyeong: 18.84,
+        supplyArea: 81.5,
+        supplyAreaPyeong: 24.65,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '송중기',
+        ownerRegNo: '770815-1******',
+        ownershipChangeDate: '2016-10-11',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '나동',
+        ho: '102호',
+        floor: '지상 1층',
+        exclusiveArea: 56.40,
+        exclusiveAreaPyeong: 17.06,
+        supplyArea: 74.2,
+        supplyAreaPyeong: 22.45,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '한효주',
+        ownerRegNo: '840422-2******',
+        ownershipChangeDate: '2019-03-30',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '나동',
+        ho: '201호',
+        floor: '지상 2층',
+        exclusiveArea: 62.30,
+        exclusiveAreaPyeong: 18.84,
+        supplyArea: 81.5,
+        supplyAreaPyeong: 24.65,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '조인성',
+        ownerRegNo: '710728-1******',
+        ownershipChangeDate: '2018-12-05',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '나동',
+        ho: '202호',
+        floor: '지상 2층',
+        exclusiveArea: 56.40,
+        exclusiveAreaPyeong: 17.06,
+        supplyArea: 74.2,
+        supplyAreaPyeong: 22.45,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '배수지',
+        ownerRegNo: '941010-2******',
+        ownershipChangeDate: '2021-06-18',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '나동',
+        ho: '301호',
+        floor: '지상 3층',
+        exclusiveArea: 62.30,
+        exclusiveAreaPyeong: 18.84,
+        supplyArea: 81.5,
+        supplyAreaPyeong: 24.65,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '신민아',
+        ownerRegNo: '830405-2******',
+        ownershipChangeDate: '2020-05-22',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '나동',
+        ho: '302호',
+        floor: '지상 3층',
+        exclusiveArea: 56.40,
+        exclusiveAreaPyeong: 17.06,
+        supplyArea: 74.2,
+        supplyAreaPyeong: 22.45,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '김우빈',
+        ownerRegNo: '890716-1******',
+        ownershipChangeDate: '2022-09-01',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '나동',
+        ho: '401호',
+        floor: '지상 4층',
+        exclusiveArea: 50.15,
+        exclusiveAreaPyeong: 15.17,
+        supplyArea: 67.8,
+        supplyAreaPyeong: 20.51,
+        mainUse: '공동주택 (다세대주택)',
+        ownerName: '박보검',
+        ownerRegNo: '930616-1******',
+        ownershipChangeDate: '2023-04-14',
+        ownershipChangeReason: '매매',
+      },
+    ],
+  },
   {
     // 부산 사상구 사상로 300 / 덕포동 795 (사상강변동원아파트)
     keywords: ['사상로 300', '덕포동 795', '사상강변동원', '사상로300', '덕포동795'],
@@ -80,6 +318,95 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
     parkingCount: 682,
     parkingDetail: '총 682대 (지하 자주식 580대, 지상 102대 / 세대당 1.1대)',
     parkingPerHousehold: '1.1대',
+    isCollectiveBuilding: true,
+    buildingCategoryName: '집합건축물',
+    dongList: ['101동', '102동', '103동', '105동', '106동', '107동', '108동', '109동', '110동'],
+    unitList: [
+      {
+        dong: '110동',
+        ho: '2906호',
+        floor: '지상 29층',
+        exclusiveArea: 84.9,
+        exclusiveAreaPyeong: 25.68,
+        supplyArea: 112.4,
+        supplyAreaPyeong: 34.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '이동현',
+        ownerRegNo: '780612-1******',
+        ownershipChangeDate: '2019-05-18',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '110동',
+        ho: '101호',
+        floor: '지상 1층',
+        exclusiveArea: 84.9,
+        exclusiveAreaPyeong: 25.68,
+        supplyArea: 112.4,
+        supplyAreaPyeong: 34.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '정성훈',
+        ownerRegNo: '810325-1******',
+        ownershipChangeDate: '2020-08-11',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '110동',
+        ho: '1502호',
+        floor: '지상 15층',
+        exclusiveArea: 84.9,
+        exclusiveAreaPyeong: 25.68,
+        supplyArea: 112.4,
+        supplyAreaPyeong: 34.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '한지민',
+        ownerRegNo: '841105-2******',
+        ownershipChangeDate: '2021-03-20',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '101동',
+        ho: '501호',
+        floor: '지상 5층',
+        exclusiveArea: 59.9,
+        exclusiveAreaPyeong: 18.12,
+        supplyArea: 79.4,
+        supplyAreaPyeong: 24.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '강호동',
+        ownerRegNo: '700115-1******',
+        ownershipChangeDate: '2018-09-03',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '101동',
+        ho: '1203호',
+        floor: '지상 12층',
+        exclusiveArea: 84.9,
+        exclusiveAreaPyeong: 25.68,
+        supplyArea: 112.4,
+        supplyAreaPyeong: 34.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '유재석',
+        ownerRegNo: '720814-1******',
+        ownershipChangeDate: '2017-04-12',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '102동',
+        ho: '802호',
+        floor: '지상 8층',
+        exclusiveArea: 84.9,
+        exclusiveAreaPyeong: 25.68,
+        supplyArea: 112.4,
+        supplyAreaPyeong: 34.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '손흥민',
+        ownerRegNo: '920708-1******',
+        ownershipChangeDate: '2022-12-01',
+        ownershipChangeReason: '매매',
+      },
+    ],
     floorList: [
       { floor: '지하 1~2층', area: 18400.0, mainUse: '주차장 / 기계실 / 전기실', etcUse: '부대복리시설' },
       { floor: '지상 1~25층', area: 84.9, mainUse: '공동주택 (아파트 110동 2906호 등)', etcUse: '전용면적 84.9㎡ / 공급 112.4㎡' },
@@ -142,6 +469,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         etcUse: '물탱크실 및 계단실',
       },
     ],
+    isCollectiveBuilding: false,
+    buildingCategoryName: '일반건축물',
   },
   {
     // 서울 강남구 역삼동 아파트
@@ -164,6 +493,67 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
     ownershipChangeReason: '분양에 의한 소유권보존',
     parkingCount: 142,
     parkingDetail: '총 142대 (자주식 옥내 142대 / 세대당 1.4대)',
+    isCollectiveBuilding: true,
+    buildingCategoryName: '집합건축물',
+    dongList: ['101동', '102동'],
+    unitList: [
+      {
+        dong: '101동',
+        ho: '301호',
+        floor: '지상 3층',
+        exclusiveArea: 59.2,
+        exclusiveAreaPyeong: 17.9,
+        supplyArea: 79.5,
+        supplyAreaPyeong: 24.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '김태영',
+        ownerRegNo: '720315-1******',
+        ownershipChangeDate: '2020-05-12',
+        ownershipChangeReason: '분양',
+      },
+      {
+        dong: '101동',
+        ho: '802호',
+        floor: '지상 8층',
+        exclusiveArea: 84.9,
+        exclusiveAreaPyeong: 25.68,
+        supplyArea: 114.8,
+        supplyAreaPyeong: 34.7,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '이수진',
+        ownerRegNo: '800412-2******',
+        ownershipChangeDate: '2021-02-15',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '101동',
+        ho: '1501호',
+        floor: '지상 15층',
+        exclusiveArea: 84.9,
+        exclusiveAreaPyeong: 25.68,
+        supplyArea: 114.8,
+        supplyAreaPyeong: 34.7,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '박찬호',
+        ownerRegNo: '730628-1******',
+        ownershipChangeDate: '2022-09-08',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '102동',
+        ho: '503호',
+        floor: '지상 5층',
+        exclusiveArea: 59.2,
+        exclusiveAreaPyeong: 17.9,
+        supplyArea: 79.5,
+        supplyAreaPyeong: 24.0,
+        mainUse: '공동주택 (아파트)',
+        ownerName: '정지훈',
+        ownerRegNo: '820625-1******',
+        ownershipChangeDate: '2020-06-20',
+        ownershipChangeReason: '매매',
+      },
+    ],
     floorList: [
       { floor: '지하 1~3층', area: 4200.0, mainUse: '주차장 / 기계실', etcUse: '부대복리시설' },
       { floor: '지상 1~25층', area: 114.8, mainUse: '공동주택 (아파트)', etcUse: '주거시설' },
@@ -190,6 +580,67 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
     ownershipChangeReason: '매매 (소유권이전)',
     parkingCount: 18,
     parkingDetail: '총 18대 (자주식 옥내 10대, 기계식 8대)',
+    isCollectiveBuilding: true,
+    buildingCategoryName: '집합건축물',
+    dongList: ['본동'],
+    unitList: [
+      {
+        dong: '본동',
+        ho: '101호',
+        floor: '지상 1층',
+        exclusiveArea: 65.4,
+        exclusiveAreaPyeong: 19.78,
+        supplyArea: 92.5,
+        supplyAreaPyeong: 27.98,
+        mainUse: '제1종근린생활시설',
+        ownerName: '김상철',
+        ownerRegNo: '670312-1******',
+        ownershipChangeDate: '2019-03-12',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '본동',
+        ho: '102호',
+        floor: '지상 1층',
+        exclusiveArea: 65.4,
+        exclusiveAreaPyeong: 19.78,
+        supplyArea: 92.5,
+        supplyAreaPyeong: 27.98,
+        mainUse: '제1종근린생활시설',
+        ownerName: '이영희',
+        ownerRegNo: '740822-2******',
+        ownershipChangeDate: '2019-05-18',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '본동',
+        ho: '201호',
+        floor: '지상 2층',
+        exclusiveArea: 88.0,
+        exclusiveAreaPyeong: 26.62,
+        supplyArea: 120.0,
+        supplyAreaPyeong: 36.3,
+        mainUse: '제2종근린생활시설',
+        ownerName: '박진우',
+        ownerRegNo: '810905-1******',
+        ownershipChangeDate: '2020-01-20',
+        ownershipChangeReason: '매매',
+      },
+      {
+        dong: '본동',
+        ho: '301호',
+        floor: '지상 3층',
+        exclusiveArea: 130.0,
+        exclusiveAreaPyeong: 39.32,
+        supplyArea: 185.0,
+        supplyAreaPyeong: 55.96,
+        mainUse: '업무시설',
+        ownerName: '(주)서초자산관리',
+        ownerRegNo: '110111-2******',
+        ownershipChangeDate: '2019-01-10',
+        ownershipChangeReason: '매매',
+      },
+    ],
     floorList: [
       { floor: '지하 1층', area: 185.0, mainUse: '제2종근린생활시설', etcUse: '일반음식점, 주차장' },
       { floor: '지상 1층', area: 185.0, mainUse: '제1종근린생활시설', etcUse: '소매점, 카페' },
@@ -261,6 +712,11 @@ export async function GET(request: NextRequest) {
       maintenanceFee: matched.maintenanceFee,
       heatingType: matched.heatingType,
       floorList: matched.floorList,
+      // 집합건물 및 전유부(각 동·호수) 목록
+      isCollectiveBuilding: matched.isCollectiveBuilding,
+      buildingCategoryName: matched.buildingCategoryName,
+      dongList: matched.dongList,
+      unitList: matched.unitList,
     });
   }
 
@@ -525,6 +981,74 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // 집합건물 여부 판별 (아파트, 빌라, 다세대, 연립, 하이츠, 맨션, 오피스텔 등)
+  const isCollective = isApartmentType || 
+    cleanAddr.includes('다세대') || 
+    cleanAddr.includes('연립') || 
+    cleanAddr.includes('빌라') || 
+    cleanAddr.includes('하이츠') || 
+    cleanAddr.includes('맨션') || 
+    cleanAddr.includes('오피스텔') ||
+    cleanAddr.includes('타운') ||
+    cleanAddr.includes('팰리스') ||
+    propertyType === 'APARTMENT';
+
+  let dynamicDongList: string[] | undefined = undefined;
+  let dynamicUnitList: PublicBuildingUnitInfo[] | undefined = undefined;
+
+  if (isCollective) {
+    dynamicDongList = isApartmentType ? ['101동', '102동', '103동'] : ['가동', '나동'];
+    dynamicUnitList = [];
+    
+    // 각 동별 호수 생성 (1층부터 최대 4~15층)
+    const maxGenFloor = Math.min(defaultFloor, isApartmentType ? 15 : 4);
+    for (const d of dynamicDongList) {
+      for (let f = 1; f <= maxGenFloor; f++) {
+        const ho1 = `${f}01호`;
+        const ho2 = `${f}02호`;
+        
+        const unitExcl = isApartmentType ? aptPreset.excl : Math.round((defaultBuildingArea * 0.45) * 100) / 100;
+        const unitExclPy = +((unitExcl * 0.3025).toFixed(2));
+        const unitSupp = isApartmentType ? aptPreset.supp : Math.round((defaultBuildingArea * 0.58) * 100) / 100;
+        const unitSuppPy = +((unitSupp * 0.3025).toFixed(2));
+        const unitUse = isApartmentType ? '공동주택 (아파트)' : (cleanAddr.includes('오피스텔') ? '업무시설 (오피스텔)' : '공동주택 (다세대주택)');
+        
+        const owner1 = SURNAMES[(hash + f) % SURNAMES.length] + GIVEN_NAMES[(hash + f) % GIVEN_NAMES.length];
+        const owner2 = SURNAMES[(hash + f + 7) % SURNAMES.length] + GIVEN_NAMES[(hash + f + 5) % GIVEN_NAMES.length];
+
+        dynamicUnitList.push({
+          dong: d,
+          ho: ho1,
+          floor: `지상 ${f}층`,
+          exclusiveArea: unitExcl,
+          exclusiveAreaPyeong: unitExclPy,
+          supplyArea: unitSupp,
+          supplyAreaPyeong: unitSuppPy,
+          mainUse: unitUse,
+          ownerName: owner1,
+          ownerRegNo: `${60 + ((hash + f) % 35)}0512-1******`,
+          ownershipChangeDate: `20${18 + (f % 5)}-0${(f % 9) + 1}-15`,
+          ownershipChangeReason: '매매',
+        });
+
+        dynamicUnitList.push({
+          dong: d,
+          ho: ho2,
+          floor: `지상 ${f}층`,
+          exclusiveArea: Math.round(unitExcl * 0.92 * 100) / 100,
+          exclusiveAreaPyeong: +((unitExcl * 0.92 * 0.3025).toFixed(2)),
+          supplyArea: Math.round(unitSupp * 0.92 * 100) / 100,
+          supplyAreaPyeong: +((unitSupp * 0.92 * 0.3025).toFixed(2)),
+          mainUse: unitUse,
+          ownerName: owner2,
+          ownerRegNo: `${65 + ((hash + f + 3) % 30)}0821-2******`,
+          ownershipChangeDate: `20${19 + (f % 4)}-0${(f % 9) + 1}-20`,
+          ownershipChangeReason: '매매',
+        });
+      }
+    }
+  }
+
   return NextResponse.json({
     address: cleanAddr,
     landArea: defaultLandArea,
@@ -561,5 +1085,10 @@ export async function GET(request: NextRequest) {
     maintenanceFee: isApartmentType ? aptPreset.fee : undefined,
     heatingType: isApartmentType ? '도시가스(개별난방)' : undefined,
     floorList: dynamicFloorList,
+    // 집합건물 및 전유부(각 동·호수) 목록
+    isCollectiveBuilding: isCollective,
+    buildingCategoryName: isCollective ? '집합건축물' : '일반건축물',
+    dongList: dynamicDongList,
+    unitList: dynamicUnitList,
   });
 }

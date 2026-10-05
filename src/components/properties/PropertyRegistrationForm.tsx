@@ -20,6 +20,7 @@ import {
   PropertyItem,
   PublicBuildingLedgerResult,
   PublicBuildingFloorInfo,
+  PublicBuildingUnitInfo,
   PROPERTY_TYPE_LABELS,
   DIRECTION_OPTIONS,
   DIRECTION_CRITERIA_OPTIONS,
@@ -326,10 +327,103 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     setCustomerPhone(formatted);
   };
 
+  // 집합건물 전유부(호수) 데이터 서브폼 자동 반영
+  const applyUnitToSubForms = (unit: PublicBuildingUnitInfo, currentLedger: PublicBuildingLedgerResult | null) => {
+    const formattedDetail = `${unit.dong ? unit.dong + ' ' : ''}${unit.ho}`;
+    setDetailAddress(formattedDetail);
+
+    const exclArea = unit.exclusiveArea;
+    const exclPyeong = unit.exclusiveAreaPyeong || +(exclArea * 0.3025).toFixed(2);
+    const suppArea = unit.supplyArea || unit.exclusiveArea;
+    const suppPyeong = unit.supplyAreaPyeong || +(suppArea * 0.3025).toFixed(2);
+    const mainUse = unit.mainUse || currentLedger?.buildingRegisterUse;
+
+    if (propertyType === 'HOUSE') {
+      setHouseData((prev: any) => ({
+        ...prev,
+        currentFloor: unit.floor,
+        buildingArea: suppArea,
+        buildingAreaPyeong: suppPyeong,
+        exclusiveArea: exclArea,
+        exclusiveAreaPyeong: exclPyeong,
+        actualArea: exclArea,
+        actualAreaPyeong: exclPyeong,
+        buildingUse: mainUse || prev.buildingUse,
+        totalFloors: currentLedger?.floorCount || prev.totalFloors,
+        approvalDate: currentLedger?.approvalDate || prev.approvalDate,
+      }));
+    } else if (propertyType === 'APARTMENT') {
+      setApartmentData((prev: any) => ({
+        ...prev,
+        complexName: currentLedger?.complexName || prev.complexName,
+        buildingNo: unit.dong || prev.buildingNo,
+        unitNo: unit.ho,
+        currentFloor: unit.floor,
+        exclusiveArea: exclArea,
+        exclusiveAreaPyeong: exclPyeong,
+        supplyArea: suppArea,
+        supplyAreaPyeong: suppPyeong,
+        approvalDate: currentLedger?.approvalDate || prev.approvalDate,
+      }));
+    } else if (propertyType === 'STORE') {
+      setStoreData((prev: any) => ({
+        ...prev,
+        currentFloor: unit.floor,
+        buildingArea: suppArea,
+        buildingAreaPyeong: suppPyeong,
+        actualArea: exclArea,
+        actualAreaPyeong: exclPyeong,
+        buildingUse: mainUse || prev.buildingUse,
+      }));
+    } else if (propertyType === 'OFFICE') {
+      setOfficeData((prev: any) => ({
+        ...prev,
+        currentFloor: unit.floor,
+        buildingArea: suppArea,
+        buildingAreaPyeong: suppPyeong,
+        actualArea: exclArea,
+        actualAreaPyeong: exclPyeong,
+        buildingUse: mainUse || prev.buildingUse,
+      }));
+    }
+
+    // 소유자 정보가 호실별로 별도 존재하는 경우 업데이트
+    if (unit.ownerName && currentLedger) {
+      setLedgerData((prev) => prev ? {
+        ...prev,
+        ownerName: unit.ownerName,
+        ownerRegNo: unit.ownerRegNo || prev.ownerRegNo,
+        ownershipChangeDate: unit.ownershipChangeDate || prev.ownershipChangeDate,
+        ownershipChangeReason: unit.ownershipChangeReason || prev.ownershipChangeReason,
+      } : prev);
+    }
+  };
+
+  // 전유부 호수 직접 선택 핸들러
+  const handleSelectUnitFromLedger = (unit: PublicBuildingUnitInfo) => {
+    applyUnitToSubForms(unit, ledgerData);
+  };
+
   // 상세주소(동/호수/층) 입력시 해당층수, 대장상면적, 대장상 주용도 자동 연동 (수정도 언제든지 가능)
   const syncFloorFromDetailAddress = (detail: string, currentLedger: PublicBuildingLedgerResult | null) => {
     if (!detail) return;
     const cleanDetail = detail.trim();
+
+    // 0. 집합건물 전유부(unitList)가 있는 경우, 호수 및 동 매칭 우선 확인
+    if (currentLedger?.unitList && currentLedger.unitList.length > 0) {
+      const cleanNoSpace = cleanDetail.replace(/\s+/g, '');
+      const matchedUnit = currentLedger.unitList.find((u) => {
+        const fullKey = `${u.dong || ''}${u.ho}`.replace(/\s+/g, '');
+        return cleanNoSpace.includes(fullKey) || 
+               fullKey.includes(cleanNoSpace) || 
+               (cleanDetail.includes(u.ho) && (!u.dong || cleanDetail.includes(u.dong)));
+      });
+
+      if (matchedUnit) {
+        applyUnitToSubForms(matchedUnit, currentLedger);
+        return;
+      }
+    }
 
     // 1. 상세주소에서 층수 파악 (예: 1층, 지상 1층, 101호, 2층, 지하 1층, B1층 등)
     let detectedFloor = '';
@@ -836,6 +930,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   roadAddress={roadAddress}
                   jibunAddress={jibunAddress}
                   propertyType={propertyType}
+                  detailAddress={detailAddress}
                   onAddressChange={(road, jibun) => {
                     setRoadAddress(road);
                     setJibunAddress(jibun);
@@ -844,6 +939,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   }}
                   onApplyData={handleApplyPublicData}
                   onSelectFloor={handleSelectFloorFromLedger}
+                  onSelectUnit={handleSelectUnitFromLedger}
                 />
 
                 {/* 3. 소재지 주소 확인 및 실시간 카카오 지도 연동 */}
@@ -875,18 +971,52 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        상세주소 (동/호수/층)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-slate-700">
+                          상세주소 (동/호수/층)
+                        </label>
+                        {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
+                          <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                            🏢 집합건물 전유부
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 집합건물 전유부 빠른 선택 드롭다운 */}
+                      {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
+                        <div className="mb-1.5">
+                          <select
+                            value={ledgerData.unitList.some(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === detailAddress) ? detailAddress : ''}
+                            onChange={(e) => {
+                              if (!e.target.value) return;
+                              const found = ledgerData.unitList?.find(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === e.target.value);
+                              if (found) {
+                                handleSelectUnitFromLedger(found);
+                              }
+                            }}
+                            className="w-full text-xs font-bold px-2 py-1.5 bg-blue-50/70 border border-blue-300 rounded-lg text-blue-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="">▼ 호수 바로 선택 (동/호수/전용면적)</option>
+                            {ledgerData.unitList.map((u, i) => {
+                              const val = `${u.dong ? u.dong + ' ' : ''}${u.ho}`;
+                              const label = `${val} (${u.floor} / 전용 ${u.exclusiveArea}㎡ / ${u.ownerName || '소유자'})`;
+                              return (
+                                <option key={i} value={val}>{label}</option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
+
                       <input
                         type="text"
                         value={detailAddress}
                         onChange={(e) => handleDetailAddressChange(e.target.value)}
-                        placeholder="예: 지상 1층 (도로변) / 2층 / 101호"
-                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-[56px]"
+                        placeholder="예: 가동 201호 / 110동 2906호 / 1층"
+                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-[48px]"
                       />
                       <p className="text-[10px] text-blue-600 mt-1 font-medium">
-                        💡 1층, 2층, 101호 등 입력 시 해당층수·대장상면적·주용도가 자동 반영됩니다 (수정 가능).
+                        💡 위에서 동·호수를 클릭하거나 직접 입력 시 해당층수·대장상면적·주용도가 자동 반영됩니다 (수정 가능).
                       </p>
                     </div>
                   </div>
