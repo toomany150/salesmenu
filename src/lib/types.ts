@@ -633,6 +633,14 @@ export interface AccessLogItem {
   createdAt: string;
 }
 
+// 층별 용도 및 면적 규격
+export interface PublicBuildingFloorInfo {
+  floor: string; // 예: "지상 1층", "지하 1층"
+  area: number; // 면적 (㎡)
+  mainUse: string; // 주용도 (예: "제1·2종근린생활시설", "다가구주택")
+  etcUse?: string; // 세부/기타용도 (예: "소매점, 일반음식점")
+}
+
 // 공공데이터 API 응답 규격
 export interface PublicBuildingLedgerResult {
   address: string;
@@ -651,6 +659,16 @@ export interface PublicBuildingLedgerResult {
   height?: number; // 높이 (m)
   isViolation?: boolean; // 위반건축물 여부
   source: 'API' | 'MOCK_DEMO';
+  // 소유자 정보 (Image 2 연동)
+  ownerName?: string; // 소유자 성명 (예: "임정원")
+  ownerRegNo?: string; // 주민(법인)등록번호 (예: "590917-1******")
+  ownershipChangeDate?: string; // 소유권 변동일 (예: "2015-04-20")
+  ownershipChangeReason?: string; // 소유권 변동원인 (예: "매매")
+  // 공부상 주차대수
+  parkingCount?: number; // 공부상 총 주차대수 (예: 3)
+  parkingDetail?: string; // 주차 상세 표기 (예: "총 3대 (자주식 옥외 3대)")
+  // 층수별 용도 및 면적
+  floorList?: PublicBuildingFloorInfo[];
 }
 
 // 매물 및 고객의 수정 권한 판별 함수 (auth.ts와 통일)

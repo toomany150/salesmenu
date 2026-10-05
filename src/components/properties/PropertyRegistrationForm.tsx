@@ -19,6 +19,7 @@ import {
   CustomerItem, 
   PropertyItem,
   PublicBuildingLedgerResult,
+  PublicBuildingFloorInfo,
   PROPERTY_TYPE_LABELS,
   DIRECTION_OPTIONS,
   DIRECTION_CRITERIA_OPTIONS,
@@ -119,6 +120,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [underFloorCount, setUnderFloorCount] = useState<number | undefined>();
   const [floorText, setFloorText] = useState<string | undefined>();
   const [approvalDate, setApprovalDate] = useState<string | undefined>();
+  const [ledgerData, setLedgerData] = useState<PublicBuildingLedgerResult | null>(null);
 
   // Subform Specific States
   const [apartmentData, setApartmentData] = useState<any>({
@@ -328,8 +330,119 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     setCustomerPhone(formatted);
   };
 
+  // 상세주소(동/호수/층) 입력시 해당층수, 대장상면적, 대장상 주용도 자동 연동 (수정도 언제든지 가능)
+  const syncFloorFromDetailAddress = (detail: string, currentLedger: PublicBuildingLedgerResult | null) => {
+    if (!detail) return;
+    const cleanDetail = detail.trim();
+
+    // 1. 상세주소에서 층수 파악 (예: 1층, 지상 1층, 101호, 2층, 지하 1층, B1층 등)
+    let detectedFloor = '';
+    let floorNum = 0;
+    let isUnderground = false;
+
+    if (/지하\s*(\d+)층?/i.test(cleanDetail) || /B(\d+)/i.test(cleanDetail)) {
+      const match = cleanDetail.match(/지하\s*(\d+)층?/i) || cleanDetail.match(/B(\d+)/i);
+      floorNum = match ? parseInt(match[1], 10) : 1;
+      detectedFloor = `지하 ${floorNum}층`;
+      isUnderground = true;
+    } else if (/(\d+)층/i.test(cleanDetail)) {
+      const match = cleanDetail.match(/(\d+)층/i);
+      floorNum = match ? parseInt(match[1], 10) : 1;
+      detectedFloor = `지상 ${floorNum}층`;
+    } else if (/(\d+)호/i.test(cleanDetail)) {
+      const match = cleanDetail.match(/(\d+)호/i);
+      if (match) {
+        const roomNum = parseInt(match[1], 10);
+        floorNum = roomNum >= 100 ? Math.floor(roomNum / 100) : 1;
+        detectedFloor = `지상 ${floorNum}층`;
+      }
+    }
+
+    // 2. 대장상 층별목록(floorList)에서 일치하는 층 찾기
+    const matchedFloorInfo = currentLedger?.floorList?.find((f) => {
+      if (isUnderground) {
+        return f.floor.includes('지하') && f.floor.includes(String(floorNum));
+      } else if (floorNum > 0) {
+        return (f.floor.includes('지상') || !f.floor.includes('지하')) && f.floor.includes(String(floorNum));
+      }
+      return false;
+    });
+
+    const targetFloor = detectedFloor || cleanDetail;
+    const targetArea = matchedFloorInfo?.area ?? currentLedger?.buildingArea;
+    const targetUse = matchedFloorInfo?.mainUse || matchedFloorInfo?.etcUse || currentLedger?.buildingRegisterUse;
+
+    // 3. 서브폼 데이터에 자동 반영 (사용자가 언제든지 수정 가능)
+    if (propertyType === 'STORE') {
+      setStoreData((prev: any) => ({
+        ...prev,
+        currentFloor: targetFloor,
+        buildingArea: targetArea !== undefined ? targetArea : prev.buildingArea,
+        buildingUse: targetUse || prev.buildingUse,
+        actualArea: prev.actualArea ? prev.actualArea : (targetArea !== undefined ? targetArea : prev.actualArea),
+      }));
+    } else if (propertyType === 'OFFICE') {
+      setOfficeData((prev: any) => ({
+        ...prev,
+        currentFloor: targetFloor,
+        buildingArea: targetArea !== undefined ? targetArea : prev.buildingArea,
+        buildingUse: targetUse || prev.buildingUse,
+        actualArea: prev.actualArea ? prev.actualArea : (targetArea !== undefined ? targetArea : prev.actualArea),
+      }));
+    } else if (propertyType === 'HOUSE') {
+      setHouseData((prev: any) => ({
+        ...prev,
+        currentFloor: targetFloor,
+        buildingArea: targetArea !== undefined ? targetArea : prev.buildingArea,
+        buildingUse: targetUse || prev.buildingUse,
+      }));
+    } else if (propertyType === 'APARTMENT') {
+      setApartmentData((prev: any) => ({
+        ...prev,
+        currentFloor: targetFloor,
+        supplyArea: targetArea !== undefined ? targetArea : prev.supplyArea,
+      }));
+    }
+  };
+
+  // 상세주소 입력 변경 핸들러
+  const handleDetailAddressChange = (val: string) => {
+    setDetailAddress(val);
+    syncFloorFromDetailAddress(val, ledgerData);
+  };
+
+  // 대장상 층수 클릭 시 해당층수, 대장상면적, 대장상주용도 자동 입력 (수정 가능)
+  const handleSelectFloorFromLedger = (floorInfo: PublicBuildingFloorInfo) => {
+    setDetailAddress(floorInfo.floor);
+    if (propertyType === 'STORE') {
+      setStoreData((prev: any) => ({
+        ...prev,
+        currentFloor: floorInfo.floor,
+        buildingArea: floorInfo.area,
+        buildingUse: floorInfo.mainUse,
+        actualArea: prev.actualArea ? prev.actualArea : floorInfo.area,
+      }));
+    } else if (propertyType === 'OFFICE') {
+      setOfficeData((prev: any) => ({
+        ...prev,
+        currentFloor: floorInfo.floor,
+        buildingArea: floorInfo.area,
+        buildingUse: floorInfo.mainUse,
+        actualArea: prev.actualArea ? prev.actualArea : floorInfo.area,
+      }));
+    } else if (propertyType === 'HOUSE') {
+      setHouseData((prev: any) => ({
+        ...prev,
+        currentFloor: floorInfo.floor,
+        buildingArea: floorInfo.area,
+        buildingUse: floorInfo.mainUse,
+      }));
+    }
+  };
+
   // Handle apply data from government public data portal
   const handleApplyPublicData = (data: PublicBuildingLedgerResult) => {
+    setLedgerData(data);
     if (data.landArea) setLandArea(data.landArea);
     if (data.totalFloorArea) setTotalFloorArea(data.totalFloorArea);
     if (data.buildingArea) setBuildingArea(data.buildingArea);
@@ -340,6 +453,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     if (data.underFloorCount !== undefined) setUnderFloorCount(data.underFloorCount);
     if (data.floorText) setFloorText(data.floorText);
     if (data.approvalDate) setApprovalDate(data.approvalDate);
+
+    // 기본 층수 및 1층 정보 추출
+    const groundFirstFloor = data.floorList?.find((f) => f.floor.includes('1층') && !f.floor.includes('지하')) || data.floorList?.[0];
+    const initialFloorText = detailAddress || groundFirstFloor?.floor || data.floorText || '지상 1층';
+    const initialArea = groundFirstFloor?.area || data.buildingArea;
+    const initialUse = groundFirstFloor?.mainUse || data.buildingRegisterUse;
 
     // Sub-data updates
     if (propertyType === 'APARTMENT') {
@@ -358,29 +477,38 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: data.floorText || (data.floorCount ? `지상 ${data.floorCount}층 / 지하 ${data.underFloorCount || 0}층` : prev.currentFloor),
+        parkingCount: data.parkingCount || prev.parkingCount,
       }));
     } else if (propertyType === 'STORE') {
       setStoreData((prev: any) => ({
         ...prev,
         landArea: data.landArea || prev.landArea,
-        buildingArea: data.buildingArea || prev.buildingArea,
-        actualArea: data.buildingArea || prev.actualArea,
-        buildingUse: data.buildingRegisterUse || prev.buildingUse,
+        buildingArea: initialArea || prev.buildingArea,
+        actualArea: prev.actualArea ? prev.actualArea : (initialArea || prev.actualArea),
+        buildingUse: initialUse || prev.buildingUse,
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
-        currentFloor: data.floorText || prev.currentFloor,
+        currentFloor: initialFloorText || prev.currentFloor,
+        parkingCount: data.parkingCount || prev.parkingCount,
       }));
+      if (!detailAddress && initialFloorText) {
+        setDetailAddress(initialFloorText);
+      }
     } else if (propertyType === 'OFFICE') {
       setOfficeData((prev: any) => ({
         ...prev,
         landArea: data.landArea || prev.landArea,
-        buildingArea: data.buildingArea || prev.buildingArea,
-        actualArea: data.buildingArea || prev.actualArea,
-        buildingUse: data.buildingRegisterUse || prev.buildingUse,
+        buildingArea: initialArea || prev.buildingArea,
+        actualArea: prev.actualArea ? prev.actualArea : (initialArea || prev.actualArea),
+        buildingUse: initialUse || prev.buildingUse,
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
-        currentFloor: data.floorText || prev.currentFloor,
+        currentFloor: initialFloorText || prev.currentFloor,
+        parkingCount: data.parkingCount || prev.parkingCount,
       }));
+      if (!detailAddress && initialFloorText) {
+        setDetailAddress(initialFloorText);
+      }
     } else if (propertyType === 'FACTORY_WAREHOUSE') {
       setFactoryWarehouseData((prev: any) => ({
         ...prev,
@@ -393,6 +521,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: data.floorText || prev.currentFloor,
+        parkingCount: data.parkingCount || prev.parkingCount,
       }));
     } else if (propertyType === 'LAND') {
       setLandData((prev: any) => ({
@@ -400,6 +529,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         landArea: data.landArea || prev.landArea,
         zoningArea: data.zoningArea || prev.zoningArea,
       }));
+    }
+
+    if (detailAddress) {
+      syncFloorFromDetailAddress(detailAddress, data);
     }
   };
 
@@ -671,6 +804,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     setAddress(road || jibun);
                   }}
                   onApplyData={handleApplyPublicData}
+                  onSelectFloor={handleSelectFloorFromLedger}
                 />
 
                 {/* 3. 소재지 주소 확인 및 실시간 카카오 지도 연동 */}
@@ -708,10 +842,13 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       <input
                         type="text"
                         value={detailAddress}
-                        onChange={(e) => setDetailAddress(e.target.value)}
-                        placeholder="예: 104동 1502호 / 2층 일부"
+                        onChange={(e) => handleDetailAddressChange(e.target.value)}
+                        placeholder="예: 지상 1층 (도로변) / 2층 / 101호"
                         className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-[56px]"
                       />
+                      <p className="text-[10px] text-blue-600 mt-1 font-medium">
+                        💡 1층, 2층, 101호 등 입력 시 해당층수·대장상면적·주용도가 자동 반영됩니다 (수정 가능).
+                      </p>
                     </div>
                   </div>
 
