@@ -72,11 +72,13 @@ export function loadKakaoServicesScript(): Promise<boolean> {
     if (typeof window === 'undefined') return resolve(false);
     if (window.kakao?.maps?.services) return resolve(true);
 
+    const DEFAULT_KAKAO_KEY = 'ab4074f3fc327e405a625fc856bee022';
     const kakaoKey =
       process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ||
-      process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+      process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY ||
+      DEFAULT_KAKAO_KEY;
 
-    if (!kakaoKey || kakaoKey === 'your-kakao-map-key') {
+    if (!kakaoKey) {
       return resolve(false);
     }
 
@@ -124,6 +126,7 @@ export async function convertAddressViaGeocoder(
   jibunAddress: string;
   lat: number;
   lng: number;
+  buildingName?: string;
 } | null> {
   if (!inputAddress || !inputAddress.trim()) {
     return null;
@@ -144,12 +147,14 @@ export async function convertAddressViaGeocoder(
           const jibun = item.address?.address_name || (!inputAddress.includes('로') && !inputAddress.includes('길') ? inputAddress : '');
           const lat = parseFloat(item.y);
           const lng = parseFloat(item.x);
+          const buildingName = item.road_address?.building_name || item.address?.building_name || '';
 
           return resolve({
             roadAddress: road || jibun,
             jibunAddress: jibun || road,
             lat,
             lng,
+            buildingName: buildingName || undefined,
           });
         }
         return resolve(null);

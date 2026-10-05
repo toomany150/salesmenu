@@ -45,8 +45,6 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
   const infoWindowRef = useRef<any>(null);
 
   const [kakaoLoaded, setKakaoLoaded] = useState(false);
-  // View mode: 'portal' (Image 4 exact official Kakao Map portal) or 'sdk' (Kakao SDK interactive canvas)
-  const [viewMode, setViewMode] = useState<'portal' | 'sdk'>('portal');
 
   // Coordinates & Address state
   const [currentCoords, setCurrentCoords] = useState<Coordinates>(() => getCoordinatesFromAddress(address));
@@ -105,7 +103,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
 
   // 2. Initialize Kakao Map once SDK is verified
   useEffect(() => {
-    if (!kakaoLoaded || !mapContainerRef.current || !window.kakao?.maps || viewMode !== 'sdk') return;
+    if (!kakaoLoaded || !mapContainerRef.current || !window.kakao?.maps) return;
 
     try {
       if (!mapInstanceRef.current) {
@@ -162,7 +160,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
     return () => {
       ro?.disconnect();
     };
-  }, [kakaoLoaded, viewMode]);
+  }, [kakaoLoaded]);
 
   // 3. Search and relocate map when address changes
   useEffect(() => {
@@ -260,16 +258,13 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
     );
   }
 
-  // Kakao Map Search & Portal URLs (Image 4 exact style)
-  const searchQuery = encodeURIComponent(`${address}${detailAddress ? ' ' + detailAddress : ''}`.trim());
-  const kakaoPortalEmbedUrl = `https://map.kakao.com/?q=${searchQuery}`;
   const kakaoDirectionsUrl = `https://map.kakao.com/link/to/${encodeURIComponent(address)},${currentCoords.lat},${currentCoords.lng}`;
   const kakaoRoadviewUrl = `https://map.kakao.com/link/roadview/${currentCoords.lat},${currentCoords.lng}`;
 
   return (
     <div className={`relative w-full rounded-xl overflow-hidden border border-slate-200 shadow-xs bg-slate-100 ${className}`}>
       
-      {/* 1. Top Header Bar: Location info, View Mode Toggle & External Quick Links */}
+      {/* 1. Top Header Bar: Location info & External Quick Links */}
       <div className="flex items-center justify-between px-3 py-2 bg-slate-900 text-white text-xs z-10 relative flex-wrap gap-2">
         <div className="flex items-center gap-1.5 truncate pr-2">
           <MapPin className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
@@ -280,40 +275,14 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
             <CheckCircle className="w-2.5 h-2.5" />
             {isExactLocation ? '정밀좌표' : '위치 연동'}
           </span>
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-[#FEE500] text-slate-900 text-[10px] font-black rounded-sm shrink-0 shadow-2xs">
-            <Sparkles className="w-2.5 h-2.5 text-amber-700" />
-            카카오 공식 지도
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 bg-blue-600 text-white text-[10px] font-bold rounded-sm shrink-0 shadow-2xs">
+            <Sparkles className="w-2.5 h-2.5 text-yellow-300" />
+            위치 표시
           </span>
         </div>
 
-        {/* Action Buttons & View Toggles */}
+        {/* Action Buttons: Direct Links */}
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-          {/* Mode Switcher */}
-          <div className="flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700">
-            <button
-              type="button"
-              onClick={() => setViewMode('portal')}
-              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
-                viewMode === 'portal'
-                  ? 'bg-yellow-400 text-slate-950 shadow-xs'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              카카오 포털 뷰
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('sdk')}
-              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
-                viewMode === 'sdk'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              정밀 지도
-            </button>
-          </div>
-
           <a
             href={kakaoDirectionsUrl}
             target="_blank"
@@ -357,59 +326,45 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         </div>
       </div>
 
-      {/* 2. Map Canvas (Official Kakao Map View Matching Image 4) */}
+      {/* 2. Pure Map Canvas (No search bar, no portal header, clean pin only) */}
       <div 
         className={`w-full ${height} relative bg-slate-200 overflow-hidden`}
         style={{ minHeight: '300px' }}
       >
-        {/* Mode 1: Official Kakao Map Portal View (Image 4 exact UI with search bar, 길찾기, POIs, zoom) */}
-        {viewMode === 'portal' && (
-          <div className="w-full h-full relative">
-            <iframe
-              title="카카오 공식 지도"
-              src={kakaoPortalEmbedUrl}
-              className="w-full h-full border-0 pointer-events-auto"
-              loading="eager"
-            />
-          </div>
-        )}
-
-        {/* Mode 2: Kakao Map Native SDK Canvas */}
+        {/* Pure Kakao Map Native SDK Canvas */}
         <div 
           ref={mapContainerRef} 
-          className={`w-full h-full ${viewMode === 'sdk' ? 'block' : 'hidden'}`}
+          className="w-full h-full block"
           style={{ width: '100%', height: '100%', minHeight: '300px' }}
         />
 
-        {/* Floating Controls for SDK Mode */}
-        {viewMode === 'sdk' && kakaoLoaded && (
-          <div className="absolute bottom-2.5 right-2.5 flex flex-col gap-1 z-10">
-            <button
-              type="button"
-              onClick={() => handleZoom(-1)}
-              title="지도 확대"
-              className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleZoom(1)}
-              title="지도 축소"
-              className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleCenter}
-              title="매물 위치로 중심 이동"
-              className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-colors cursor-pointer"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+        {/* Floating Controls */}
+        <div className="absolute bottom-2.5 right-2.5 flex flex-col gap-1 z-10">
+          <button
+            type="button"
+            onClick={() => handleZoom(-1)}
+            title="지도 확대"
+            className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleZoom(1)}
+            title="지도 축소"
+            className="p-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200 transition-colors cursor-pointer"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleCenter}
+            title="매물 위치로 중심 이동"
+            className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-colors cursor-pointer"
+          >
+            <Navigation className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* 3. Coordinate Badge at bottom-left */}

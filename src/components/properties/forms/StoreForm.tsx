@@ -30,6 +30,79 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
     onChange({ ...data, [field]: value });
   };
 
+  // 대장상 면적 ㎡ 입력 시 평 자동 계산
+  const handleBuildingAreaSqm = (valStr: string) => {
+    if (!valStr) {
+      onChange({ ...data, buildingArea: undefined, buildingAreaPyeong: undefined });
+      return;
+    }
+    const sqm = parseFloat(valStr);
+    const pyeong = !isNaN(sqm) ? parseFloat((sqm * 0.3025).toFixed(2)) : undefined;
+    // 실평수가 아직 없거나 대장상 면적과 같았던 경우 실평수 초기값도 함께 연동
+    const nextActualArea = data.actualArea === undefined || data.actualArea === data.buildingArea ? sqm : data.actualArea;
+    const nextActualAreaPyeong = data.actualArea === undefined || data.actualArea === data.buildingArea ? pyeong : data.actualAreaPyeong;
+    onChange({
+      ...data,
+      buildingArea: isNaN(sqm) ? undefined : sqm,
+      buildingAreaPyeong: pyeong,
+      actualArea: nextActualArea,
+      actualAreaPyeong: nextActualAreaPyeong,
+    });
+  };
+
+  // 대장상 면적 평 입력 시 ㎡ 자동 계산
+  const handleBuildingAreaPyeong = (valStr: string) => {
+    if (!valStr) {
+      onChange({ ...data, buildingAreaPyeong: undefined });
+      return;
+    }
+    const pyeong = parseFloat(valStr);
+    const sqm = !isNaN(pyeong) ? parseFloat((pyeong / 0.3025).toFixed(2)) : undefined;
+    onChange({
+      ...data,
+      buildingAreaPyeong: isNaN(pyeong) ? undefined : pyeong,
+      buildingArea: sqm !== undefined ? sqm : data.buildingArea,
+    });
+  };
+
+  // 실평수 ㎡ 입력 시 평 자동 계산 (수정 가능)
+  const handleActualAreaSqm = (valStr: string) => {
+    if (!valStr) {
+      onChange({ ...data, actualArea: undefined, actualAreaPyeong: undefined });
+      return;
+    }
+    const sqm = parseFloat(valStr);
+    const pyeong = !isNaN(sqm) ? parseFloat((sqm * 0.3025).toFixed(2)) : undefined;
+    onChange({
+      ...data,
+      actualArea: isNaN(sqm) ? undefined : sqm,
+      actualAreaPyeong: pyeong,
+    });
+  };
+
+  // 실평수 평 입력 시 ㎡ 자동 계산
+  const handleActualAreaPyeong = (valStr: string) => {
+    if (!valStr) {
+      onChange({ ...data, actualAreaPyeong: undefined });
+      return;
+    }
+    const pyeong = parseFloat(valStr);
+    const sqm = !isNaN(pyeong) ? parseFloat((pyeong / 0.3025).toFixed(2)) : undefined;
+    onChange({
+      ...data,
+      actualAreaPyeong: isNaN(pyeong) ? undefined : pyeong,
+      actualArea: sqm !== undefined ? sqm : data.actualArea,
+    });
+  };
+
+  const calculatedBuildingPyeong = data.buildingAreaPyeong !== undefined 
+    ? data.buildingAreaPyeong 
+    : (data.buildingArea ? parseFloat((data.buildingArea * 0.3025).toFixed(2)) : '');
+
+  const calculatedActualPyeong = data.actualAreaPyeong !== undefined 
+    ? data.actualAreaPyeong 
+    : (data.actualArea ? parseFloat((data.actualArea * 0.3025).toFixed(2)) : '');
+
   return (
     <div className="space-y-6">
       
@@ -108,43 +181,80 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-2 border-t border-slate-100">
+          {/* 대장상면적(㎡) -> 대장상면적(평) -> 실평수(전용㎡)* -> 실평수(평) -> 대장상주용도 순서 */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 border-t border-slate-100">
+            {/* 1. 대장상 면적 (㎡) */}
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                실평수 (전용 ㎡) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={data.actualArea || ''}
-                onChange={(e) => updateField('actualArea', e.target.value ? parseFloat(e.target.value) : undefined)}
-                placeholder="예: 66.1 (약 20평)"
-                className="w-full text-sm px-3.5 py-2.5 bg-amber-50/50 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-bold text-amber-950"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+              <label className="block text-xs font-bold text-slate-800 mb-1">
                 대장상 면적 (㎡)
               </label>
               <input
                 type="number"
                 step="0.01"
-                value={data.buildingArea || ''}
-                onChange={(e) => updateField('buildingArea', e.target.value ? parseFloat(e.target.value) : undefined)}
-                placeholder="건축물대장상 면적"
-                className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-medium text-slate-900"
+                value={data.buildingArea !== undefined && data.buildingArea !== null ? data.buildingArea : ''}
+                onChange={(e) => handleBuildingAreaSqm(e.target.value)}
+                placeholder="대장 면적 (㎡)"
+                className="w-full text-sm px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-bold text-slate-900"
               />
             </div>
+
+            {/* 2. 대장상 면적 (평) */}
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                대장상 면적 (평)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={calculatedBuildingPyeong}
+                onChange={(e) => handleBuildingAreaPyeong(e.target.value)}
+                placeholder="대장 면적 (평)"
+                className="w-full text-sm px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-bold text-slate-700"
+              />
+            </div>
+
+            {/* 3. 실평수 (전용 ㎡) * */}
+            <div>
+              <label className="block text-xs font-bold text-amber-900 mb-1 flex items-center justify-between">
+                <span>실평수 (전용 ㎡) *</span>
+                <span className="text-[10px] text-amber-600 font-normal">수정가능</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={data.actualArea !== undefined && data.actualArea !== null ? data.actualArea : ''}
+                onChange={(e) => handleActualAreaSqm(e.target.value)}
+                placeholder="실평수 (㎡)"
+                className="w-full text-sm px-3 py-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-extrabold text-amber-950"
+              />
+            </div>
+
+            {/* 4. 실평수 (평) */}
+            <div>
+              <label className="block text-xs font-bold text-amber-900 mb-1">
+                실평수 (평)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={calculatedActualPyeong}
+                onChange={(e) => handleActualAreaPyeong(e.target.value)}
+                placeholder="실평수 (평)"
+                className="w-full text-sm px-3 py-2.5 bg-amber-50/40 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-bold text-amber-900"
+              />
+            </div>
+
+            {/* 5. 대장상 주용도 */}
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-bold text-slate-800 mb-1">
                 대장상 주용도
               </label>
               <input
                 type="text"
                 value={data.buildingUse || ''}
                 onChange={(e) => updateField('buildingUse', e.target.value)}
-                placeholder="예: 제1종근린생활시설 / 제2종근린생활시설"
-                className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-medium text-slate-900"
+                placeholder="예: 제2종근린생활시설"
+                className="w-full text-sm px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-hidden font-medium text-slate-900"
               />
             </div>
           </div>

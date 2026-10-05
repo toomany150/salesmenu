@@ -189,24 +189,54 @@ export const ApartmentForm: React.FC<ApartmentFormProps> = ({ data, onChange }) 
         </div>
       </div>
 
-      {/* 2. 면적 및 스펙 */}
+      {/* 2. 면적 및 구조 스펙 */}
       <div>
         <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
           면적 및 구조 스펙
         </h4>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+          {/* 공급면적 ㎡ */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">공급면적 (㎡)</label>
             <input
               type="number"
               step="0.01"
-              value={data.supplyArea || ''}
-              onChange={(e) => updateField('supplyArea', e.target.value ? parseFloat(e.target.value) : undefined)}
+              value={data.supplyArea !== undefined && data.supplyArea !== null ? data.supplyArea : ''}
+              onChange={(e) => {
+                const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                onChange({
+                  ...data,
+                  supplyArea: val,
+                  supplyAreaPyeong: val ? parseFloat((val * 0.3025).toFixed(2)) : undefined,
+                });
+              }}
               placeholder="예: 112.4"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
             />
           </div>
+
+          {/* 공급면적 평 */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">공급면적 (평)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={data.supplyAreaPyeong !== undefined ? data.supplyAreaPyeong : (data.supplyArea ? parseFloat((data.supplyArea * 0.3025).toFixed(2)) : '')}
+              onChange={(e) => {
+                const pyeong = e.target.value ? parseFloat(e.target.value) : undefined;
+                onChange({
+                  ...data,
+                  supplyAreaPyeong: pyeong,
+                  supplyArea: pyeong ? parseFloat((pyeong / 0.3025).toFixed(2)) : undefined,
+                });
+              }}
+              placeholder="예: 34"
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+            />
+          </div>
+
+          {/* 평타입 */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">평타입</label>
             <input
@@ -214,57 +244,88 @@ export const ApartmentForm: React.FC<ApartmentFormProps> = ({ data, onChange }) 
               value={data.pyeongType || ''}
               onChange={(e) => updateField('pyeongType', e.target.value)}
               placeholder="예: 34평형 A타입"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
             />
           </div>
+
+          {/* 전용면적 ㎡ */}
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">전용면적 (㎡)</label>
+            <label className="block text-xs font-medium text-indigo-900 mb-1">전용면적 (㎡) *</label>
             <input
               type="number"
               step="0.01"
-              value={data.exclusiveArea || ''}
-              onChange={(e) => updateField('exclusiveArea', e.target.value ? parseFloat(e.target.value) : undefined)}
+              value={data.exclusiveArea !== undefined && data.exclusiveArea !== null ? data.exclusiveArea : ''}
+              onChange={(e) => {
+                const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                onChange({
+                  ...data,
+                  exclusiveArea: val,
+                  exclusiveAreaPyeong: val ? parseFloat((val * 0.3025).toFixed(2)) : undefined,
+                });
+              }}
               placeholder="예: 84.9"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              className="w-full text-xs px-3 py-2 bg-indigo-50/60 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
             />
           </div>
+
+          {/* 전용면적 평 */}
+          <div>
+            <label className="block text-xs font-medium text-indigo-900 mb-1">전용면적 (평)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={data.exclusiveAreaPyeong !== undefined ? data.exclusiveAreaPyeong : (data.exclusiveArea ? parseFloat((data.exclusiveArea * 0.3025).toFixed(2)) : '')}
+              onChange={(e) => {
+                const pyeong = e.target.value ? parseFloat(e.target.value) : undefined;
+                onChange({
+                  ...data,
+                  exclusiveAreaPyeong: pyeong,
+                  exclusiveArea: pyeong ? parseFloat((pyeong / 0.3025).toFixed(2)) : undefined,
+                });
+              }}
+              placeholder="예: 25.68"
+              className="w-full text-xs px-3 py-2 bg-indigo-50/30 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-900"
+            />
+          </div>
+
+          {/* 방수 / 욕실수 */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">방수 / 욕실수</label>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <input
                 type="number"
                 value={data.roomCount || ''}
                 onChange={(e) => updateField('roomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                 placeholder="방 3"
-                className="w-1/2 text-xs px-2 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                className="w-1/2 text-xs px-2 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-center"
               />
               <input
                 type="number"
                 value={data.bathroomCount || ''}
                 onChange={(e) => updateField('bathroomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
                 placeholder="욕실 2"
-                className="w-1/2 text-xs px-2 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                className="w-1/2 text-xs px-2 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 text-center"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. 비용 및 설비 */}
+      {/* 3. 비용, 주차 및 공용 설비 (요청 항목: 공부상 주차대수 & 세대당 주차대수 추가) */}
       <div>
         <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-          관리비 및 공용 설비
+          관리비, 주차 및 공용 설비
         </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">관리비 (만원/월)</label>
             <input
               type="number"
-              value={data.maintenanceFee || ''}
+              value={data.maintenanceFee !== undefined && data.maintenanceFee !== null ? data.maintenanceFee : ''}
               onChange={(e) => updateField('maintenanceFee', e.target.value ? parseFloat(e.target.value) : undefined)}
               placeholder="예: 25"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
             />
           </div>
           <div>
@@ -272,7 +333,7 @@ export const ApartmentForm: React.FC<ApartmentFormProps> = ({ data, onChange }) 
             <select
               value={data.heatingType || '도시가스(개별난방)'}
               onChange={(e) => updateField('heatingType', e.target.value)}
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
             >
               <option value="도시가스(개별난방)">도시가스 (개별난방)</option>
               <option value="지역난방(열병합)">지역난방 (열병합)</option>
@@ -285,10 +346,32 @@ export const ApartmentForm: React.FC<ApartmentFormProps> = ({ data, onChange }) 
             <label className="block text-xs font-medium text-slate-700 mb-1">엘리베이터 수</label>
             <input
               type="number"
-              value={data.elevatorCount || ''}
+              value={data.elevatorCount !== undefined && data.elevatorCount !== null ? data.elevatorCount : ''}
               onChange={(e) => updateField('elevatorCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
               placeholder="예: 2"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+            />
+          </div>
+          {/* 공부상 총 주차대수 */}
+          <div>
+            <label className="block text-xs font-bold text-blue-900 mb-1">공부상 총 주차대수</label>
+            <input
+              type="number"
+              value={data.parkingCount !== undefined && data.parkingCount !== null ? data.parkingCount : ''}
+              onChange={(e) => updateField('parkingCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+              placeholder="예: 682"
+              className="w-full text-xs px-3 py-2 bg-blue-50/50 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-blue-950"
+            />
+          </div>
+          {/* 세대당 주차대수 */}
+          <div>
+            <label className="block text-xs font-bold text-blue-900 mb-1">세대당 주차대수</label>
+            <input
+              type="text"
+              value={data.parkingPerHousehold !== undefined && data.parkingPerHousehold !== null ? data.parkingPerHousehold : ''}
+              onChange={(e) => updateField('parkingPerHousehold', e.target.value)}
+              placeholder="예: 1.1대 (또는 1.25)"
+              className="w-full text-xs px-3 py-2 bg-blue-50/50 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-blue-950"
             />
           </div>
         </div>

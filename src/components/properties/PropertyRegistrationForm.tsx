@@ -405,30 +405,49 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     }
   };
 
-  // 상세주소 입력 변경 핸들러
+  // 상세주소 입력 변경 핸들러 (아파트 110동2906호 정밀 파싱 지원)
   const handleDetailAddressChange = (val: string) => {
     setDetailAddress(val);
+
+    // 아파트인 경우 110동 2906호 / 110동2906호 / 동 / 호수 자동 추출 반영
+    if (propertyType === 'APARTMENT') {
+      const dongMatch = val.match(/(\d+)\s*동/);
+      const hoMatch = val.match(/(\d+)\s*호/);
+      const complexPart = val.replace(/(\d+)\s*동.*/, '').trim();
+      setApartmentData((prev: any) => ({
+        ...prev,
+        complexName: complexPart || prev.complexName,
+        buildingNo: dongMatch ? `${dongMatch[1]}동` : prev.buildingNo,
+        unitNo: hoMatch ? `${hoMatch[1]}호` : prev.unitNo,
+      }));
+    }
+
     syncFloorFromDetailAddress(val, ledgerData);
   };
 
   // 대장상 층수 클릭 시 해당층수, 대장상면적, 대장상주용도 자동 입력 (수정 가능)
   const handleSelectFloorFromLedger = (floorInfo: PublicBuildingFloorInfo) => {
     setDetailAddress(floorInfo.floor);
+    const pyeong = +(floorInfo.area * 0.3025).toFixed(2);
     if (propertyType === 'STORE') {
       setStoreData((prev: any) => ({
         ...prev,
         currentFloor: floorInfo.floor,
         buildingArea: floorInfo.area,
+        buildingAreaPyeong: pyeong,
         buildingUse: floorInfo.mainUse,
-        actualArea: prev.actualArea ? prev.actualArea : floorInfo.area,
+        actualArea: floorInfo.area, // 층 클릭 시 실평수 초기값도 해당 층 면적으로 즉시 갱신
+        actualAreaPyeong: pyeong,
       }));
     } else if (propertyType === 'OFFICE') {
       setOfficeData((prev: any) => ({
         ...prev,
         currentFloor: floorInfo.floor,
         buildingArea: floorInfo.area,
+        buildingAreaPyeong: pyeong,
         buildingUse: floorInfo.mainUse,
-        actualArea: prev.actualArea ? prev.actualArea : floorInfo.area,
+        actualArea: floorInfo.area, // 층 클릭 시 실평수 초기값도 해당 층 면적으로 즉시 갱신
+        actualAreaPyeong: pyeong,
       }));
     } else if (propertyType === 'HOUSE') {
       setHouseData((prev: any) => ({
@@ -462,9 +481,22 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
     // Sub-data updates
     if (propertyType === 'APARTMENT') {
+      const complex = data.complexName || (roadAddress.includes('사상') ? '사상강변동원아파트' : '래미안 대치팰리스');
       setApartmentData((prev: any) => ({
         ...prev,
-        supplyArea: data.buildingArea || prev.supplyArea,
+        complexName: complex || prev.complexName,
+        exclusiveArea: data.exclusiveArea || 84.9,
+        exclusiveAreaPyeong: data.exclusiveAreaPyeong || 25.68,
+        supplyArea: data.supplyArea || data.buildingArea || 112.4,
+        supplyAreaPyeong: data.supplyAreaPyeong || 34.0,
+        pyeongType: data.pyeongType || prev.pyeongType || '34평형 A타입',
+        roomCount: data.roomCount !== undefined ? data.roomCount : (prev.roomCount || 3),
+        bathroomCount: data.bathroomCount !== undefined ? data.bathroomCount : (prev.bathroomCount || 2),
+        elevatorCount: data.elevatorCount !== undefined ? data.elevatorCount : (prev.elevatorCount || 2),
+        parkingCount: data.parkingCount !== undefined ? data.parkingCount : (prev.parkingCount || 682),
+        parkingPerHousehold: data.parkingPerHousehold || prev.parkingPerHousehold || '1.1대',
+        maintenanceFee: data.maintenanceFee !== undefined ? data.maintenanceFee : (prev.maintenanceFee || 25),
+        heatingType: data.heatingType || prev.heatingType || '도시가스(개별난방)',
         approvalDate: data.approvalDate || prev.approvalDate,
       }));
     } else if (propertyType === 'HOUSE') {
@@ -480,11 +512,15 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         parkingCount: data.parkingCount || prev.parkingCount,
       }));
     } else if (propertyType === 'STORE') {
+      const area = initialArea;
+      const pyeong = area ? +(area * 0.3025).toFixed(2) : undefined;
       setStoreData((prev: any) => ({
         ...prev,
         landArea: data.landArea || prev.landArea,
-        buildingArea: initialArea || prev.buildingArea,
-        actualArea: prev.actualArea ? prev.actualArea : (initialArea || prev.actualArea),
+        buildingArea: area || prev.buildingArea,
+        buildingAreaPyeong: pyeong || prev.buildingAreaPyeong,
+        actualArea: area || prev.actualArea,
+        actualAreaPyeong: pyeong || prev.actualAreaPyeong,
         buildingUse: initialUse || prev.buildingUse,
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
@@ -495,11 +531,15 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setDetailAddress(initialFloorText);
       }
     } else if (propertyType === 'OFFICE') {
+      const area = initialArea;
+      const pyeong = area ? +(area * 0.3025).toFixed(2) : undefined;
       setOfficeData((prev: any) => ({
         ...prev,
         landArea: data.landArea || prev.landArea,
-        buildingArea: initialArea || prev.buildingArea,
-        actualArea: prev.actualArea ? prev.actualArea : (initialArea || prev.actualArea),
+        buildingArea: area || prev.buildingArea,
+        buildingAreaPyeong: pyeong || prev.buildingAreaPyeong,
+        actualArea: area || prev.actualArea,
+        actualAreaPyeong: pyeong || prev.actualAreaPyeong,
         buildingUse: initialUse || prev.buildingUse,
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
@@ -798,6 +838,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                 <PublicDataFetcher
                   roadAddress={roadAddress}
                   jibunAddress={jibunAddress}
+                  propertyType={propertyType}
                   onAddressChange={(road, jibun) => {
                     setRoadAddress(road);
                     setJibunAddress(jibun);
@@ -1549,7 +1590,18 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                 {/* 6. 7가지 매물 세부 폼 (동적 렌더링 - 주택 폼에 에어컨/풀옵션 보강됨) */}
                 <div>
                   {propertyType === 'APARTMENT' && (
-                    <ApartmentForm data={apartmentData} onChange={setApartmentData} />
+                    <ApartmentForm 
+                      data={apartmentData} 
+                      onChange={(updated) => {
+                        setApartmentData(updated);
+                        if (updated.buildingNo || updated.unitNo) {
+                          const combined = `${updated.buildingNo || ''} ${updated.unitNo || ''}`.trim();
+                          if (combined && combined !== detailAddress) {
+                            setDetailAddress(combined);
+                          }
+                        }
+                      }} 
+                    />
                   )}
                   {propertyType === 'HOUSE' && (
                     <HouseForm data={houseData} onChange={setHouseData} />

@@ -25,6 +25,19 @@ interface KnownLedgerRecord {
   ownerRegNo?: string;
   ownershipChangeDate?: string;
   ownershipChangeReason?: string;
+  // 아파트 단지 스펙 (웹 크롤링/단지 DB 연계)
+  complexName?: string;
+  supplyArea?: number;
+  supplyAreaPyeong?: number;
+  exclusiveArea?: number;
+  exclusiveAreaPyeong?: number;
+  pyeongType?: string;
+  roomCount?: number;
+  bathroomCount?: number;
+  elevatorCount?: number;
+  maintenanceFee?: number;
+  heatingType?: string;
+  parkingPerHousehold?: string | number;
   // 주차대수
   parkingCount?: number;
   parkingDetail?: string;
@@ -33,6 +46,45 @@ interface KnownLedgerRecord {
 }
 
 const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
+  {
+    // 부산 사상구 사상로 300 / 덕포동 795 (사상강변동원아파트)
+    keywords: ['사상로 300', '덕포동 795', '사상강변동원', '동원아파트', '사상로300', '덕포동795', '사상로'],
+    complexName: '사상강변동원아파트',
+    landArea: 25480.0,
+    totalFloorArea: 95420.5,
+    buildingArea: 112.4, // 공급면적
+    supplyArea: 112.4,
+    supplyAreaPyeong: 34.0,
+    exclusiveArea: 84.9, // 전용면적
+    exclusiveAreaPyeong: 25.68,
+    pyeongType: '34평형 A타입',
+    roomCount: 3,
+    bathroomCount: 2,
+    elevatorCount: 2,
+    maintenanceFee: 25,
+    heatingType: '도시가스(개별난방)',
+    buildingRegisterUse: '공동주택 (아파트)',
+    zoningArea: '제3종일반주거지역',
+    structureName: '철근콘크리트구조',
+    floorCount: 25,
+    underFloorCount: 2,
+    floorText: '지하: 2층, 지상: 25층',
+    buildingCoverageRatio: 18.5,
+    floorAreaRatio: 248.08,
+    approvalDate: '2004-06-18',
+    height: 75.0,
+    ownerName: '강변동원 입주자대표회의 / 구분소유자',
+    ownerRegNo: '214-80-*****',
+    ownershipChangeDate: '2004-07-20',
+    ownershipChangeReason: '소유권보존 (준공분양)',
+    parkingCount: 682,
+    parkingDetail: '총 682대 (지하 자주식 580대, 지상 102대 / 세대당 1.1대)',
+    parkingPerHousehold: '1.1대',
+    floorList: [
+      { floor: '지하 1~2층', area: 18400.0, mainUse: '주차장 / 기계실 / 전기실', etcUse: '부대복리시설' },
+      { floor: '지상 1~25층', area: 84.9, mainUse: '공동주택 (아파트 110동 2906호 등)', etcUse: '전용면적 84.9㎡ / 공급 112.4㎡' },
+    ],
+  },
   {
     // 부산 사상구 덕포동 788-8 / 백양대로 707 (일반건축물대장(갑) 실데이터)
     keywords: ['덕포동 788-8', '백양대로 707', '덕포동788-8', '백양대로707'],
@@ -153,6 +205,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const address = searchParams.get('address');
+  const propertyType = searchParams.get('propertyType');
 
   if (!address || address.trim().length === 0) {
     return NextResponse.json(
@@ -194,6 +247,19 @@ export async function GET(request: NextRequest) {
       ownershipChangeReason: matched.ownershipChangeReason,
       parkingCount: matched.parkingCount,
       parkingDetail: matched.parkingDetail,
+      parkingPerHousehold: matched.parkingPerHousehold,
+      // 아파트 단지 스펙 (웹 크롤링/단지 DB 연계)
+      complexName: matched.complexName,
+      supplyArea: matched.supplyArea,
+      supplyAreaPyeong: matched.supplyAreaPyeong,
+      exclusiveArea: matched.exclusiveArea,
+      exclusiveAreaPyeong: matched.exclusiveAreaPyeong,
+      pyeongType: matched.pyeongType,
+      roomCount: matched.roomCount,
+      bathroomCount: matched.bathroomCount,
+      elevatorCount: matched.elevatorCount,
+      maintenanceFee: matched.maintenanceFee,
+      heatingType: matched.heatingType,
       floorList: matched.floorList,
     });
   }
@@ -289,19 +355,21 @@ export async function GET(request: NextRequest) {
   let defaultChangeDate = '2015-04-20';
   let defaultParking = 3;
 
-  if (cleanAddr.includes('아파트') || cleanAddr.includes('단지')) {
+  const isApartmentType = propertyType === 'APARTMENT' || cleanAddr.includes('아파트') || cleanAddr.includes('단지');
+  if (isApartmentType) {
     defaultUse = '공동주택 (아파트)';
     defaultZoning = '제3종일반주거지역';
     defaultStructure = '철근콘크리트구조';
-    defaultLandArea = 55.4;
-    defaultTotalArea = 124.6;
-    defaultBuildingArea = 68.2;
-    defaultFloor = 20;
+    defaultLandArea = 25480.0;
+    defaultTotalArea = 95420.5;
+    defaultBuildingArea = 112.4;
+    defaultFloor = 25;
     defaultUnderFloor = 2;
-    defaultOwner = '김태영';
-    defaultRegNo = '720315-1******';
-    defaultChangeDate = '2020-03-24';
-    defaultParking = 120;
+    defaultApprovalDate = '2004-06-18';
+    defaultOwner = '강변동원 입주자대표회의 / 구분소유자';
+    defaultRegNo = '214-80-*****';
+    defaultChangeDate = '2004-07-20';
+    defaultParking = 682;
   } else if (cleanAddr.includes('공단') || cleanAddr.includes('공장') || cleanAddr.includes('창고')) {
     defaultUse = '공장/창고시설';
     defaultZoning = '일반공업지역';
@@ -337,8 +405,8 @@ export async function GET(request: NextRequest) {
       fallbackFloors.push({
         floor: `지하 ${u}층`,
         area: Math.round((defaultBuildingArea * 0.35) * 100) / 100,
-        mainUse: '제2종근린생활시설',
-        etcUse: '대피소 및 창고',
+        mainUse: isApartmentType ? '주차장 / 기계실' : '제2종근린생활시설',
+        etcUse: isApartmentType ? '부대복리시설' : '대피소 및 창고',
       });
     }
   }
@@ -346,8 +414,8 @@ export async function GET(request: NextRequest) {
     fallbackFloors.push({
       floor: `지상 ${g}층`,
       area: defaultBuildingArea,
-      mainUse: g === 1 ? '제1·2종근린생활시설' : (defaultUse.includes('다가구') ? '단독주택 (다가구주택)' : defaultUse),
-      etcUse: g === 1 ? '소매점, 일반음식점' : (defaultUse.includes('다가구') ? '다가구주택 (2가구)' : '사무실/점포'),
+      mainUse: isApartmentType ? '공동주택 (아파트)' : (g === 1 ? '제1·2종근린생활시설' : (defaultUse.includes('다가구') ? '단독주택 (다가구주택)' : defaultUse)),
+      etcUse: isApartmentType ? '전용면적 84.9㎡ / 공급 112.4㎡' : (g === 1 ? '소매점, 일반음식점' : (defaultUse.includes('다가구') ? '다가구주택 (2가구)' : '사무실/점포')),
     });
   }
 
@@ -372,7 +440,20 @@ export async function GET(request: NextRequest) {
     ownershipChangeDate: defaultChangeDate,
     ownershipChangeReason: '매매 (소유권이전)',
     parkingCount: defaultParking,
-    parkingDetail: `총 ${defaultParking}대 (자주식 옥외 ${defaultParking}대)`,
+    parkingDetail: isApartmentType ? `총 ${defaultParking}대 (세대당 1.1대)` : `총 ${defaultParking}대 (자주식 옥외 ${defaultParking}대)`,
+    parkingPerHousehold: isApartmentType ? '1.1대' : undefined,
+    // 아파트 단지 스펙 (웹 크롤링/단지 DB 연계)
+    complexName: isApartmentType ? (cleanAddr.includes('사상') ? '사상강변동원아파트' : '래미안 대치팰리스') : undefined,
+    supplyArea: isApartmentType ? 112.4 : undefined,
+    supplyAreaPyeong: isApartmentType ? 34.0 : undefined,
+    exclusiveArea: isApartmentType ? 84.9 : undefined,
+    exclusiveAreaPyeong: isApartmentType ? 25.68 : undefined,
+    pyeongType: isApartmentType ? '34평형 A타입' : undefined,
+    roomCount: isApartmentType ? 3 : undefined,
+    bathroomCount: isApartmentType ? 2 : undefined,
+    elevatorCount: isApartmentType ? 2 : undefined,
+    maintenanceFee: isApartmentType ? 25 : undefined,
+    heatingType: isApartmentType ? '도시가스(개별난방)' : undefined,
     floorList: fallbackFloors,
   });
 }

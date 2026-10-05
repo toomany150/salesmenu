@@ -233,12 +233,16 @@ export interface ApartmentData {
   buildingNo?: string;
   unitNo?: string;
   supplyArea?: number;
+  supplyAreaPyeong?: number;
   pyeongType?: string;
   exclusiveArea?: number;
+  exclusiveAreaPyeong?: number;
   roomCount?: number;
   bathroomCount?: number;
   approvalDate?: string;
   elevatorCount?: number;
+  parkingCount?: number; // 공부상 총 주차대수
+  parkingPerHousehold?: string | number; // 세대당 주차대수
   maintenanceFee?: number;
   heatingType?: string;
   systemAircon?: boolean;
@@ -283,10 +287,12 @@ export interface StoreData {
   landArea?: number;
   totalFloorArea?: number;
   buildingArea?: number;
+  buildingAreaPyeong?: number;
   buildingUse?: string;
   zoningArea?: string;
   structure?: string;
   actualArea?: number;
+  actualAreaPyeong?: number;
   roomCount?: number;
   bathroomCount?: number;
   toiletGenderType?: string; // 남녀구분 (남녀분리, 남녀공용, 내부전용, 외부공용)
@@ -338,10 +344,12 @@ export interface OfficeData {
   landArea?: number;
   totalFloorArea?: number;
   buildingArea?: number;
+  buildingAreaPyeong?: number;
   buildingUse?: string;
   zoningArea?: string;
   structure?: string;
   actualArea?: number;
+  actualAreaPyeong?: number;
   roomCount?: number;
   bathroomCount?: number;
   toiletGenderType?: string; // 남녀구분 (남녀분리, 남녀공용, 층별분리)
@@ -667,6 +675,19 @@ export interface PublicBuildingLedgerResult {
   // 공부상 주차대수
   parkingCount?: number; // 공부상 총 주차대수 (예: 3)
   parkingDetail?: string; // 주차 상세 표기 (예: "총 3대 (자주식 옥외 3대)")
+  parkingPerHousehold?: string | number; // 세대당 주차대수 (예: "1.25대")
+  // 아파트 단지 스펙 (웹 크롤링/단지 DB 연계)
+  complexName?: string; // 단지명 (예: "사상강변동원아파트")
+  supplyArea?: number; // 공급면적 (㎡)
+  supplyAreaPyeong?: number; // 공급면적 (평)
+  exclusiveArea?: number; // 전용면적 (㎡)
+  exclusiveAreaPyeong?: number; // 전용면적 (평)
+  pyeongType?: string; // 평타입 (예: "34평형 A타입")
+  roomCount?: number; // 방수
+  bathroomCount?: number; // 욕실수
+  elevatorCount?: number; // 엘리베이터 수
+  maintenanceFee?: number; // 관리비
+  heatingType?: string; // 난방방식
   // 층수별 용도 및 면적
   floorList?: PublicBuildingFloorInfo[];
 }
