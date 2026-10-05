@@ -36,9 +36,8 @@ export default function RootLayout({
         />
         {/* Kakao Maps SDK with services and clusterer */}
         <script
-          id="kakao-map-sdk"
+          id="kakao-maps-sdk"
           src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || 'ab4074f3fc327e405a625fc856bee022'}&autoload=false&libraries=services,clusterer`}
-          defer
         />
       </head>
       <body className="antialiased selection:bg-blue-500 selection:text-white font-sans">

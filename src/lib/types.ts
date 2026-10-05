@@ -687,7 +687,7 @@ export interface PublicBuildingLedgerResult {
   approvalDate?: string; // 사용승인일 (YYYY-MM-DD)
   height?: number; // 높이 (m)
   isViolation?: boolean; // 위반건축물 여부
-  source: 'API' | 'MOCK_DEMO';
+  source: 'API' | 'MOCK_DEMO' | 'USER_CUSTOM';
   // 소유자 정보 (Image 2 연동)
   ownerName?: string; // 소유자 성명 (예: "임정원")
   ownerRegNo?: string; // 주민(법인)등록번호 (예: "590917-1******")

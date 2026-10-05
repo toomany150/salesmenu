@@ -452,7 +452,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             <KakaoAddressMap
               address={property.roadAddress || property.jibunAddress || property.address}
               detailAddress={property.detailAddress}
-              height="h-60"
+              height="h-[420px]"
             />
           </div>
 

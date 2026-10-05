@@ -338,6 +338,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     const suppPyeong = unit.supplyAreaPyeong || +(suppArea * 0.3025).toFixed(2);
     const mainUse = unit.mainUse || currentLedger?.buildingRegisterUse;
 
+    // 호실 선택 시 매물 폼의 메인 대장면적(공급면적) 및 층수 자동 동기화 (전체 건물 연면적 대신 선택 호실 면적으로 정확히 치환)
+    setBuildingArea(suppArea);
+    if (unit.floor) {
+      setFloorText(unit.floor);
+    }
+
     if (propertyType === 'HOUSE') {
       setHouseData((prev: any) => ({
         ...prev,
@@ -388,14 +394,19 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     }
 
     // 소유자 정보가 호실별로 별도 존재하는 경우 업데이트
-    if (unit.ownerName && currentLedger) {
-      setLedgerData((prev) => prev ? {
-        ...prev,
-        ownerName: unit.ownerName,
-        ownerRegNo: unit.ownerRegNo || prev.ownerRegNo,
-        ownershipChangeDate: unit.ownershipChangeDate || prev.ownershipChangeDate,
-        ownershipChangeReason: unit.ownershipChangeReason || prev.ownershipChangeReason,
-      } : prev);
+    if (unit.ownerName) {
+      if (!customerName.trim() && customerMode === 'DIRECT') {
+        setCustomerName(unit.ownerName);
+      }
+      if (currentLedger) {
+        setLedgerData((prev) => prev ? {
+          ...prev,
+          ownerName: unit.ownerName,
+          ownerRegNo: unit.ownerRegNo || prev.ownerRegNo,
+          ownershipChangeDate: unit.ownershipChangeDate || prev.ownershipChangeDate,
+          ownershipChangeReason: unit.ownershipChangeReason || prev.ownershipChangeReason,
+        } : prev);
+      }
     }
   };
 
@@ -1021,12 +1032,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     </div>
                   </div>
 
-                  {/* 실시간 카카오 지도 임베드 */}
-                  <div className="mt-2">
+                  {/* 실시간 카카오 지도 임베드 (첨부한 두번째 형태) */}
+                  <div className="mt-3">
                     <KakaoAddressMap
                       address={roadAddress || jibunAddress || address}
                       detailAddress={detailAddress}
-                      height="h-56"
+                      height="h-[420px]"
                       onCoordinatesChange={(coords) => {
                         setLatitude(coords.lat);
                         setLongitude(coords.lng);

@@ -34,11 +34,13 @@ import {
   PROPERTY_TYPE_LABELS,
   PROPERTY_TYPE_ORDER,
   CustomerItem,
-  PublicBuildingLedgerResult
+  PublicBuildingLedgerResult,
+  PublicBuildingUnitInfo
 } from '@/lib/types';
 import { useAuth } from '@/components/auth/AuthContext';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
 import { VoiceInput, VoiceTextarea } from '@/components/common/VoiceInput';
+import { KakaoAddressMap } from '@/components/map/KakaoAddressMap';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -131,12 +133,33 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [recvLedgerData, setRecvLedgerData] = useState<PublicBuildingLedgerResult | null>(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
+  // 집합건물 전유부(동/호수) 선택 상태
+  const [recvSelectedDong, setRecvSelectedDong] = useState<string>('ALL');
+  const [recvSelectedUnitKey, setRecvSelectedUnitKey] = useState<string | null>(null);
 
   const debounceAddressRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleSelectRecvUnit = (unit: PublicBuildingUnitInfo) => {
+    const key = `${unit.dong || ''}_${unit.ho}`;
+    setRecvSelectedUnitKey(key);
+    const fullHo = `${unit.dong ? unit.dong + ' ' : ''}${unit.ho}`;
+    setRecvFloorAndUnit(`${unit.floor} ${fullHo}`);
+    setRecvDetailAddress(fullHo);
+
+    // 고객 성명이 비어있고 매도인/임대인인 경우 소유자명 자동 입력
+    if (!name.trim() && unit.ownerName) {
+      setName(unit.ownerName);
+    }
+
+    // 메모에 선택 전유부 정보 상세 기록
+    const unitTag = `[대장 전유부: ${fullHo} (${unit.floor}) / 전용: ${unit.exclusiveArea}㎡ (${unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평) / 공급: ${unit.supplyArea || unit.exclusiveArea}㎡ / 소유: ${unit.ownerName || '확인요망'}]`;
+    setMemo((prev) => (prev ? `${prev}\n${unitTag}` : unitTag));
+  };
 
   const handleRecvRoadAddressChange = (val: string) => {
     setRecvRoadAddress(val);
     setRecvLedgerData(null);
+    setRecvSelectedUnitKey(null);
     setLedgerError(null);
     if (debounceAddressRef.current) clearTimeout(debounceAddressRef.current);
     if (!val || val.trim().length < 5) return;
@@ -151,6 +174,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const handleRecvJibunAddressChange = (val: string) => {
     setRecvJibunAddress(val);
     setRecvLedgerData(null);
+    setRecvSelectedUnitKey(null);
     setLedgerError(null);
     if (debounceAddressRef.current) clearTimeout(debounceAddressRef.current);
     if (!val || val.trim().length < 5) return;
@@ -167,6 +191,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setRecvRoadAddress(result.roadAddress);
       setRecvJibunAddress(result.jibunAddress);
       setRecvLedgerData(null);
+      setRecvSelectedUnitKey(null);
       setLedgerError(null);
     });
   };
@@ -188,6 +213,21 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         throw new Error((data as any).error || '대장 정보 조회 중 오류가 발생했습니다.');
       }
       setRecvLedgerData(data);
+      setRecvSelectedUnitKey(null);
+      setRecvSelectedDong('ALL');
+
+      // 상세주소와 일치하는 호실이 있으면 자동 선택
+      if (data.isCollectiveBuilding && data.unitList && data.unitList.length > 0 && recvDetailAddress) {
+        const cleanD = recvDetailAddress.trim().replace(/\s+/g, '');
+        const matched = data.unitList.find(u => {
+          const full = `${u.dong || ''}${u.ho}`.replace(/\s+/g, '');
+          return cleanD.includes(full) || full.includes(cleanD) || (cleanD.includes(u.ho) && (!u.dong || cleanD.includes(u.dong)));
+        });
+        if (matched) {
+          handleSelectRecvUnit(matched);
+        }
+      }
+
       // 자동 연동: 층수/호수
       if (!recvFloorAndUnit && data.floorText) {
         setRecvFloorAndUnit(data.floorText);
@@ -1958,59 +1998,317 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
                     {/* 대장 정보 불러오기 성공 시 요약 카드 */}
                     {recvLedgerData && (
-                      <div className="p-3 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 rounded-xl border border-blue-200 text-xs space-y-2 animate-in fade-in duration-150">
-                        <div className="flex items-center justify-between border-b border-blue-200/70 pb-1.5">
-                          <div className="flex items-center gap-1.5 font-bold text-blue-900">
-                            <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                      <div className="p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 rounded-xl border border-blue-200 text-xs space-y-3 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between border-b border-blue-200/70 pb-2 flex-wrap gap-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-blue-900 flex-wrap">
+                            <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
                             <span>건축물대장 정보 연동 완료</span>
-                            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-semibold">정부공공데이터</span>
+                            {recvLedgerData.complexName && (
+                              <span className="text-[11px] font-black text-blue-950 bg-blue-100 px-2 py-0.5 rounded border border-blue-300">
+                                건물명: {recvLedgerData.complexName}
+                              </span>
+                            )}
                           </div>
-                          {recvLedgerData.approvalDate && (
-                            <span className="text-[11px] text-slate-500">
-                              사용승인: {recvLedgerData.approvalDate}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">
+                              출처: {recvLedgerData.isCollectiveBuilding ? '집합건축물대장(표제부/전유부) 정밀 연동' : '일반건축물대장(갑) 정밀 연동'}
                             </span>
-                          )}
+                            {recvLedgerData.approvalDate && (
+                              <span className="text-[11px] text-slate-500 font-medium">
+                                사용승인: {recvLedgerData.approvalDate}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
+                        {/* 표제부 핵심 항목 그리드 */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                          <div className="bg-white/90 p-2 rounded-lg border border-slate-200">
-                            <span className="text-slate-400 block text-[10px]">대장상 주용도</span>
-                            <span className="font-bold text-slate-800 truncate block" title={recvLedgerData.buildingRegisterUse}>
+                          <div className="bg-white/90 p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                            <span className="text-slate-500 block text-[10px] font-medium">대장상 주용도</span>
+                            <span className="font-bold text-slate-900 truncate block mt-0.5" title={recvLedgerData.buildingRegisterUse}>
                               {recvLedgerData.buildingRegisterUse || '일반건축물'}
                             </span>
                           </div>
-                          <div className="bg-white/90 p-2 rounded-lg border border-slate-200">
-                            <span className="text-slate-400 block text-[10px]">대장상 면적</span>
-                            <span className="font-bold text-slate-800">
+                          <div className="bg-white/90 p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                            <span className="text-slate-500 block text-[10px] font-medium">대장상 면적</span>
+                            <span className="font-bold text-slate-900 mt-0.5 block">
                               {recvLedgerData.buildingArea ? `${recvLedgerData.buildingArea}㎡ (${(recvLedgerData.buildingArea * 0.3025).toFixed(1)}평)` : '-'}
                             </span>
                           </div>
-                          <div className="bg-white/90 p-2 rounded-lg border border-slate-200">
-                            <span className="text-slate-400 block text-[10px]">층수 구조</span>
-                            <span className="font-bold text-slate-800">
+                          <div className="bg-white/90 p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                            <span className="text-slate-500 block text-[10px] font-medium">층수 구조</span>
+                            <span className="font-bold text-slate-900 mt-0.5 block">
                               {recvLedgerData.floorText || `지상 ${recvLedgerData.floorCount || 0}층`}
                             </span>
                           </div>
-                          <div className="bg-white/90 p-2 rounded-lg border border-slate-200">
-                            <span className="text-slate-400 block text-[10px]">소유자 / 주차</span>
-                            <span className="font-bold text-slate-800 truncate block">
+                          <div className="bg-white/90 p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                            <span className="text-slate-500 block text-[10px] font-medium">소유자 / 주차</span>
+                            <span className="font-bold text-slate-900 truncate block mt-0.5">
                               {recvLedgerData.ownerName || '소유자확인'} / {recvLedgerData.parkingCount !== undefined ? `${recvLedgerData.parkingCount}대` : '확인요망'}
                             </span>
                           </div>
                         </div>
 
-                        <div className="text-[10px] text-blue-700 flex items-center justify-between">
+                        {/* 🏢 집합건축물 전유부(각 동·호수) 선택 섹션 */}
+                        {recvLedgerData.isCollectiveBuilding && recvLedgerData.unitList && recvLedgerData.unitList.length > 0 && (
+                          <div className="bg-white border-2 border-blue-400 rounded-xl p-3.5 space-y-3 shadow-xs">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-blue-200">
+                              <div className="flex items-center gap-1.5">
+                                <div className="p-1 rounded-md bg-blue-600 text-white shadow-2xs">
+                                  <Building className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-black text-blue-950 flex items-center gap-1.5 flex-wrap">
+                                    🏢 집합건축물 전유부(각 동·호수) 선택
+                                    <span className="px-1.5 py-0.2 text-[10px] font-bold bg-blue-600 text-white rounded">
+                                      {recvLedgerData.buildingCategoryName || '집합건축물'}
+                                    </span>
+                                    <span className="px-1.5 py-0.2 text-[10px] font-semibold bg-blue-100 text-blue-800 rounded border border-blue-200">
+                                      총 {recvLedgerData.unitList.length}개 호실
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-blue-800 mt-0.5">
+                                    💡 원하시는 동·호수를 클릭하시면 고객 매물 층수/동호수, 상세주소, 전용면적, 소유자 정보가 자동 입력됩니다.
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* 동 선택 탭 (가동, 나동 / 101동 등) */}
+                              {recvLedgerData.dongList && recvLedgerData.dongList.length > 1 && (
+                                <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-blue-200 shadow-2xs shrink-0 self-start sm:self-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setRecvSelectedDong('ALL')}
+                                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                                      recvSelectedDong === 'ALL'
+                                        ? 'bg-blue-600 text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-200/70'
+                                    }`}
+                                  >
+                                    전체 ({recvLedgerData.unitList.length})
+                                  </button>
+                                  {recvLedgerData.dongList.map((d) => {
+                                    const count = recvLedgerData.unitList?.filter((u) => u.dong === d).length || 0;
+                                    return (
+                                      <button
+                                        key={d}
+                                        type="button"
+                                        onClick={() => setRecvSelectedDong(d)}
+                                        className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                                          recvSelectedDong === d
+                                            ? 'bg-blue-600 text-white shadow-2xs'
+                                            : 'text-slate-600 hover:bg-slate-200/70'
+                                        }`}
+                                      >
+                                        {d} ({count})
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 전유부 호수 카드 그리드 */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                              {recvLedgerData.unitList
+                                .filter((unit) => recvSelectedDong === 'ALL' || unit.dong === recvSelectedDong)
+                                .map((unit, idx) => {
+                                  const unitKey = `${unit.dong || ''}_${unit.ho}`;
+                                  const isSelected = recvSelectedUnitKey === unitKey;
+                                  return (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => handleSelectRecvUnit(unit)}
+                                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between group ${
+                                        isSelected
+                                          ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-400 shadow-md scale-[1.02]'
+                                          : 'bg-slate-50 hover:bg-blue-50/80 border-slate-200 hover:border-blue-300 shadow-2xs'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-1 mb-1">
+                                        <span className={`text-xs font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900 group-hover:text-blue-700'}`}>
+                                          {unit.dong ? `${unit.dong} ` : ''}{unit.ho}
+                                        </span>
+                                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                                          isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
+                                        }`}>
+                                          {unit.floor.replace('지상 ', '')}
+                                        </span>
+                                      </div>
+
+                                      <div className="space-y-0.5 mt-0.5">
+                                        <div className={`text-[11px] font-extrabold flex items-center justify-between ${
+                                          isSelected ? 'text-blue-100' : 'text-blue-700'
+                                        }`}>
+                                          <span>전용</span>
+                                          <span>{unit.exclusiveArea}㎡</span>
+                                        </div>
+                                        <div className={`text-[10px] font-medium flex items-center justify-between ${
+                                          isSelected ? 'text-blue-200' : 'text-slate-500'
+                                        }`}>
+                                          <span>실평수</span>
+                                          <span>{unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평</span>
+                                        </div>
+                                        {unit.ownerName && (
+                                          <div className={`text-[10px] pt-1 mt-1 border-t truncate font-semibold ${
+                                            isSelected ? 'border-blue-500/80 text-amber-200' : 'border-slate-200 text-slate-600'
+                                          }`}>
+                                            소유: {unit.ownerName}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                            </div>
+
+                            {/* 선택된 호수 상세 안내 및 해제 버튼 */}
+                            {(() => {
+                              const currentSelected = recvLedgerData.unitList.find((u) => `${u.dong || ''}_${u.ho}` === recvSelectedUnitKey);
+                              if (!currentSelected) return null;
+                              return (
+                                <div className="p-2.5 bg-blue-100/70 border border-blue-300 rounded-lg flex flex-wrap items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-black text-blue-900 flex items-center gap-1">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                                      선택된 전유부: {currentSelected.dong ? `${currentSelected.dong} ` : ''}{currentSelected.ho}
+                                    </span>
+                                    <span className="text-slate-300">|</span>
+                                    <span className="text-slate-700">층수: <strong>{currentSelected.floor}</strong></span>
+                                    <span className="text-slate-300">|</span>
+                                    <span className="text-slate-700">전용(실평수): <strong className="text-blue-700">{currentSelected.exclusiveArea}㎡ ({currentSelected.exclusiveAreaPyeong || +(currentSelected.exclusiveArea * 0.3025).toFixed(1)}평)</strong></span>
+                                    <span className="text-slate-300">|</span>
+                                    <span className="text-slate-700">공급(대장상): <strong>{currentSelected.supplyArea || currentSelected.exclusiveArea}㎡</strong></span>
+                                    {currentSelected.ownerName && (
+                                      <>
+                                        <span className="text-slate-300">|</span>
+                                        <span className="text-slate-700">소유자: <strong className="text-purple-700">{currentSelected.ownerName}</strong> ({currentSelected.ownerRegNo || '-'})</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRecvSelectedUnitKey(null)}
+                                    className="text-[11px] text-slate-500 hover:text-rose-600 underline font-medium cursor-pointer"
+                                  >
+                                    호수 선택 해제
+                                  </button>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+
+                        {/* 대장상 소유자 정보 카드 (전유부 선택 시 전유부 소유자 정확 연동) */}
+                        {(() => {
+                          const currentSelected = recvLedgerData.unitList?.find((u) => `${u.dong || ''}_${u.ho}` === recvSelectedUnitKey);
+                          const activeOwner = currentSelected?.ownerName || recvLedgerData.ownerName || '소유자';
+                          const activeRegNo = currentSelected?.ownerRegNo || recvLedgerData.ownerRegNo || '******-1******';
+                          const activeDate = currentSelected?.ownershipChangeDate || recvLedgerData.ownershipChangeDate || '2016-09-10';
+                          const activeReason = currentSelected?.ownershipChangeReason || recvLedgerData.ownershipChangeReason || '매매';
+
+                          return (
+                            <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-3 space-y-2">
+                              <div className="flex items-center justify-between pb-1 border-b border-amber-200/70">
+                                <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                  <UserCheck className="w-4 h-4 text-amber-700" />
+                                  대장상 소유자 정보 (소유권 현황)
+                                  {currentSelected && (
+                                    <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold">
+                                      {currentSelected.dong ? `${currentSelected.dong} ` : ''}{currentSelected.ho} 전유부 소유권
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold border border-amber-200">
+                                  {currentSelected
+                                    ? '집합건축물대장(전유부) 소유자란'
+                                    : (recvLedgerData.isCollectiveBuilding ? '집합건축물대장(표제부) 소유자현황' : '건축물대장(갑) 소유자란')}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                <div className="bg-white/95 p-2 rounded-lg border border-amber-200/70">
+                                  <span className="text-[10px] text-slate-500 block font-medium">성명 (명칭)</span>
+                                  <span className="font-black text-slate-900 text-xs mt-0.5 block">{activeOwner}</span>
+                                </div>
+                                <div className="bg-white/95 p-2 rounded-lg border border-amber-200/70">
+                                  <span className="text-[10px] text-slate-500 block font-medium">주민(법인)등록번호</span>
+                                  <span className="font-bold text-slate-800 text-xs mt-0.5 block">{activeRegNo}</span>
+                                </div>
+                                <div className="bg-white/95 p-2 rounded-lg border border-amber-200/70">
+                                  <span className="text-[10px] text-slate-500 block font-medium">소유권 변동일</span>
+                                  <span className="font-bold text-blue-900 text-xs mt-0.5 block">{activeDate}</span>
+                                </div>
+                                <div className="bg-white/95 p-2 rounded-lg border border-amber-200/70">
+                                  <span className="text-[10px] text-slate-500 block font-medium">변동원인</span>
+                                  <span className="font-bold text-slate-800 text-xs mt-0.5 block">{activeReason}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* 대장상 층별 개요 (층수별 용도 및 면적) */}
+                        {recvLedgerData.floorList && recvLedgerData.floorList.length > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                              <Building className="w-3.5 h-3.5 text-blue-600" />
+                              층수에 따른 용도 및 면적 현황 (대장상 층별개요)
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1.5">
+                              {recvLedgerData.floorList.map((fl, i) => (
+                                <div key={i} className="p-2 rounded-lg bg-white border border-slate-200">
+                                  <div className="flex items-center justify-between text-blue-700 font-bold mb-0.5">
+                                    <span>{fl.floor}</span>
+                                    <span>{fl.area}㎡</span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-800 font-semibold truncate" title={fl.mainUse}>
+                                    {fl.mainUse}
+                                  </div>
+                                  {fl.etcUse && (
+                                    <div className="text-[10px] text-slate-500 truncate" title={fl.etcUse}>
+                                      {fl.etcUse}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="text-[10px] text-blue-700 flex items-center justify-between pt-1">
                           <span>💡 매물 층수/동호수 및 주차대수, 상담 메모에 대장 스펙이 자동 반영되었습니다.</span>
                           <button
                             type="button"
                             onClick={() => {
                               setRecvLedgerData(null);
+                              setRecvSelectedUnitKey(null);
                             }}
                             className="text-slate-400 hover:text-slate-600 hover:underline cursor-pointer"
                           >
                             초기화
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {/* 실시간 카카오 지도 연동 (첨부한 두번째 형태) */}
+                    {(recvRoadAddress || recvJibunAddress) && (
+                      <div className="pt-2">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            <span>소재지 실시간 카카오 지도 연동</span>
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            {recvRoadAddress || recvJibunAddress} {recvDetailAddress ? `(${recvDetailAddress})` : ''}
+                          </span>
+                        </div>
+                        <KakaoAddressMap
+                          address={recvRoadAddress || recvJibunAddress}
+                          detailAddress={recvDetailAddress}
+                          height="h-[420px]"
+                        />
                       </div>
                     )}
                   </div>

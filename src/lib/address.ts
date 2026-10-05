@@ -83,21 +83,33 @@ export function loadKakaoServicesScript(): Promise<boolean> {
     }
 
     if (window.kakao?.maps) {
-      window.kakao.maps.load(() => {
-        resolve(!!window.kakao?.maps?.services);
-      });
+      try {
+        window.kakao.maps.load(() => {
+          resolve(!!window.kakao?.maps?.services);
+        });
+      } catch {
+        resolve(true);
+      }
       return;
     }
 
-    const existing = document.getElementById('kakao-maps-sdk');
+    const existing = document.getElementById('kakao-maps-sdk') || document.getElementById('kakao-map-sdk');
     if (existing) {
-      existing.addEventListener('load', () => {
+      let attempts = 0;
+      const checkInterval = setInterval(() => {
+        attempts++;
         if (window.kakao?.maps) {
-          window.kakao.maps.load(() => resolve(!!window.kakao?.maps?.services));
-        } else {
+          clearInterval(checkInterval);
+          try {
+            window.kakao.maps.load(() => resolve(!!window.kakao?.maps?.services));
+          } catch {
+            resolve(true);
+          }
+        } else if (attempts > 60) {
+          clearInterval(checkInterval);
           resolve(false);
         }
-      });
+      }, 80);
       return;
     }
 
@@ -106,7 +118,11 @@ export function loadKakaoServicesScript(): Promise<boolean> {
     script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoKey}&libraries=services,clusterer&autoload=false`;
     script.onload = () => {
       if (window.kakao?.maps) {
-        window.kakao.maps.load(() => resolve(!!window.kakao?.maps?.services));
+        try {
+          window.kakao.maps.load(() => resolve(!!window.kakao?.maps?.services));
+        } catch {
+          resolve(true);
+        }
       } else {
         resolve(false);
       }

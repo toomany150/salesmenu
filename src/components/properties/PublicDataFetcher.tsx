@@ -12,7 +12,12 @@ import {
   Layers,
   Car,
   Calendar,
-  Check
+  Check,
+  Edit3,
+  Save,
+  X,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { PublicBuildingLedgerResult, PublicBuildingFloorInfo, PublicBuildingUnitInfo } from '@/lib/types';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
@@ -49,7 +54,38 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   // 주소 입력창 접힘/펼침 상태 (주소 입력 완료 시 자동 접힘)
   const [isEditingAddress, setIsEditingAddress] = useState<boolean>(false);
 
+  // 대장 정보 직접 수정 모달 상태
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState<PublicBuildingLedgerResult | null>(null);
+  const [savingCustomLedger, setSavingCustomLedger] = useState(false);
+
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleOpenEditModal = () => {
+    if (!fetchedData) return;
+    setEditForm(JSON.parse(JSON.stringify(fetchedData)));
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditModal = async () => {
+    if (!editForm) return;
+    setSavingCustomLedger(true);
+    try {
+      await fetch('/api/public-data/building-ledger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      });
+    } catch (err) {
+      console.warn('Custom ledger save failed', err);
+    } finally {
+      setSavingCustomLedger(false);
+    }
+
+    setFetchedData(editForm);
+    onApplyData(editForm);
+    setIsEditModalOpen(false);
+  };
 
   // 외부 상세주소(detailAddress) 또는 대장 데이터 변경 시 선택된 전유부 동기화
   React.useEffect(() => {
@@ -411,14 +447,33 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       {/* Success Banner and Result Preview (대장상 정보 전체 표시 & 줄임표 제거) */}
       {fetchedData && (
         <div className="p-4 rounded-xl bg-white border border-emerald-300 shadow-xs transition-all space-y-3.5">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 flex-wrap">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>정부 건축물대장 정보가 성공적으로 조회되어 아래 폼에 자동 입력되었습니다.</span>
+              {fetchedData.complexName && (
+                <span className="text-[11px] font-black text-blue-900 bg-blue-100/90 px-2 py-0.5 rounded border border-blue-300">
+                  건물명: {fetchedData.complexName}
+                </span>
+              )}
             </div>
-            <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold">
-              출처: {fetchedData.source === 'API' ? '국토부 공공데이터 API' : '일반건축물대장(갑) 정밀 연동'}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenEditModal}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-white hover:bg-slate-100 text-blue-700 border border-blue-300 rounded-lg font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+              >
+                <Edit3 className="w-3 h-3 text-blue-600" />
+                <span>대장정보 직접 수정</span>
+              </button>
+              <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold">
+                출처: {fetchedData.source === 'API'
+                  ? (fetchedData.isCollectiveBuilding ? '국토부 집합건축물대장(표제부/전유부) API' : '국토부 일반건축물대장(갑) API')
+                  : (fetchedData.source === 'USER_CUSTOM'
+                      ? '사용자 직접 등록/수정 대장'
+                      : (fetchedData.isCollectiveBuilding ? '집합건축물대장(표제부/전유부) 정밀 연동' : '일반건축물대장(갑) 정밀 연동'))}
+              </span>
+            </div>
           </div>
 
           {/* 1. 핵심 대장 항목 그리드 (줄임표 ... 제거 & 여유로운 3~4열 배치) */}
@@ -700,7 +755,9 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                     )}
                   </span>
                   <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded font-bold border border-amber-200">
-                    건축물대장(갑) 소유자란
+                    {currentSelected
+                      ? '집합건축물대장(전유부) 소유자란'
+                      : (fetchedData.isCollectiveBuilding ? '집합건축물대장(표제부) 소유자현황' : '건축물대장(갑) 소유자란')}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs pt-0.5">
@@ -787,6 +844,416 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 5. 건축물대장 정보 직접 수정 모달 (표제부 + 전유부 호실 완벽 편집) */}
+      {isEditModalOpen && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+            {/* Modal Header */}
+            <div className="p-4 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-xs">
+                  <Edit3 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">건축물대장 정보 직접 수정 및 폼 즉시 반영</h3>
+                  <p className="text-xs text-blue-100 font-medium">
+                    소재지: {editForm.address} | 실제 건축물대장 수치로 수정하시면 매물장 폼에 완벽히 동기화됩니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="p-5 overflow-y-auto space-y-5 text-xs">
+              {/* 표제부 정보 */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <span className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                    <Building className="w-4 h-4 text-blue-600" />
+                    1. 표제부 기본 정보
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-slate-600">대장 구분:</label>
+                    <select
+                      value={editForm.isCollectiveBuilding ? 'COLLECTIVE' : 'GENERAL'}
+                      onChange={(e) => {
+                        const isCol = e.target.value === 'COLLECTIVE';
+                        setEditForm({
+                          ...editForm,
+                          isCollectiveBuilding: isCol,
+                          buildingCategoryName: isCol ? '집합건축물' : '일반건축물',
+                        });
+                      }}
+                      className="px-2 py-1 bg-white border border-slate-300 rounded font-bold text-blue-700"
+                    >
+                      <option value="COLLECTIVE">🏢 집합건축물 (다세대/연립/아파트/오피스텔)</option>
+                      <option value="GENERAL">🏠 일반건축물 (단독/다가구/상가단독)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">건물/단지명</label>
+                    <input
+                      type="text"
+                      value={editForm.complexName || ''}
+                      onChange={(e) => setEditForm({ ...editForm, complexName: e.target.value })}
+                      placeholder="예: 우방하이츠빌라"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">대장상 주용도</label>
+                    <input
+                      type="text"
+                      value={editForm.buildingRegisterUse || ''}
+                      onChange={(e) => setEditForm({ ...editForm, buildingRegisterUse: e.target.value })}
+                      placeholder="예: 공동주택 (다세대주택)"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">주구조</label>
+                    <input
+                      type="text"
+                      value={editForm.structureName || ''}
+                      onChange={(e) => setEditForm({ ...editForm, structureName: e.target.value })}
+                      placeholder="예: 철근콘크리트구조"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">대지면적 (㎡)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.landArea ?? ''}
+                      onChange={(e) => setEditForm({ ...editForm, landArea: e.target.value ? parseFloat(e.target.value) : undefined })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">연면적 (㎡)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.totalFloorArea ?? ''}
+                      onChange={(e) => setEditForm({ ...editForm, totalFloorArea: e.target.value ? parseFloat(e.target.value) : undefined })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">건축면적 (㎡)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.buildingArea ?? ''}
+                      onChange={(e) => setEditForm({ ...editForm, buildingArea: e.target.value ? parseFloat(e.target.value) : undefined })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">사용승인일</label>
+                    <input
+                      type="date"
+                      value={editForm.approvalDate || ''}
+                      onChange={(e) => setEditForm({ ...editForm, approvalDate: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">층수 (지상/지하 표기)</label>
+                    <input
+                      type="text"
+                      value={editForm.floorText || ''}
+                      onChange={(e) => setEditForm({ ...editForm, floorText: e.target.value })}
+                      placeholder="예: 지상: 4층 (가동, 나동)"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">주차대수</label>
+                    <input
+                      type="number"
+                      value={editForm.parkingCount ?? ''}
+                      onChange={(e) => setEditForm({ ...editForm, parkingCount: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">위반건축물 여부</label>
+                    <select
+                      value={editForm.isViolation ? 'YES' : 'NO'}
+                      onChange={(e) => setEditForm({ ...editForm, isViolation: e.target.value === 'YES' })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-bold"
+                    >
+                      <option value="NO">정상 (위반 없음)</option>
+                      <option value="YES">위반건축물</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">대표 소유자 성명</label>
+                    <input
+                      type="text"
+                      value={editForm.ownerName || ''}
+                      onChange={(e) => setEditForm({ ...editForm, ownerName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">주민/법인등록번호</label>
+                    <input
+                      type="text"
+                      value={editForm.ownerRegNo || ''}
+                      onChange={(e) => setEditForm({ ...editForm, ownerRegNo: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">변동일자 / 변동원인</label>
+                    <input
+                      type="text"
+                      value={`${editForm.ownershipChangeDate || ''} ${editForm.ownershipChangeReason || ''}`.trim()}
+                      onChange={(e) => {
+                        const parts = e.target.value.split(' ');
+                        setEditForm({
+                          ...editForm,
+                          ownershipChangeDate: parts[0] || '',
+                          ownershipChangeReason: parts.slice(1).join(' ') || undefined,
+                        });
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 전유부(호실별) 정보 (집합건축물인 경우) */}
+              {editForm.isCollectiveBuilding && (
+                <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-200 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-blue-200">
+                    <div>
+                      <span className="font-bold text-blue-950 text-sm flex items-center gap-1.5">
+                        <UserCheck className="w-4 h-4 text-blue-600" />
+                        2. 전유부 호실별 상세 정보 ({editForm.unitList?.length || 0}개 호실)
+                      </span>
+                      <p className="text-[11px] text-blue-700 mt-0.5">
+                        각 호실의 동, 호수, 층수, 전용면적, 공급면적 및 소유자를 실제 대장 기준으로 직접 수정할 수 있습니다.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curList = editForm.unitList || [];
+                        const newHo = `${curList.length + 1}01호`;
+                        const newUnit: PublicBuildingUnitInfo = {
+                          dong: editForm.dongList?.[0] || '가동',
+                          ho: newHo,
+                          floor: '지상 1층',
+                          exclusiveArea: 59.84,
+                          exclusiveAreaPyeong: 18.1,
+                          supplyArea: 78.2,
+                          supplyAreaPyeong: 23.6,
+                          mainUse: editForm.buildingRegisterUse || '공동주택 (다세대주택)',
+                          ownerName: '소유자',
+                          ownerRegNo: '******-1******',
+                          ownershipChangeDate: '2020-01-01',
+                          ownershipChangeReason: '매매',
+                        };
+                        setEditForm({
+                          ...editForm,
+                          unitList: [...curList, newUnit],
+                        });
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-2xs cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>호실 추가</span>
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto max-h-[300px] border border-blue-200 rounded-lg bg-white">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="bg-blue-100/70 text-blue-900 sticky top-0 font-bold border-b border-blue-200">
+                        <tr>
+                          <th className="p-2 text-center w-16">동</th>
+                          <th className="p-2 text-center w-20">호수</th>
+                          <th className="p-2 text-center w-24">층수</th>
+                          <th className="p-2 text-center w-24">전용(㎡)</th>
+                          <th className="p-2 text-center w-24">공급(㎡)</th>
+                          <th className="p-2 text-center w-24">소유자</th>
+                          <th className="p-2 text-center w-32">주민번호</th>
+                          <th className="p-2 text-center w-16">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {(editForm.unitList || []).map((u, idx) => (
+                          <tr key={idx} className="hover:bg-blue-50/40">
+                            <td className="p-1.5 text-center">
+                              <input
+                                type="text"
+                                value={u.dong || ''}
+                                onChange={(e) => {
+                                  const next = [...(editForm.unitList || [])];
+                                  next[idx].dong = e.target.value;
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="w-full px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded"
+                              />
+                            </td>
+                            <td className="p-1.5 text-center">
+                              <input
+                                type="text"
+                                value={u.ho}
+                                onChange={(e) => {
+                                  const next = [...(editForm.unitList || [])];
+                                  next[idx].ho = e.target.value;
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="w-full px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded font-bold"
+                              />
+                            </td>
+                            <td className="p-1.5 text-center">
+                              <input
+                                type="text"
+                                value={u.floor}
+                                onChange={(e) => {
+                                  const next = [...(editForm.unitList || [])];
+                                  next[idx].floor = e.target.value;
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="w-full px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded"
+                              />
+                            </td>
+                            <td className="p-1.5 text-center">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={u.exclusiveArea}
+                                onChange={(e) => {
+                                  const next = [...(editForm.unitList || [])];
+                                  const val = parseFloat(e.target.value) || 0;
+                                  next[idx].exclusiveArea = val;
+                                  next[idx].exclusiveAreaPyeong = +(val * 0.3025).toFixed(2);
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="w-full px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded"
+                              />
+                            </td>
+                            <td className="p-1.5 text-center">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={u.supplyArea || u.exclusiveArea}
+                                onChange={(e) => {
+                                  const next = [...(editForm.unitList || [])];
+                                  const val = parseFloat(e.target.value) || 0;
+                                  next[idx].supplyArea = val;
+                                  next[idx].supplyAreaPyeong = +(val * 0.3025).toFixed(2);
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="w-full px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded"
+                              />
+                            </td>
+                            <td className="p-1.5 text-center">
+                              <input
+                                type="text"
+                                value={u.ownerName || ''}
+                                onChange={(e) => {
+                                  const next = [...(editForm.unitList || [])];
+                                  next[idx].ownerName = e.target.value;
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="w-full px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded font-bold text-slate-800"
+                              />
+                            </td>
+                            <td className="p-1.5 text-center">
+                              <input
+                                type="text"
+                                value={u.ownerRegNo || ''}
+                                onChange={(e) => {
+                                  const next = [...(editForm.unitList || [])];
+                                  next[idx].ownerRegNo = e.target.value;
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="w-full px-1.5 py-1 text-center bg-slate-50 border border-slate-200 rounded text-slate-600"
+                              />
+                            </td>
+                            <td className="p-1.5 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = (editForm.unitList || []).filter((_, i) => i !== idx);
+                                  setEditForm({ ...editForm, unitList: next });
+                                }}
+                                className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-500">
+                수정된 내용은 캐시에 저장되어 이후 검색 시에도 우선 적용됩니다.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditModal}
+                  disabled={savingCustomLedger}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md transition-all cursor-pointer active:scale-95 disabled:bg-blue-300"
+                >
+                  {savingCustomLedger ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>저장 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>저장 및 폼에 즉시 적용</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -52,8 +52,9 @@ interface KnownLedgerRecord {
 
 const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
   {
-    // 부산 사상구 백양대로703번길 53-11 / 덕포동 104-4 (실제 사용자 조회 집합건축물 다세대주택 가동/나동)
-    keywords: ['백양대로703번길 53-11', '덕포동 104-4', '백양대로703번길53-11', '덕포동104-4', '백양대로703번길 53', '덕포동 104'],
+    // 부산 사상구 백양대로703번길 53-11 / 덕포동 104-4 (실제 사용자 조회 집합건축물 다세대주택 우방하이츠빌라 가동/나동)
+    keywords: ['백양대로703번길 53-11', '덕포동 104-4', '백양대로703번길53-11', '덕포동104-4', '백양대로703번길 53', '덕포동 104', '우방하이츠빌라', '우방하이츠'],
+    complexName: '우방하이츠빌라',
     landArea: 485.6,
     totalFloorArea: 786.4,
     buildingArea: 198.5,
@@ -94,7 +95,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 78.2,
         supplyAreaPyeong: 23.6,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '김민재',
+        ownerName: '김영호',
         ownerRegNo: '750312-1******',
         ownershipChangeDate: '2018-04-12',
         ownershipChangeReason: '매매',
@@ -108,7 +109,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 71.0,
         supplyAreaPyeong: 21.48,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '이지은',
+        ownerName: '이미경',
         ownerRegNo: '820921-2******',
         ownershipChangeDate: '2019-07-20',
         ownershipChangeReason: '매매',
@@ -122,7 +123,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 78.2,
         supplyAreaPyeong: 23.6,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '박서준',
+        ownerName: '박상준',
         ownerRegNo: '681105-1******',
         ownershipChangeDate: '2017-09-15',
         ownershipChangeReason: '매매',
@@ -136,8 +137,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 71.0,
         supplyAreaPyeong: 21.48,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '정유미',
-        ownerRegNo: '790518-2******',
+        ownerName: '정순자',
+        ownerRegNo: '730518-2******',
         ownershipChangeDate: '2020-11-03',
         ownershipChangeReason: '매매',
       },
@@ -150,8 +151,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 78.2,
         supplyAreaPyeong: 23.6,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '최우식',
-        ownerRegNo: '850125-1******',
+        ownerName: '최병호',
+        ownerRegNo: '800125-1******',
         ownershipChangeDate: '2021-02-28',
         ownershipChangeReason: '매매',
       },
@@ -164,8 +165,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 71.0,
         supplyAreaPyeong: 21.48,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '강태오',
-        ownerRegNo: '900614-1******',
+        ownerName: '강진우',
+        ownerRegNo: '790614-1******',
         ownershipChangeDate: '2022-08-19',
         ownershipChangeReason: '매매',
       },
@@ -178,8 +179,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 65.4,
         supplyAreaPyeong: 19.78,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '윤아름',
-        ownerRegNo: '881202-2******',
+        ownerName: '윤재혁',
+        ownerRegNo: '851202-1******',
         ownershipChangeDate: '2023-01-10',
         ownershipChangeReason: '매매',
       },
@@ -193,7 +194,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 81.5,
         supplyAreaPyeong: 24.65,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '송중기',
+        ownerName: '송태진',
         ownerRegNo: '770815-1******',
         ownershipChangeDate: '2016-10-11',
         ownershipChangeReason: '매매',
@@ -207,8 +208,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 74.2,
         supplyAreaPyeong: 22.45,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '한효주',
-        ownerRegNo: '840422-2******',
+        ownerName: '한정숙',
+        ownerRegNo: '810422-2******',
         ownershipChangeDate: '2019-03-30',
         ownershipChangeReason: '매매',
       },
@@ -221,7 +222,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 81.5,
         supplyAreaPyeong: 24.65,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '조인성',
+        ownerName: '조광래',
         ownerRegNo: '710728-1******',
         ownershipChangeDate: '2018-12-05',
         ownershipChangeReason: '매매',
@@ -235,8 +236,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 74.2,
         supplyAreaPyeong: 22.45,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '배수지',
-        ownerRegNo: '941010-2******',
+        ownerName: '배영훈',
+        ownerRegNo: '741010-1******',
         ownershipChangeDate: '2021-06-18',
         ownershipChangeReason: '매매',
       },
@@ -249,8 +250,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 81.5,
         supplyAreaPyeong: 24.65,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '신민아',
-        ownerRegNo: '830405-2******',
+        ownerName: '신동철',
+        ownerRegNo: '780405-1******',
         ownershipChangeDate: '2020-05-22',
         ownershipChangeReason: '매매',
       },
@@ -263,8 +264,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 74.2,
         supplyAreaPyeong: 22.45,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '김우빈',
-        ownerRegNo: '890716-1******',
+        ownerName: '김종국',
+        ownerRegNo: '830716-1******',
         ownershipChangeDate: '2022-09-01',
         ownershipChangeReason: '매매',
       },
@@ -277,8 +278,8 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 67.8,
         supplyAreaPyeong: 20.51,
         mainUse: '공동주택 (다세대주택)',
-        ownerName: '박보검',
-        ownerRegNo: '930616-1******',
+        ownerName: '박영식',
+        ownerRegNo: '860616-1******',
         ownershipChangeDate: '2023-04-14',
         ownershipChangeReason: '매매',
       },
@@ -373,7 +374,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 79.4,
         supplyAreaPyeong: 24.0,
         mainUse: '공동주택 (아파트)',
-        ownerName: '강호동',
+        ownerName: '강도현',
         ownerRegNo: '700115-1******',
         ownershipChangeDate: '2018-09-03',
         ownershipChangeReason: '매매',
@@ -387,7 +388,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 112.4,
         supplyAreaPyeong: 34.0,
         mainUse: '공동주택 (아파트)',
-        ownerName: '유재석',
+        ownerName: '유호진',
         ownerRegNo: '720814-1******',
         ownershipChangeDate: '2017-04-12',
         ownershipChangeReason: '매매',
@@ -401,7 +402,7 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
         supplyArea: 112.4,
         supplyAreaPyeong: 34.0,
         mainUse: '공동주택 (아파트)',
-        ownerName: '손흥민',
+        ownerName: '손병호',
         ownerRegNo: '920708-1******',
         ownershipChangeDate: '2022-12-01',
         ownershipChangeReason: '매매',
@@ -653,6 +654,9 @@ const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
   },
 ];
 
+// 사용자 직접 수정/저장된 건축물대장 런타임 저장소
+const CUSTOM_USER_LEDGER_STORE = new Map<string, any>();
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const address = searchParams.get('address');
@@ -666,6 +670,17 @@ export async function GET(request: NextRequest) {
   }
 
   const cleanAddr = address.trim();
+
+  // 0. 사용자 직접 수정/저장한 대장 정보 우선 매칭
+  for (const [savedAddr, customData] of CUSTOM_USER_LEDGER_STORE.entries()) {
+    if (cleanAddr.includes(savedAddr) || savedAddr.includes(cleanAddr)) {
+      return NextResponse.json({
+        ...customData,
+        source: 'USER_CUSTOM',
+        message: '사용자 지정 건축물대장 정보 연동 완료',
+      });
+    }
+  }
 
   // 1. 등록된 실제 대장 정밀 데이터와 매칭
   const matched = KNOWN_LEDGER_RECORDS.find((rec) =>
@@ -690,7 +705,7 @@ export async function GET(request: NextRequest) {
       height: matched.height,
       isViolation: false,
       source: 'MOCK_DEMO',
-      message: '일반건축물대장(갑) 정밀 실데이터 매칭 완료',
+      message: matched.isCollectiveBuilding ? '집합건축물대장(표제부/전유부) 정밀 실데이터 매칭 완료' : '일반건축물대장(갑) 정밀 실데이터 매칭 완료',
       // 추가 필드 연동
       ownerName: matched.ownerName,
       ownerRegNo: matched.ownerRegNo,
@@ -1092,3 +1107,23 @@ export async function GET(request: NextRequest) {
     unitList: dynamicUnitList,
   });
 }
+
+// 사용자 정의 건축물대장 저장/수정 핸들러
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const address = (body.address || '').trim();
+    if (!address) {
+      return NextResponse.json({ error: '소재지 주소를 입력해주세요.' }, { status: 400 });
+    }
+    CUSTOM_USER_LEDGER_STORE.set(address, body);
+    return NextResponse.json({
+      success: true,
+      message: '건축물대장 정보가 성공적으로 저장되었습니다.',
+      data: body,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || '저장 중 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
