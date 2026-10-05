@@ -44,6 +44,22 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 주소가 비어있거나 달라질 때 이전 대장 정보 초기화
+  React.useEffect(() => {
+    if (!roadAddress && !jibunAddress) {
+      setFetchedData(null);
+      setErrorMsg(null);
+      setSelectedFloorName(null);
+      setIsEditingAddress(false);
+    } else if (fetchedData && fetchedData.address) {
+      const current = (roadAddress || jibunAddress).trim();
+      if (!current.includes(fetchedData.address) && !fetchedData.address.includes(current)) {
+        setFetchedData(null);
+        setSelectedFloorName(null);
+      }
+    }
+  }, [roadAddress, jibunAddress, fetchedData]);
+
   // Daum Postcode modal search
   const handleOpenPostcode = () => {
     openDaumPostcode((result) => {

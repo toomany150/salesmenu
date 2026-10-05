@@ -268,6 +268,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setCustomerName('');
         setCustomerPhone('');
         setCustomerCarrier('');
+        setLedgerData(null);
         setLandArea(undefined);
         setTotalFloorArea(undefined);
         setBuildingArea(undefined);
@@ -280,11 +281,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setFloorText(undefined);
         setApartmentData({
           complexName: '',
-          supplyArea: 112.4,
-          exclusiveArea: 84.9,
-          roomCount: 3,
-          bathroomCount: 2,
-          elevatorCount: 2,
           heatingType: '도시가스(개별난방)',
         });
         setHouseData({});
@@ -481,21 +477,21 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
     // Sub-data updates
     if (propertyType === 'APARTMENT') {
-      const complex = data.complexName || (roadAddress.includes('사상') ? '사상강변동원아파트' : '래미안 대치팰리스');
+      const complex = data.complexName || detailAddress || roadAddress || jibunAddress || '';
       setApartmentData((prev: any) => ({
         ...prev,
         complexName: complex || prev.complexName,
-        exclusiveArea: data.exclusiveArea || 84.9,
-        exclusiveAreaPyeong: data.exclusiveAreaPyeong || 25.68,
-        supplyArea: data.supplyArea || data.buildingArea || 112.4,
-        supplyAreaPyeong: data.supplyAreaPyeong || 34.0,
-        pyeongType: data.pyeongType || prev.pyeongType || '34평형 A타입',
-        roomCount: data.roomCount !== undefined ? data.roomCount : (prev.roomCount || 3),
-        bathroomCount: data.bathroomCount !== undefined ? data.bathroomCount : (prev.bathroomCount || 2),
-        elevatorCount: data.elevatorCount !== undefined ? data.elevatorCount : (prev.elevatorCount || 2),
-        parkingCount: data.parkingCount !== undefined ? data.parkingCount : (prev.parkingCount || 682),
-        parkingPerHousehold: data.parkingPerHousehold || prev.parkingPerHousehold || '1.1대',
-        maintenanceFee: data.maintenanceFee !== undefined ? data.maintenanceFee : (prev.maintenanceFee || 25),
+        exclusiveArea: data.exclusiveArea !== undefined ? data.exclusiveArea : prev.exclusiveArea,
+        exclusiveAreaPyeong: data.exclusiveAreaPyeong !== undefined ? data.exclusiveAreaPyeong : prev.exclusiveAreaPyeong,
+        supplyArea: (data.supplyArea || data.buildingArea) !== undefined ? (data.supplyArea || data.buildingArea) : prev.supplyArea,
+        supplyAreaPyeong: data.supplyAreaPyeong !== undefined ? data.supplyAreaPyeong : prev.supplyAreaPyeong,
+        pyeongType: data.pyeongType || prev.pyeongType,
+        roomCount: data.roomCount !== undefined ? data.roomCount : prev.roomCount,
+        bathroomCount: data.bathroomCount !== undefined ? data.bathroomCount : prev.bathroomCount,
+        elevatorCount: data.elevatorCount !== undefined ? data.elevatorCount : prev.elevatorCount,
+        parkingCount: data.parkingCount !== undefined ? data.parkingCount : prev.parkingCount,
+        parkingPerHousehold: data.parkingPerHousehold || prev.parkingPerHousehold,
+        maintenanceFee: data.maintenanceFee !== undefined ? data.maintenanceFee : prev.maintenanceFee,
         heatingType: data.heatingType || prev.heatingType || '도시가스(개별난방)',
         approvalDate: data.approvalDate || prev.approvalDate,
       }));
@@ -844,6 +840,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     setRoadAddress(road);
                     setJibunAddress(jibun);
                     setAddress(road || jibun);
+                    setLedgerData(null);
                   }}
                   onApplyData={handleApplyPublicData}
                   onSelectFloor={handleSelectFloorFromLedger}

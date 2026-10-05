@@ -48,7 +48,7 @@ interface KnownLedgerRecord {
 const KNOWN_LEDGER_RECORDS: KnownLedgerRecord[] = [
   {
     // 부산 사상구 사상로 300 / 덕포동 795 (사상강변동원아파트)
-    keywords: ['사상로 300', '덕포동 795', '사상강변동원', '동원아파트', '사상로300', '덕포동795', '사상로'],
+    keywords: ['사상로 300', '덕포동 795', '사상강변동원', '사상로300', '덕포동795'],
     complexName: '사상강변동원아파트',
     landArea: 25480.0,
     totalFloorArea: 95420.5,
@@ -340,82 +340,188 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 3. 일반 fallback 추정 로직 (대지면적, 연면적, 건축면적, 주용도, 지역, 주구조, 층수 모두 포함)
+  // 3. 주소 기반 고유 맞춤형 건축물대장 자동 생성 (주소에 따라 완전히 다른 실제적인 데이터 생성)
+  function hashString(str: string): number {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = ((h << 5) - h) + str.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h);
+  }
+
+  const hash = hashString(cleanAddr);
+
+  // 행정구역 및 도로명/동 추출
+  const addrParts = cleanAddr.split(/\s+/);
+  const dongPart = addrParts.find((p) => p.endsWith('동') || p.endsWith('읍') || p.endsWith('면') || p.endsWith('가') || p.endsWith('리')) 
+    || addrParts[1] 
+    || '중앙';
+
+  // 한국인 성/이름 풀 (주소별로 완전히 다른 소유자 생성)
+  const SURNAMES = ['김', '이', '박', '정', '최', '강', '조', '윤', '장', '한', '오', '서', '신', '권', '황', '안', '송', '전', '홍', '배', '백', '유', '고', '문'];
+  const GIVEN_NAMES = ['준호', '서연', '민재', '승우', '윤서', '경수', '태영', '지원', '동현', '영수', '진우', '현우', '하은', '도윤', '시우', '지훈', '성민', '예은', '민수', '수빈', '재원', '소율', '정우', '은우'];
+  const genSurname = SURNAMES[hash % SURNAMES.length];
+  const genGivenName = GIVEN_NAMES[(hash >> 3) % GIVEN_NAMES.length];
+  const generatedPersonName = `${genSurname}${genGivenName}`;
+
+  // 출생연도/주민번호 마스킹
+  const birthYear = 52 + (hash % 42); // 52~93년생
+  const birthMonth = String((hash % 12) + 1).padStart(2, '0');
+  const birthDay = String((hash % 28) + 1).padStart(2, '0');
+  const genderDigit = (hash % 2 === 0) ? '1' : '2';
+  const generatedRegNo = `${String(birthYear).padStart(2, '0')}${birthMonth}${birthDay}-${genderDigit}******`;
+
+  // 승인일자 및 변동일자 (주소별 고유 날짜)
+  const aprYear = 1998 + (hash % 26); // 1998~2023
+  const aprMonth = String(((hash >> 2) % 12) + 1).padStart(2, '0');
+  const aprDay = String(((hash >> 4) % 28) + 1).padStart(2, '0');
+  const generatedApprovalDate = `${aprYear}-${aprMonth}-${aprDay}`;
+
+  const chgYear = Math.min(2025, aprYear + ((hash >> 3) % 7) + 1);
+  const chgMonth = String(((hash >> 5) % 12) + 1).padStart(2, '0');
+  const chgDay = String(((hash >> 6) % 28) + 1).padStart(2, '0');
+  const generatedChangeDate = `${chgYear}-${chgMonth}-${chgDay}`;
+
+  const isApartmentType = propertyType === 'APARTMENT' || cleanAddr.includes('아파트') || cleanAddr.includes('단지');
+  const isStoreType = propertyType === 'STORE';
+  const isOfficeType = propertyType === 'OFFICE';
+  const isHouseType = propertyType === 'HOUSE';
+  const isFactoryType = propertyType === 'FACTORY_WAREHOUSE' || cleanAddr.includes('공단') || cleanAddr.includes('공장') || cleanAddr.includes('창고');
+  const isLandType = propertyType === 'LAND';
+
+  // 아파트 브랜드 풀
+  const APT_BRANDS = ['센트럴자이', '푸르지오', '더샵센트럴', '래미안', '힐스테이트', '롯데캐슬', '아이파크', 'e편한세상', 'SK뷰', '더퍼스트'];
+  // 아파트 평형 프리셋
+  const APT_PRESETS = [
+    { excl: 59.91, exclPy: 18.12, supp: 79.45, suppPy: 24.03, type: '24평형 (전용 59㎡)', rooms: 3, baths: 2, elevators: 2, fee: 18 },
+    { excl: 74.88, exclPy: 22.65, supp: 98.72, suppPy: 29.86, type: '30평형 (전용 74㎡)', rooms: 3, baths: 2, elevators: 2, fee: 22 },
+    { excl: 84.92, exclPy: 25.68, supp: 112.45, suppPy: 34.01, type: '34평형 A타입 (전용 84㎡)', rooms: 3, baths: 2, elevators: 2, fee: 25 },
+    { excl: 84.98, exclPy: 25.70, supp: 114.12, suppPy: 34.52, type: '34평형 B타입 (전용 84㎡)', rooms: 3, baths: 2, elevators: 2, fee: 25 },
+    { excl: 101.42, exclPy: 30.67, supp: 133.56, suppPy: 40.40, type: '40평형 (전용 101㎡)', rooms: 4, baths: 2, elevators: 2, fee: 29 },
+    { excl: 114.85, exclPy: 34.74, supp: 149.20, suppPy: 45.13, type: '45평형 (전용 114㎡)', rooms: 4, baths: 2, elevators: 3, fee: 33 },
+  ];
+
   let defaultUse = '다가구주택, 근린생활시설';
   let defaultZoning = '제2종일반주거지역';
   let defaultStructure = '철근콘크리트조, 벽돌조';
-  let defaultLandArea = 199.3;
-  let defaultTotalArea = 494.42;
-  let defaultBuildingArea = 116.56;
-  let defaultFloor = 3;
-  let defaultUnderFloor = 1;
-  let defaultApprovalDate = '1995-12-28';
-  let defaultOwner = '임정원';
-  let defaultRegNo = '590917-1******';
-  let defaultChangeDate = '2015-04-20';
-  let defaultParking = 3;
+  let defaultLandArea = 180 + (hash % 120) + (hash % 9) * 0.1;
+  let defaultFloor = 3 + (hash % 2);
+  let defaultUnderFloor = (hash % 2 === 0) ? 1 : 0;
+  let defaultBuildingArea = Math.round(defaultLandArea * (0.55 + (hash % 5) * 0.01) * 100) / 100;
+  let defaultTotalArea = Math.round(defaultBuildingArea * (defaultFloor + (defaultUnderFloor > 0 ? 0.6 : 0)) * 100) / 100;
+  let defaultOwner = generatedPersonName;
+  let defaultRegNo = generatedRegNo;
+  let defaultParking = 3 + (hash % 3);
+  let defaultParkingDetail = `총 ${defaultParking}대 (자주식 옥외 ${defaultParking}대)`;
+  let defaultParkingPerHousehold: string | undefined = undefined;
 
-  const isApartmentType = propertyType === 'APARTMENT' || cleanAddr.includes('아파트') || cleanAddr.includes('단지');
+  let aptComplexName: string | undefined = undefined;
+  let aptPreset = APT_PRESETS[(hash >> 2) % APT_PRESETS.length];
+
   if (isApartmentType) {
+    const rawComplexMatch = cleanAddr.match(/([가-힣A-Za-z0-9]+아파트|[가-힣A-Za-z0-9]+단지)/);
+    aptComplexName = rawComplexMatch ? rawComplexMatch[0] : `${dongPart} ${APT_BRANDS[hash % APT_BRANDS.length]}아파트`;
+    
+    const households = 320 + (hash % 16) * 35; // 320~845세대
+    const parkingRatio = 1.15 + (hash % 6) * 0.08;
+    defaultParking = Math.round(households * parkingRatio);
+    defaultParkingPerHousehold = `${parkingRatio.toFixed(2)}대`;
+    defaultParkingDetail = `총 ${defaultParking}대 (지하 자주식 ${Math.round(defaultParking * 0.85)}대, 지상 ${Math.round(defaultParking * 0.15)}대 / 세대당 ${defaultParkingPerHousehold})`;
+
     defaultUse = '공동주택 (아파트)';
     defaultZoning = '제3종일반주거지역';
     defaultStructure = '철근콘크리트구조';
-    defaultLandArea = 25480.0;
-    defaultTotalArea = 95420.5;
-    defaultBuildingArea = 112.4;
-    defaultFloor = 25;
-    defaultUnderFloor = 2;
-    defaultApprovalDate = '2004-06-18';
-    defaultOwner = '강변동원 입주자대표회의 / 구분소유자';
-    defaultRegNo = '214-80-*****';
-    defaultChangeDate = '2004-07-20';
-    defaultParking = 682;
-  } else if (cleanAddr.includes('공단') || cleanAddr.includes('공장') || cleanAddr.includes('창고')) {
-    defaultUse = '공장/창고시설';
+    defaultLandArea = Math.round(households * 36.5 * 10) / 10;
+    defaultTotalArea = Math.round(households * 118.0 * 10) / 10;
+    defaultBuildingArea = aptPreset.supp;
+    defaultFloor = 18 + (hash % 18); // 18~35층
+    defaultUnderFloor = 2 + (hash % 2); // 2~3층
+    defaultOwner = `${aptComplexName} 입주자대표회의 / 구분소유자`;
+    defaultRegNo = `${200 + (hash % 700)}-82-*****`;
+  } else if (isStoreType || isOfficeType || cleanAddr.includes('상가') || cleanAddr.includes('빌딩') || cleanAddr.includes('대로')) {
+    defaultFloor = 4 + (hash % 5); // 4~8층
+    defaultUnderFloor = 1 + (hash % 2); // 1~2층
+    defaultBuildingArea = 140 + (hash % 240) + (hash % 9) * 0.1;
+    defaultLandArea = Math.round(defaultBuildingArea * (1.45 + (hash % 5) * 0.08) * 100) / 100;
+    defaultTotalArea = Math.round(defaultBuildingArea * defaultFloor * 0.95 * 100) / 100;
+    defaultUse = isOfficeType ? '업무시설, 제1·2종근린생활시설' : '제1·2종근린생활시설, 일반음식점 및 소매점';
+    defaultZoning = (hash % 2 === 0) ? '일반상업지역' : '준주거지역';
+    defaultStructure = '철근콘크리트구조';
+    defaultParking = 6 + (hash % 14);
+    defaultParkingDetail = `총 ${defaultParking}대 (자주식 ${Math.max(2, defaultParking - 4)}대, 기계식 ${Math.min(defaultParking - 2, 8)}대)`;
+    
+    if (hash % 3 === 0) {
+      defaultOwner = `(주)${dongPart}자산관리`;
+      defaultRegNo = `110111-${100000 + (hash % 800000)}`;
+    } else {
+      defaultOwner = generatedPersonName;
+      defaultRegNo = generatedRegNo;
+    }
+  } else if (isFactoryType) {
+    defaultFloor = 1 + (hash % 2);
+    defaultUnderFloor = 0;
+    defaultLandArea = 1200 + (hash % 1800);
+    defaultBuildingArea = 600 + (hash % 900);
+    defaultTotalArea = defaultBuildingArea * defaultFloor;
+    defaultUse = '공장, 창고시설';
     defaultZoning = '일반공업지역';
     defaultStructure = '일반철골구조';
-    defaultLandArea = 1650.0;
-    defaultTotalArea = 820.0;
-    defaultBuildingArea = 540.0;
-    defaultFloor = 2;
+    defaultParking = 8 + (hash % 12);
+    defaultParkingDetail = `총 ${defaultParking}대 (자주식 옥외 ${defaultParking}대, 대형 트럭 접안 가능)`;
+    defaultOwner = `(주)${dongPart}산업`;
+    defaultRegNo = `120111-${100000 + (hash % 800000)}`;
+  } else if (isLandType) {
+    defaultFloor = 0;
     defaultUnderFloor = 0;
-    defaultOwner = '(주)한일산업';
-    defaultRegNo = '110111-3******';
-    defaultChangeDate = '2017-06-15';
-    defaultParking = 8;
-  } else if (cleanAddr.includes('상가') || cleanAddr.includes('빌딩') || cleanAddr.includes('대로')) {
-    defaultUse = '제1·2종근린생활시설, 업무시설';
-    defaultZoning = '일반상업지역';
-    defaultStructure = '철근콘크리트조';
-    defaultLandArea = 330.0;
-    defaultTotalArea = 780.0;
-    defaultBuildingArea = 198.0;
-    defaultFloor = 5;
-    defaultUnderFloor = 1;
-    defaultOwner = '(주)서초자산관리';
-    defaultRegNo = '110111-2******';
-    defaultChangeDate = '2019-01-10';
-    defaultParking = 12;
+    defaultLandArea = 250 + (hash % 650);
+    defaultBuildingArea = 0;
+    defaultTotalArea = 0;
+    defaultUse = '대지 (나대지)';
+    defaultZoning = (hash % 2 === 0) ? '제2종일반주거지역' : '자연녹지지역';
+    defaultStructure = '해당없음';
+    defaultParking = 0;
+    defaultParkingDetail = '해당없음';
+    defaultOwner = generatedPersonName;
+    defaultRegNo = generatedRegNo;
+  } else if (isHouseType) {
+    defaultFloor = 2 + (hash % 3); // 2~4층
+    defaultUnderFloor = (hash % 2 === 0) ? 1 : 0;
+    defaultLandArea = 130 + (hash % 140) + (hash % 9) * 0.1;
+    defaultBuildingArea = Math.round(defaultLandArea * (0.54 + (hash % 5) * 0.01) * 100) / 100;
+    defaultTotalArea = Math.round(defaultBuildingArea * (defaultFloor + (defaultUnderFloor > 0 ? 0.6 : 0)) * 100) / 100;
+    defaultUse = (hash % 2 === 0) ? '단독주택 (다가구주택)' : '단독주택, 제1종근린생활시설';
+    defaultZoning = '제2종일반주거지역';
+    defaultStructure = '철근콘크리트조 및 벽돌조';
+    defaultParking = 2 + (hash % 3);
+    defaultParkingDetail = `총 ${defaultParking}대 (자주식 옥외 ${defaultParking}대)`;
+    defaultOwner = generatedPersonName;
+    defaultRegNo = generatedRegNo;
   }
 
-  // Fallback 층별 현황 생성
-  const fallbackFloors: PublicBuildingFloorInfo[] = [];
+  // 층별 현황 생성
+  const dynamicFloorList: PublicBuildingFloorInfo[] = [];
   if (defaultUnderFloor > 0) {
     for (let u = defaultUnderFloor; u >= 1; u--) {
-      fallbackFloors.push({
+      dynamicFloorList.push({
         floor: `지하 ${u}층`,
-        area: Math.round((defaultBuildingArea * 0.35) * 100) / 100,
+        area: Math.round((defaultBuildingArea * 0.85) * 100) / 100,
         mainUse: isApartmentType ? '주차장 / 기계실' : '제2종근린생활시설',
-        etcUse: isApartmentType ? '부대복리시설' : '대피소 및 창고',
+        etcUse: isApartmentType ? '부대복리시설' : '대피소 및 주차장',
       });
     }
   }
   for (let g = 1; g <= defaultFloor; g++) {
-    fallbackFloors.push({
+    const isFirstFloor = g === 1;
+    dynamicFloorList.push({
       floor: `지상 ${g}층`,
       area: defaultBuildingArea,
-      mainUse: isApartmentType ? '공동주택 (아파트)' : (g === 1 ? '제1·2종근린생활시설' : (defaultUse.includes('다가구') ? '단독주택 (다가구주택)' : defaultUse)),
-      etcUse: isApartmentType ? '전용면적 84.9㎡ / 공급 112.4㎡' : (g === 1 ? '소매점, 일반음식점' : (defaultUse.includes('다가구') ? '다가구주택 (2가구)' : '사무실/점포')),
+      mainUse: isApartmentType 
+        ? '공동주택 (아파트)' 
+        : (isFirstFloor ? '제1·2종근린생활시설' : defaultUse),
+      etcUse: isApartmentType 
+        ? `전용면적 ${aptPreset.excl}㎡ / 공급 ${aptPreset.supp}㎡` 
+        : (isFirstFloor ? '소매점, 일반음식점' : (defaultUse.includes('다가구') ? '다가구주택 (2가구)' : '사무실/점포')),
     });
   }
 
@@ -429,31 +535,31 @@ export async function GET(request: NextRequest) {
     structureName: defaultStructure,
     floorCount: defaultFloor,
     underFloorCount: defaultUnderFloor,
-    floorText: `지하: ${defaultUnderFloor}층, 지상: ${defaultFloor}층`,
-    buildingCoverageRatio: Math.round((defaultBuildingArea / defaultLandArea) * 10000) / 100,
-    floorAreaRatio: Math.round((defaultTotalArea / defaultLandArea) * 10000) / 100,
-    approvalDate: defaultApprovalDate,
+    floorText: defaultFloor === 0 ? '지상: 0층 (나대지)' : `지하: ${defaultUnderFloor}층, 지상: ${defaultFloor}층`,
+    buildingCoverageRatio: defaultLandArea > 0 ? Math.round((defaultBuildingArea / defaultLandArea) * 10000) / 100 : 0,
+    floorAreaRatio: defaultLandArea > 0 ? Math.round((defaultTotalArea / defaultLandArea) * 10000) / 100 : 0,
+    approvalDate: generatedApprovalDate,
     isViolation: false,
     source: 'MOCK_DEMO',
     ownerName: defaultOwner,
     ownerRegNo: defaultRegNo,
-    ownershipChangeDate: defaultChangeDate,
+    ownershipChangeDate: generatedChangeDate,
     ownershipChangeReason: '매매 (소유권이전)',
     parkingCount: defaultParking,
-    parkingDetail: isApartmentType ? `총 ${defaultParking}대 (세대당 1.1대)` : `총 ${defaultParking}대 (자주식 옥외 ${defaultParking}대)`,
-    parkingPerHousehold: isApartmentType ? '1.1대' : undefined,
-    // 아파트 단지 스펙 (웹 크롤링/단지 DB 연계)
-    complexName: isApartmentType ? (cleanAddr.includes('사상') ? '사상강변동원아파트' : '래미안 대치팰리스') : undefined,
-    supplyArea: isApartmentType ? 112.4 : undefined,
-    supplyAreaPyeong: isApartmentType ? 34.0 : undefined,
-    exclusiveArea: isApartmentType ? 84.9 : undefined,
-    exclusiveAreaPyeong: isApartmentType ? 25.68 : undefined,
-    pyeongType: isApartmentType ? '34평형 A타입' : undefined,
-    roomCount: isApartmentType ? 3 : undefined,
-    bathroomCount: isApartmentType ? 2 : undefined,
-    elevatorCount: isApartmentType ? 2 : undefined,
-    maintenanceFee: isApartmentType ? 25 : undefined,
+    parkingDetail: defaultParkingDetail,
+    parkingPerHousehold: defaultParkingPerHousehold,
+    // 아파트 단지 스펙
+    complexName: isApartmentType ? aptComplexName : undefined,
+    supplyArea: isApartmentType ? aptPreset.supp : undefined,
+    supplyAreaPyeong: isApartmentType ? aptPreset.suppPy : undefined,
+    exclusiveArea: isApartmentType ? aptPreset.excl : undefined,
+    exclusiveAreaPyeong: isApartmentType ? aptPreset.exclPy : undefined,
+    pyeongType: isApartmentType ? aptPreset.type : undefined,
+    roomCount: isApartmentType ? aptPreset.rooms : undefined,
+    bathroomCount: isApartmentType ? aptPreset.baths : undefined,
+    elevatorCount: isApartmentType ? aptPreset.elevators : undefined,
+    maintenanceFee: isApartmentType ? aptPreset.fee : undefined,
     heatingType: isApartmentType ? '도시가스(개별난방)' : undefined,
-    floorList: fallbackFloors,
+    floorList: dynamicFloorList,
   });
 }
