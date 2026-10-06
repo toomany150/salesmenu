@@ -136,6 +136,40 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   // 집합건물 전유부(동/호수) 선택 상태
   const [recvSelectedDong, setRecvSelectedDong] = useState<string>('ALL');
   const [recvSelectedUnitKey, setRecvSelectedUnitKey] = useState<string | null>(null);
+  // 물건 주소 접힘/펼침 상태 (주소 입력 후 확정 주소 카드로 전환)
+  const [isEditingRecvAddress, setIsEditingRecvAddress] = useState(false);
+  // 도로명 / 지번 개별 복사 피드백 상태
+  const [copiedRecvType, setCopiedRecvType] = useState<'road' | 'jibun' | null>(null);
+
+  const handleCopyRecvAddress = (text: string, type: 'road' | 'jibun') => {
+    if (!text) return;
+    const clean = text.trim();
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(clean).then(() => {
+        setCopiedRecvType(type);
+        setTimeout(() => setCopiedRecvType(null), 2000);
+      }).catch(() => fallbackCopyRecv(clean, type));
+    } else {
+      fallbackCopyRecv(clean, type);
+    }
+  };
+
+  const fallbackCopyRecv = (text: string, type: 'road' | 'jibun') => {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedRecvType(type);
+      setTimeout(() => setCopiedRecvType(null), 2000);
+    } catch {
+      alert('주소 복사에 실패했습니다.');
+    }
+  };
 
   const debounceAddressRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -190,6 +224,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     openDaumPostcode((result) => {
       setRecvRoadAddress(result.roadAddress);
       setRecvJibunAddress(result.jibunAddress);
+      setIsEditingRecvAddress(false);
       setRecvLedgerData(null);
       setRecvSelectedUnitKey(null);
       setLedgerError(null);
@@ -1918,75 +1953,233 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 3-2. 물건 주소 (도로명 / 지번 양방향 자동완성 및 우편번호 검색) */}
-                  {/* 3-2. 물건 주소 (도로명 / 지번 양방향 자동완성 및 우편번호 검색 / 대장정보 불러오기) */}
+                  {/* 3-2. 물건 주소 및 공공 건축물대장 연동 (확정 주소란 도로명 / 지번 분리 및 복사) */}
                   <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2.5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                        <span>물건 주소 및 공공 건축물대장 연동</span>
-                      </label>
-                      <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                        <button
-                          type="button"
-                          onClick={handleOpenRecvPostcode}
-                          className="px-2.5 py-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300 transition-colors shadow-2xs cursor-pointer"
-                        >
-                          우편번호/주소 검색
-                        </button>
-                        <button
-                          type="button"
-                          onClick={fetchCustomerRecvLedger}
-                          disabled={loadingLedger || (!recvRoadAddress && !recvJibunAddress)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        >
-                          {loadingLedger ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              <span>대장 조회중...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3 h-3 text-yellow-300" />
-                              <span>대장정보 불러오기</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                    {(recvRoadAddress || recvJibunAddress) && !isEditingRecvAddress ? (
+                      <div className="space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-600 text-white rounded-md flex items-center gap-1 shadow-2xs shrink-0">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                              확정 주소
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              도로명 및 지번 주소 분리 / 원클릭 복사
+                            </span>
+                          </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      <div>
-                        <span className="text-[11px] font-bold text-slate-600 block mb-1">도로명 주소</span>
-                        <input
-                          type="text"
-                          value={recvRoadAddress}
-                          onChange={(e) => handleRecvRoadAddressChange(e.target.value)}
-                          placeholder="도로명 주소 입력 시 지번 자동 변환"
-                          className="w-full text-xs px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[11px] font-bold text-slate-600 block mb-1">지번 주소</span>
-                        <input
-                          type="text"
-                          value={recvJibunAddress}
-                          onChange={(e) => handleRecvJibunAddressChange(e.target.value)}
-                          placeholder="지번 주소 입력 시 도로명 자동 변환"
-                          className="w-full text-xs px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg"
-                        />
-                      </div>
-                    </div>
+                          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingRecvAddress(true)}
+                              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition-colors cursor-pointer"
+                            >
+                              주소 변경 / 재입력 ✏️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={fetchCustomerRecvLedger}
+                              disabled={loadingLedger || (!recvRoadAddress && !recvJibunAddress)}
+                              className="inline-flex items-center gap-1 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 rounded-lg shadow-2xs transition-all cursor-pointer"
+                            >
+                              {loadingLedger ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>대장 조회중...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-3 h-3 text-yellow-300" />
+                                  <span>대장정보 불러오기</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
 
-                    <div>
-                      <input
-                        type="text"
-                        value={recvDetailAddress}
-                        onChange={(e) => setRecvDetailAddress(e.target.value)}
-                        placeholder="상세 주소 (동, 층, 호수 등)"
-                        className="w-full text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
-                      />
-                    </div>
+                        {/* 도로명 주소 & 지번 주소 분리 표시 및 개별 복사 버튼 */}
+                        <div className="grid grid-cols-1 gap-2">
+                          {/* 1. 도로명 주소 */}
+                          <div className="flex items-center justify-between gap-2 p-2.5 bg-slate-50/90 hover:bg-blue-50/40 rounded-lg border border-slate-200/90 transition-colors">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className="px-2 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded shrink-0">
+                                도로명 주소
+                              </span>
+                              <span className="text-xs font-extrabold text-slate-900 break-all select-all">
+                                {recvRoadAddress || '(도로명 주소 미입력)'}
+                              </span>
+                            </div>
+                            {recvRoadAddress && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyRecvAddress(recvRoadAddress, 'road')}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 bg-white hover:bg-blue-50 active:scale-95 border border-blue-300 rounded-md transition-all shadow-2xs shrink-0 cursor-pointer"
+                                title="도로명 주소 클립보드 복사"
+                              >
+                                {copiedRecvType === 'road' ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                    <span className="text-emerald-700 font-extrabold">복사 완료!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3 text-blue-600" />
+                                    <span>도로명 복사</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* 2. 지번 주소 */}
+                          <div className="flex items-center justify-between gap-2 p-2.5 bg-slate-50/90 hover:bg-amber-50/40 rounded-lg border border-slate-200/90 transition-colors">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className="px-2 py-0.5 text-[10px] font-extrabold bg-amber-100 text-amber-800 rounded shrink-0">
+                                지번 주소
+                              </span>
+                              <span className="text-xs font-bold text-slate-800 break-all select-all">
+                                {recvJibunAddress || '(지번 주소 미입력)'}
+                              </span>
+                            </div>
+                            {recvJibunAddress && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyRecvAddress(recvJibunAddress, 'jibun')}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-amber-800 bg-white hover:bg-amber-50 active:scale-95 border border-amber-300 rounded-md transition-all shadow-2xs shrink-0 cursor-pointer"
+                                title="지번 주소 클립보드 복사"
+                              >
+                                {copiedRecvType === 'jibun' ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                    <span className="text-emerald-700 font-extrabold">복사 완료!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3 text-amber-700" />
+                                    <span>지번 복사</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 상세 주소 입력 / 확인 */}
+                        <div>
+                          <input
+                            type="text"
+                            value={recvDetailAddress}
+                            onChange={(e) => setRecvDetailAddress(e.target.value)}
+                            placeholder="상세 주소 (동, 층, 호수 등)"
+                            className="w-full text-xs px-3 py-1.5 bg-slate-50/50 focus:bg-white border border-slate-200 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            <span>물건 주소 및 공공 건축물대장 연동</span>
+                          </label>
+                          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                            {(recvRoadAddress || recvJibunAddress) && (
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingRecvAddress(false)}
+                                className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+                              >
+                                확정 주소로 접기 ✓
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={handleOpenRecvPostcode}
+                              className="px-2.5 py-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+                            >
+                              우편번호/주소 검색
+                            </button>
+                            <button
+                              type="button"
+                              onClick={fetchCustomerRecvLedger}
+                              disabled={loadingLedger || (!recvRoadAddress && !recvJibunAddress)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-all shadow-2xs active:scale-95 cursor-pointer"
+                            >
+                              {loadingLedger ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>대장 조회중...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-3 h-3 text-yellow-300" />
+                                  <span>대장정보 불러오기</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] font-bold text-slate-600">도로명 주소</span>
+                              {recvRoadAddress && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyRecvAddress(recvRoadAddress, 'road')}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded cursor-pointer"
+                                  title="도로명 주소 복사"
+                                >
+                                  <Copy className="w-2.5 h-2.5" />
+                                  <span>도로명 복사</span>
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              value={recvRoadAddress}
+                              onChange={(e) => handleRecvRoadAddressChange(e.target.value)}
+                              placeholder="도로명 주소 입력 시 지번 자동 변환"
+                              className="w-full text-xs px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] font-bold text-slate-600">지번 주소</span>
+                              {recvJibunAddress && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyRecvAddress(recvJibunAddress, 'jibun')}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded cursor-pointer"
+                                  title="지번 주소 복사"
+                                >
+                                  <Copy className="w-2.5 h-2.5" />
+                                  <span>지번 복사</span>
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              value={recvJibunAddress}
+                              onChange={(e) => handleRecvJibunAddressChange(e.target.value)}
+                              placeholder="지번 주소 입력 시 도로명 자동 변환"
+                              className="w-full text-xs px-3 py-2 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <input
+                            type="text"
+                            value={recvDetailAddress}
+                            onChange={(e) => setRecvDetailAddress(e.target.value)}
+                            placeholder="상세 주소 (동, 층, 호수 등)"
+                            className="w-full text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
+                          />
+                        </div>
+                      </>
+                    )}
 
                     {/* 에러 메시지 표시 */}
                     {ledgerError && (

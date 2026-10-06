@@ -52,6 +52,37 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   const { currentUser } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedDemandId, setCopiedDemandId] = useState<string | null>(null);
+  const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
+
+  const handleCopyText = (text: string, key: string) => {
+    if (!text) return;
+    const clean = text.trim();
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(clean).then(() => {
+        setCopiedAddressKey(key);
+        setTimeout(() => setCopiedAddressKey(null), 2000);
+      }).catch(() => fallbackCopyKey(clean, key));
+    } else {
+      fallbackCopyKey(clean, key);
+    }
+  };
+
+  const fallbackCopyKey = (text: string, key: string) => {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedAddressKey(key);
+      setTimeout(() => setCopiedAddressKey(null), 2000);
+    } catch {
+      alert('주소 복사에 실패했습니다.');
+    }
+  };
 
   if (!isOpen || !customer) return null;
 
@@ -386,6 +417,87 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                 </div>
               )}
 
+              {/* [물건 접수] 확정 주소 (도로명 / 지번 분리 및 복사 버튼) */}
+              {(customer.receivedDetail?.roadAddress || customer.receivedDetail?.jibunAddress) && (
+                <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-600 text-white rounded-md flex items-center gap-1 shadow-2xs shrink-0">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                      확정 주소
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      접수 의뢰 물건 소재지 (도로명 및 지번 분리)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5 text-xs">
+                    {customer.receivedDetail.roadAddress && (
+                      <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded shrink-0">도로명</span>
+                          <span className="font-bold text-slate-900 break-all select-all">
+                            {customer.receivedDetail.roadAddress}
+                            {customer.receivedDetail.detailAddress ? ` (${customer.receivedDetail.detailAddress})` : ''}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyText(customer.receivedDetail?.roadAddress || '', 'recv_road');
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-700 bg-white hover:bg-blue-50 active:scale-95 border border-blue-300 rounded-md transition-all shadow-2xs shrink-0 cursor-pointer"
+                          title="도로명 주소 복사"
+                        >
+                          {copiedAddressKey === 'recv_road' ? (
+                            <>
+                              <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                              <span className="text-emerald-700 font-bold">복사 완료!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-2.5 h-2.5 text-blue-600" />
+                              <span>도로명 복사</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                    {customer.receivedDetail.jibunAddress && (
+                      <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-amber-100 text-amber-800 rounded shrink-0">지번</span>
+                          <span className="font-semibold text-slate-800 break-all select-all">
+                            {customer.receivedDetail.jibunAddress}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyText(customer.receivedDetail?.jibunAddress || '', 'recv_jibun');
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-amber-800 bg-white hover:bg-amber-50 active:scale-95 border border-amber-300 rounded-md transition-all shadow-2xs shrink-0 cursor-pointer"
+                          title="지번 주소 복사"
+                        >
+                          {copiedAddressKey === 'recv_jibun' ? (
+                            <>
+                              <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                              <span className="text-emerald-700 font-bold">복사 완료!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-2.5 h-2.5 text-amber-700" />
+                              <span>지번 복사</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <Building className="w-4 h-4 text-blue-600" />
@@ -400,7 +512,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                       className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/20 transition-all flex items-center justify-between cursor-pointer"
                       onClick={() => onSelectProperty && onSelectProperty(prop)}
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-100 text-blue-800">
                             {PROPERTY_TYPE_LABELS[prop.propertyType]}
@@ -412,9 +524,66 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                             ({prop.transactionType})
                           </span>
                         </div>
-                        <p className="text-xs font-bold text-slate-900">
-                          {prop.address} {prop.detailAddress || ''}
-                        </p>
+
+                        {/* 도로명 & 지번 분리 표시 및 복사 버튼 */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded shrink-0">도로명</span>
+                            <span className="text-xs font-bold text-slate-900 break-all">
+                              {prop.roadAddress || prop.address} {prop.detailAddress || ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyText(prop.roadAddress || prop.address, `prop_road_${prop.id}`);
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 rounded shadow-2xs cursor-pointer ml-1"
+                              title="도로명 복사"
+                            >
+                              {copiedAddressKey === `prop_road_${prop.id}` ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                  <span className="text-emerald-700">복사됨</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-blue-600" />
+                                  <span>도로명 복사</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          {prop.jibunAddress && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded shrink-0">지번</span>
+                              <span className="text-xs font-medium text-slate-700 break-all">
+                                {prop.jibunAddress}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyText(prop.jibunAddress || '', `prop_jibun_${prop.id}`);
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 bg-white hover:bg-amber-50 border border-amber-200 rounded shadow-2xs cursor-pointer ml-1"
+                                title="지번 복사"
+                              >
+                                {copiedAddressKey === `prop_jibun_${prop.id}` ? (
+                                  <>
+                                    <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                    <span className="text-emerald-700">복사됨</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-2.5 h-2.5 text-amber-700" />
+                                    <span>지번 복사</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="text-right">

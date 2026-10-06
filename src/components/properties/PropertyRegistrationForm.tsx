@@ -9,6 +9,7 @@ import {
   UserPlus, 
   Users, 
   Check, 
+  Copy,
   Edit3,
   Building,
   Sparkles
@@ -81,6 +82,37 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [images, setImages] = useState<string[]>([]);
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
+  const [copiedAddressType, setCopiedAddressType] = useState<'road' | 'jibun' | null>(null);
+
+  const handleCopySummaryAddress = (text: string, type: 'road' | 'jibun') => {
+    if (!text) return;
+    const clean = text.trim();
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(clean).then(() => {
+        setCopiedAddressType(type);
+        setTimeout(() => setCopiedAddressType(null), 2000);
+      }).catch(() => fallbackCopySummary(clean, type));
+    } else {
+      fallbackCopySummary(clean, type);
+    }
+  };
+
+  const fallbackCopySummary = (text: string, type: 'road' | 'jibun') => {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedAddressType(type);
+      setTimeout(() => setCopiedAddressType(null), 2000);
+    } catch {
+      alert('주소 복사에 실패했습니다.');
+    }
+  };
 
   // Direction & Criteria States (요청 1)
   const [direction, setDirection] = useState<string>('남향');
@@ -1050,14 +1082,58 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       <label className="block text-xs font-semibold text-slate-700">
                         선택된 주소 요약
                       </label>
-                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-800 rounded shrink-0">주소1 도로명</span>
-                          <span className="font-semibold text-slate-900 truncate">{roadAddress || '(위의 대장 연동란에서 입력/검색)'}</span>
+                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-800 rounded shrink-0">주소1 도로명</span>
+                            <span className="font-semibold text-slate-900 truncate">{roadAddress || '(위의 대장 연동란에서 입력/검색)'}</span>
+                          </div>
+                          {roadAddress && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopySummaryAddress(roadAddress, 'road')}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-blue-700 bg-white hover:bg-blue-50 active:scale-95 border border-blue-300 rounded shadow-2xs shrink-0 cursor-pointer"
+                              title="도로명 주소 복사"
+                            >
+                              {copiedAddressType === 'road' ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                  <span className="text-emerald-700">복사 완료</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-blue-600" />
+                                  <span>도로명 복사</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded shrink-0">주소2 지번</span>
-                          <span className="text-slate-700 truncate">{jibunAddress || '-'}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded shrink-0">주소2 지번</span>
+                            <span className="text-slate-700 truncate">{jibunAddress || '-'}</span>
+                          </div>
+                          {jibunAddress && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopySummaryAddress(jibunAddress, 'jibun')}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-amber-800 bg-white hover:bg-amber-50 active:scale-95 border border-amber-300 rounded shadow-2xs shrink-0 cursor-pointer"
+                              title="지번 주소 복사"
+                            >
+                              {copiedAddressType === 'jibun' ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                                  <span className="text-emerald-700">복사 완료</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 text-amber-700" />
+                                  <span>지번 복사</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -23,7 +23,8 @@ import {
   Lock,
   Trash2,
   Building2,
-  Copy
+  Copy,
+  Check
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -53,6 +54,37 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [isPhotoLightboxOpen, setIsPhotoLightboxOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [copiedAddressType, setCopiedAddressType] = useState<'road' | 'jibun' | null>(null);
+
+  const handleCopyPropertyAddress = (text: string, type: 'road' | 'jibun') => {
+    if (!text) return;
+    const clean = text.trim();
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(clean).then(() => {
+        setCopiedAddressType(type);
+        setTimeout(() => setCopiedAddressType(null), 2000);
+      }).catch(() => fallbackCopy(clean, type));
+    } else {
+      fallbackCopy(clean, type);
+    }
+  };
+
+  const fallbackCopy = (text: string, type: 'road' | 'jibun') => {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedAddressType(type);
+      setTimeout(() => setCopiedAddressType(null), 2000);
+    } catch {
+      alert('주소 복사에 실패했습니다.');
+    }
+  };
 
   if (!isOpen || !property) return null;
 
@@ -237,42 +269,89 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           {/* Main Title & Price Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-blue-50/70 via-sky-50/40 to-slate-50 border border-blue-200/70">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2 text-slate-500 text-xs mb-1.5 break-keep">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="font-semibold text-slate-800 break-keep">
-                      {property.roadAddress ? `[도로명] ${property.roadAddress}` : property.address}
-                    </span>
-                    {property.detailAddress && (
-                      <span className="text-slate-600">{property.detailAddress}</span>
+              <div className="space-y-1.5 text-slate-500 text-xs mb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* 도로명 주소 & 도로명 복사 */}
+                    <div className="flex items-center gap-1.5 bg-blue-50/80 px-2 py-1 rounded-lg border border-blue-200">
+                      <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-1 rounded">도로명</span>
+                      <span className="font-bold text-slate-900 break-keep">
+                        {property.roadAddress || property.address}
+                      </span>
+                      {property.detailAddress && (
+                        <span className="text-slate-600 font-medium">({property.detailAddress})</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPropertyAddress(property.roadAddress || property.address, 'road')}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 bg-white hover:bg-blue-100 active:scale-95 border border-blue-300 rounded shadow-2xs cursor-pointer ml-1"
+                        title="도로명 주소 복사"
+                      >
+                        {copiedAddressType === 'road' ? (
+                          <>
+                            <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                            <span className="text-emerald-700 font-extrabold">복사 완료</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-2.5 h-2.5 text-blue-600" />
+                            <span>도로명 복사</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* 지번 주소 & 지번 복사 */}
+                    {property.jibunAddress && (
+                      <div className="flex items-center gap-1.5 bg-amber-50/80 px-2 py-1 rounded-lg border border-amber-200">
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1 rounded">지번</span>
+                        <span className="font-semibold text-slate-800 break-keep">
+                          {property.jibunAddress}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPropertyAddress(property.jibunAddress || '', 'jibun')}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 bg-white hover:bg-amber-100 active:scale-95 border border-amber-300 rounded shadow-2xs cursor-pointer ml-1"
+                          title="지번 주소 복사"
+                        >
+                          {copiedAddressType === 'jibun' ? (
+                            <>
+                              <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                              <span className="text-emerald-700 font-extrabold">복사 완료</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-2.5 h-2.5 text-amber-700" />
+                              <span>지번 복사</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
-                  {property.jibunAddress && (
-                    <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 whitespace-nowrap">
-                      지번: {property.jibunAddress}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 ml-0 sm:ml-2">
-                  <a
-                    href={getKakaoMapUrl(property.address, property.latitude, property.longitude)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#FEE500] text-[#191919] hover:bg-[#FADA0A] transition-colors shadow-2xs whitespace-nowrap"
-                  >
-                    <span>🟡 카카오지도</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                  <a
-                    href={getNaverMapUrl(property.address)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#03C75A] text-white hover:bg-[#02b350] transition-colors shadow-2xs whitespace-nowrap"
-                  >
-                    <span>🟢 네이버지도</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
+
+                  {/* 지도 바로가기 버튼 */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <a
+                      href={getKakaoMapUrl(property.address, property.latitude, property.longitude)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-[#FEE500] text-[#191919] hover:bg-[#FADA0A] transition-colors shadow-2xs whitespace-nowrap"
+                    >
+                      <span>🟡 카카오지도</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                    <a
+                      href={getNaverMapUrl(property.address)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-[#03C75A] text-white hover:bg-[#02b350] transition-colors shadow-2xs whitespace-nowrap"
+                    >
+                      <span>🟢 네이버지도</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
                 </div>
               </div>
               <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight break-keep">
