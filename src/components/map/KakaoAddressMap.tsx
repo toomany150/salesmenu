@@ -380,7 +380,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
     }
   }, [mapEngine, kakaoLoaded]);
 
-  // 5. Update Kakao Map Center when Coords Change (유지 축척: level 4)
+  // 5. Update Kakao Map Center when Coords or Title Change (유지 축척: level 4)
   useEffect(() => {
     if (mapEngine === 'KAKAO' && kakaoMapRef.current && window.kakao?.maps) {
       const map = kakaoMapRef.current;
@@ -395,9 +395,29 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
       }
       if (kakaoOverlayRef.current) {
         kakaoOverlayRef.current.setPosition(movePos);
+        const overlayDiv = document.createElement('div');
+        overlayDiv.style.cssText = 'position: relative; bottom: 48px; cursor: pointer; user-select: none;';
+        overlayDiv.innerHTML = `
+          <div style="background: #ffffff; border: 2px solid #258FFF; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.22); padding: 7px 12px; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif; text-align: center; min-width: 160px; max-width: 280px;">
+            <div style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; background: #EEF6FF; border-radius: 6px; margin-bottom: 3px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #258FFF; display: inline-block;"></span>
+              <span style="font-size: 11px; font-weight: 800; color: #258FFF;">매물 위치</span>
+            </div>
+            <div style="font-size: 12px; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${fullDisplayTitle}
+            </div>
+            <div style="position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 8px solid #258FFF;"></div>
+            <div style="position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #ffffff;"></div>
+          </div>
+        `;
+        overlayDiv.onclick = () => {
+          setShowSpeechBubble((prev) => !prev);
+          map.panTo(movePos);
+        };
+        kakaoOverlayRef.current.setContent(overlayDiv);
       }
     }
-  }, [currentCoords, mapEngine, address]);
+  }, [currentCoords, fullDisplayTitle, mapEngine, address]);
 
   // 6. Relayout map when sidebar is toggled
   useEffect(() => {
@@ -542,6 +562,17 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
       }
     };
   }, [mapEngine]);
+
+  // 10. Update Leaflet Map and Marker when Coords or Title Change
+  useEffect(() => {
+    if (mapEngine === 'LEAFLET' && leafletMapRef.current) {
+      leafletMapRef.current.setView([currentCoords.lat, currentCoords.lng], 17);
+      if (leafletMarkerRef.current) {
+        leafletMarkerRef.current.setLatLng([currentCoords.lat, currentCoords.lng]);
+        leafletMarkerRef.current.setTooltipContent(`📍 매물 위치: ${fullDisplayTitle}`);
+      }
+    }
+  }, [currentCoords, fullDisplayTitle, mapEngine]);
 
   const handleZoomIn = () => {
     if (mapEngine === 'KAKAO' && kakaoMapRef.current) {
