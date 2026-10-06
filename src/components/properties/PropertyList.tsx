@@ -58,19 +58,13 @@ export const PropertyList: React.FC<PropertyListProps> = ({
 
   const getPriceDisplay = (p: PropertyItem) => {
     if (p.transactionType === '매매') {
-      const base = p.price ? `${p.price.toLocaleString()} 만원` : '협의';
-      return p.negotiablePrice ? `${base} (조정: ${p.negotiablePrice.toLocaleString()}만)` : base;
+      return p.price ? `${p.price.toLocaleString()} 만원` : '협의';
     } else if (p.transactionType === '전세') {
-      const base = p.deposit ? `${p.deposit.toLocaleString()} 만원` : '협의';
-      return p.negotiableDeposit ? `${base} (조정: ${p.negotiableDeposit.toLocaleString()}만)` : base;
+      return p.deposit ? `${p.deposit.toLocaleString()} 만원` : '협의';
     } else {
       const isVat = p.monthlyRentVat || p.storeDetail?.monthlyRentVat || p.officeDetail?.monthlyRentVat;
       const vatText = isVat ? ' (부가세 별도)' : '';
-      const base = `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
-      if (p.negotiableDeposit || p.negotiableMonthlyRent) {
-        return `${base} (조정: ${p.negotiableDeposit || 0}만/${p.negotiableMonthlyRent || 0}만)`;
-      }
-      return base;
+      return `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
     }
   };
 
@@ -354,7 +348,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                   shareViaKakao({
                     id: property.id,
                     title: `${PROPERTY_TYPE_LABELS[property.propertyType]} (${property.transactionType})`,
-                    description: property.consultationNotes || property.address,
+                    description: `${property.address} ${property.detailAddress || ''}`,
                     priceText: `${property.transactionType} ${getPriceDisplay(property)}`,
                     address: property.address,
                     propertyNumber: property.propertyNumber,

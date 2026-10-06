@@ -110,17 +110,6 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     priceText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
   }
 
-  let negotiablePriceText = '';
-  if (property.transactionType === '매매') {
-    negotiablePriceText = property.negotiablePrice ? `${property.negotiablePrice.toLocaleString()} 만원` : '';
-  } else if (property.transactionType === '전세') {
-    negotiablePriceText = property.negotiableDeposit ? `${property.negotiableDeposit.toLocaleString()} 만원` : '';
-  } else {
-    if (property.negotiableDeposit || property.negotiableMonthlyRent) {
-      negotiablePriceText = `보증금 ${property.negotiableDeposit ? property.negotiableDeposit.toLocaleString() + '만' : '협의'} / 월세 ${property.negotiableMonthlyRent ? property.negotiableMonthlyRent.toLocaleString() + '만' : '협의'}`;
-    }
-  }
-
   const smsLink = generateSmsLink({
     propertyNumber: property.propertyNumber,
     propertyType: PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType,
@@ -130,14 +119,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     monthlyRent: property.monthlyRent,
     address: property.address,
     detailAddress: property.detailAddress,
-    consultationNotes: property.consultationNotes,
   });
 
   const handleKakaoShare = async () => {
     await shareViaKakao({
       id: property.id,
       title: `${PROPERTY_TYPE_LABELS[property.propertyType]} (${property.transactionType})`,
-      description: property.consultationNotes || `${property.address} ${property.detailAddress || ''}`,
+      description: `${property.address} ${property.detailAddress || ''}`,
       priceText: `${property.transactionType} ${priceText}`,
       address: `${property.address} ${property.detailAddress || ''}`,
       propertyNumber: property.propertyNumber,
@@ -304,11 +292,6 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <div className="text-xl sm:text-2xl font-black text-blue-900 mt-0.5 break-keep tracking-tight">
                 {priceText}
               </div>
-              {negotiablePriceText && (
-                <div className="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1 inline-block break-keep">
-                  조정가능가: {negotiablePriceText}
-                </div>
-              )}
             </div>
           </div>
 
@@ -925,17 +908,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
           )}
 
-          {/* Consultation Notes (중개사 로그인 상태에서만 내부 메모 노출) */}
-          {property.consultationNotes && currentUser && (
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                상담 및 특이사항 메모 (내부 전용)
-              </h4>
-              <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
-                {property.consultationNotes}
-              </p>
-            </div>
-          )}
+
 
         </div>
 
