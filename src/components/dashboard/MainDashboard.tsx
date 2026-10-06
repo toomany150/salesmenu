@@ -14,7 +14,8 @@ import { CustomerDetailModal } from '../crm/CustomerDetailModal';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { LoginModal } from '../auth/LoginModal';
 import { AdminLogModal } from '../auth/AdminLogModal';
-import { initKakao } from '@/lib/kakao';
+import { CustomerPropertyBriefing } from '../properties/CustomerPropertyBriefing';
+import { initKakao, AddressShareMode } from '@/lib/kakao';
 import { 
   getCustomProperties, 
   saveCustomProperty, 
@@ -62,6 +63,11 @@ const DashboardContent: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
+
+  // Customer Briefing View State (외부 공유 링크로 들어온 고객 전용 안내장 화면)
+  const [customerBriefingProp, setCustomerBriefingProp] = useState<PropertyItem | null>(null);
+  const [customerBriefingAddrMode, setCustomerBriefingAddrMode] = useState<AddressShareMode>('dong');
+  const [isCustomerMode, setIsCustomerMode] = useState(false);
 
   // Auth & Admin Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -174,6 +180,16 @@ const DashboardContent: React.FC = () => {
 
   const hasAutoOpenedPropRef = useRef(false);
 
+  // 중개사가 로그인하면 고객 전용 뷰 모드 해제 및 관리자 상세창으로 전환
+  useEffect(() => {
+    if (currentUser && isCustomerMode) {
+      setIsCustomerMode(false);
+      if (customerBriefingProp) {
+        setSelectedProperty(customerBriefingProp);
+      }
+    }
+  }, [currentUser, isCustomerMode, customerBriefingProp]);
+
   // 카카오톡 등 외부 공유 링크로 접근 시 (?propertyId=... 또는 ?pData=...) 해당 매물 상세창 자동 열기
   useEffect(() => {
     if (typeof window === 'undefined' || hasAutoOpenedPropRef.current) return;
@@ -181,8 +197,22 @@ const DashboardContent: React.FC = () => {
       const searchParams = new URLSearchParams(window.location.search);
       const propId = searchParams.get('propertyId');
       const pDataRaw = searchParams.get('pData');
+      const addrMode = (searchParams.get('addrMode') as AddressShareMode) || 'dong';
+      setCustomerBriefingAddrMode(addrMode);
 
       if (!propId && !pDataRaw) return;
+
+      const applyOpenedProperty = (targetProp: PropertyItem) => {
+        hasAutoOpenedPropRef.current = true;
+        if (currentUser) {
+          // 중개사 로그인 상태인 경우: 내부 관리자 상세 모달 열기
+          setSelectedProperty(targetProp);
+        } else {
+          // 외부 고객 링크 접속인 경우: 소유주/내부메모 완전 차단된 고객 전용 안내장 화면 표시
+          setCustomerBriefingProp(targetProp);
+          setIsCustomerMode(true);
+        }
+      };
 
       // 1) URL에 직렬화된 pData 매물 정보가 있는 경우: 즉시 모달 열람 (스마트폰 카톡 링크 클릭 시 100% 즉시 열림 보장)
       if (pDataRaw) {
@@ -191,9 +221,8 @@ const DashboardContent: React.FC = () => {
           if (jsonStr) {
             const parsedProp: PropertyItem = JSON.parse(jsonStr);
             if (parsedProp && (parsedProp.id || parsedProp.propertyNumber)) {
-              hasAutoOpenedPropRef.current = true;
-              setSelectedProperty(parsedProp);
-              // 매물 목록에도 추가하여 상세창을 닫은 뒤에도 둘러볼 수 있도록 지원
+              applyOpenedProperty(parsedProp);
+              // 매물 목록에도 추가
               setProperties((prev) => {
                 const exists = prev.some(
                   (p) =>
@@ -214,8 +243,7 @@ const DashboardContent: React.FC = () => {
       if (propId && properties.length > 0) {
         const found = properties.find((p) => p.id === propId || p.propertyNumber === propId);
         if (found) {
-          hasAutoOpenedPropRef.current = true;
-          setSelectedProperty(found);
+          applyOpenedProperty(found);
           return;
         }
       }
@@ -228,15 +256,14 @@ const DashboardContent: React.FC = () => {
             if (Array.isArray(items) && items.length > 0 && !hasAutoOpenedPropRef.current) {
               const matched = items.find((p: any) => p.id === propId || p.propertyNumber === propId) || items[0];
               if (matched) {
-                hasAutoOpenedPropRef.current = true;
-                setSelectedProperty(matched);
+                applyOpenedProperty(matched);
               }
             }
           })
           .catch(() => {});
       }
     } catch (e) {}
-  }, [properties]);
+  }, [properties, currentUser]);
 
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
@@ -303,6 +330,24 @@ const DashboardContent: React.FC = () => {
     setActiveTab(tab);
     scrollToDetail();
   };
+
+  // 고객 전용 매물 브리핑 안내장 뷰 (비로그인 상태로 외부 공유 링크 접속 시 내부 CRM 접근 완벽 차단)
+  if (isCustomerMode && customerBriefingProp && !currentUser) {
+    return (
+      <>
+        <CustomerPropertyBriefing
+          property={customerBriefingProp}
+          addressMode={customerBriefingAddrMode}
+          onOpenLogin={() => setIsLoginOpen(true)}
+        />
+        <LoginModal
+          isOpen={isLoginOpen}
+          onClose={() => setIsLoginOpen(false)}
+          canClose={true}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-16">

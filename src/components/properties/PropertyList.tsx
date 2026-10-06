@@ -26,6 +26,7 @@ import {
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink } from '@/lib/kakao';
 import { PropertyMapView } from '../map/PropertyMapView';
 import { PropertyFilterPanel } from './PropertyFilterPanel';
+import { SharePropertyModal } from './SharePropertyModal';
 import { useAuth } from '../auth/AuthContext';
 import { canEditItem } from '@/lib/auth';
 
@@ -48,6 +49,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [filtered, setFiltered] = useState<PropertyItem[]>(properties);
   const [viewMode, setViewMode] = useState<'SPLIT' | 'GRID' | 'MAP'>('SPLIT');
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | undefined>();
+  const [sharingProperty, setSharingProperty] = useState<PropertyItem | null>(null);
 
   // Sync when properties changes externally
   useEffect(() => {
@@ -475,28 +477,35 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             <Phone className="w-3.5 h-3.5" />
                           </a>
                         )}
-                        <a
-                          href={smsLink}
-                          title="문자로 매물정보 전송"
-                          className="p-1.5 rounded-lg text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                        </a>
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyPropertyShareLink(property);
+                            setSharingProperty(property);
                           }}
-                          title="매물 링크 복사 (카톡/문자용)"
+                          title="문자로 매물정보 전송"
+                          className="p-1.5 rounded-lg text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSharingProperty(property);
+                          }}
+                          title="매물 링크 복사 (주소 노출 옵션 선택)"
                           className="p-1.5 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors"
                         >
                           <Copy className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
-                          onClick={onShareKakao}
-                          title="카카오톡으로 공유"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSharingProperty(property);
+                          }}
+                          title="카카오톡으로 공유 (주소 노출 옵션 선택)"
                           className="p-1.5 rounded-lg text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-colors"
                         >
                           <Share2 className="w-3.5 h-3.5" />
@@ -547,6 +556,12 @@ export const PropertyList: React.FC<PropertyListProps> = ({
         </>
       )}
 
+      {/* Share & Address Disclosure Options Modal */}
+      <SharePropertyModal
+        property={sharingProperty}
+        isOpen={!!sharingProperty}
+        onClose={() => setSharingProperty(null)}
+      />
     </div>
   );
 };

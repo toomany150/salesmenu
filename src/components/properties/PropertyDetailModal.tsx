@@ -31,6 +31,7 @@ import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
 import { useAuth } from '../auth/AuthContext';
 import { maskPhoneNumber, canViewCustomerContact, canDeleteItem, canEditItem } from '@/lib/auth';
 import { KakaoAddressMap } from '../map/KakaoAddressMap';
+import { SharePropertyModal } from './SharePropertyModal';
 
 interface PropertyDetailModalProps {
   property: PropertyItem | null;
@@ -51,6 +52,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isPhotoLightboxOpen, setIsPhotoLightboxOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   if (!isOpen || !property) return null;
 
@@ -315,14 +317,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <span className="text-xs text-slate-600">접수 고객(의뢰인):</span>
               {property.customer ? (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-slate-900">{property.customer.name}</span>
-                  {property.customer.carrier && (
+                  <span className="text-xs font-bold text-slate-900">
+                    {canViewContact ? property.customer.name : '*** (비공개)'}
+                  </span>
+                  {canViewContact && property.customer.carrier && (
                     <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-sm">
                       {property.customer.carrier}
                     </span>
                   )}
                   <span className="text-xs font-mono font-bold text-slate-800">
-                    {canViewContact ? property.customer.phone : maskPhoneNumber(property.customer.phone)}
+                    {canViewContact ? property.customer.phone : '010-****-****'}
                   </span>
                   {!canViewContact && (
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded">
@@ -347,19 +351,21 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </a>
               )}
 
-              <a
-                href={smsLink}
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all active:scale-95"
+                title="주소 옵션 선택 후 문자로 전송"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>💬 문자로 전송</span>
-              </a>
+              </button>
 
               <button
                 type="button"
-                onClick={() => copyPropertyShareLink(property)}
+                onClick={() => setIsShareModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-all active:scale-95"
-                title="카톡/문자 전송용 매물 링크 및 요약 복사"
+                title="주소 옵션 선택 후 매물 링크 및 요약 복사"
               >
                 <Copy className="w-3.5 h-3.5 text-slate-600" />
                 <span>🔗 링크 복사</span>
@@ -367,8 +373,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
               <button
                 type="button"
-                onClick={handleKakaoShare}
+                onClick={() => setIsShareModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-xs transition-all active:scale-95"
+                title="주소 공개 범위(동까지만/전체/비공개) 선택 후 카카오톡 전송"
               >
                 <span className="w-2 h-2 rounded-full bg-slate-900"></span>
                 <span>🟡 카톡 공유</span>
@@ -908,11 +915,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
           )}
 
-          {/* Consultation Notes */}
-          {property.consultationNotes && (
+          {/* Consultation Notes (중개사 로그인 상태에서만 내부 메모 노출) */}
+          {property.consultationNotes && currentUser && (
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
               <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                상담 및 특이사항 메모
+                상담 및 특이사항 메모 (내부 전용)
               </h4>
               <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
                 {property.consultationNotes}
@@ -1003,6 +1010,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           )}
         </div>
       )}
+
+      {/* Share & Address Disclosure Options Modal */}
+      <SharePropertyModal
+        property={property}
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+      />
     </div>
   );
 };

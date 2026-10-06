@@ -97,15 +97,116 @@ function toUtf8Base64(str: string): string {
   }
 }
 
+export type AddressShareMode = 'full' | 'dong' | 'hidden';
+
+export const BROKER_OFFICE_INFO = {
+  officeName: '참좋은 공인중개사사무소',
+  ceoName: '개업공인중개사 (대표)',
+  registrationNumber: '제 11680-2024-00000 호',
+  tel: '010-1234-5678',
+  officeTel: '02-1234-5678',
+  address: '서울특별시 강남구 테헤란로',
+};
+
+/**
+ * 주소에서 읍/면/동/리/구 까지만 안전하게 추출하여 대략적인 위치 반환
+ * (상세 지번, 건물명, 호수를 감춰서 직거래 방지)
+ */
+export function getDongLevelAddress(address?: string): string {
+  if (!address || typeof address !== 'string') return '위치 유선 상담 시 안내';
+  const trimmed = address.trim();
+
+  // 1) 괄호 안의 (OO동) 등이 있는 경우 (도로명주소 형식)
+  const parenMatch = trimmed.match(/\(([^)]+[동읍면리가])\)/);
+
+  const tokens = trimmed.split(/\s+/);
+  let stopIndex = -1;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    // 순수 동/읍/면/리/가로 끝나는 토큰 탐색 (숫자가 붙은 번지 제외)
+    if (/[가-힣]+[동읍면리가]$/.test(t) && !/\d/.test(t)) {
+      stopIndex = i;
+      break;
+    }
+  }
+
+  if (stopIndex >= 0) {
+    const parts = tokens.slice(0, stopIndex + 1);
+    return `${parts.join(' ')} 부근`;
+  }
+
+  if (parenMatch) {
+    const guTokens: string[] = [];
+    for (const t of tokens) {
+      if (t.includes('(')) break;
+      guTokens.push(t);
+      if (/[시군구]$/.test(t)) break;
+    }
+    if (guTokens.length > 0) {
+      return `${guTokens.join(' ')} ${parenMatch[1]} 부근`;
+    }
+  }
+
+  // 도로명 (로/길) 토큰 기준
+  let roIndex = -1;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (/[가-힣]+(로|길)$/.test(t)) {
+      roIndex = i;
+      break;
+    }
+  }
+  if (roIndex >= 0) {
+    return `${tokens.slice(0, roIndex + 1).join(' ')} 부근`;
+  }
+
+  const fallback = tokens.filter((t) => !/^\d/.test(t)).slice(0, 3);
+  return fallback.length > 0 ? `${fallback.join(' ')} 부근` : '위치 유선 상담 시 안내';
+}
+
+/**
+ * 주소 공개 설정(모드)에 따른 표시 텍스트 생성
+ */
+export function formatAddressByMode(
+  address?: string,
+  detailAddress?: string,
+  mode: AddressShareMode = 'dong'
+): { displayAddress: string; isApproximate: boolean; isHidden: boolean } {
+  if (mode === 'hidden') {
+    return {
+      displayAddress: '소재지 유선 상담 시 상세 안내',
+      isApproximate: false,
+      isHidden: true,
+    };
+  }
+  if (mode === 'dong') {
+    const rough = getDongLevelAddress(address);
+    return {
+      displayAddress: `${rough} (상세주소는 상담 시 안내)`,
+      isApproximate: true,
+      isHidden: false,
+    };
+  }
+  // mode === 'full'
+  const full = [address, detailAddress].filter(Boolean).join(' ').trim();
+  return {
+    displayAddress: full || '주소 정보 없음',
+    isApproximate: false,
+    isHidden: false,
+  };
+}
+
 export interface SharePropertyParams {
   id?: string;
   title: string;
   description: string;
   priceText: string;
   address: string;
+  detailAddress?: string;
   propertyNumber: string;
   propertyType: string;
   property?: any;
+  addressMode?: AddressShareMode;
 }
 
 export async function shareViaKakao(params: SharePropertyParams): Promise<boolean> {
@@ -113,9 +214,12 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
 
   const baseUrl = getAppBaseUrl();
   const propIdentifier = params.propertyNumber || params.id || '';
+  const addrMode: AddressShareMode = params.addressMode || 'dong';
 
-  // 수신자 스마트폰에서 Vercel 서버리스 DB 동기화 여부와 무관하게 100% 즉시 상세 모달이 열리도록
-  // 경량화된 매물 데이터(pData)를 URL 파라미터에 안전하게 인코딩하여 포함합니다.
+  const { displayAddress } = formatAddressByMode(params.address, params.detailAddress, addrMode);
+
+  // 수신자 스마트폰에서 Vercel 서버리스 DB 동기화 여부와 무관하게 100% 즉시 고객용 브리핑 모달이 열리도록
+  // 보안 가공(소유자 정보, 중개사 비밀 메모 제거 및 주소 마스킹)된 pData를 URL 파라미터에 안전하게 인코딩합니다.
   let pDataQuery = '';
   const propTarget = params.property || {
     id: params.id,
@@ -124,22 +228,44 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
     transactionType: params.priceText?.includes('전세') ? '전세' : params.priceText?.includes('매매') ? '매매' : '월세',
     status: 'AVAILABLE',
     address: params.address,
-    consultationNotes: params.description,
+    detailAddress: params.detailAddress,
   };
 
   try {
-    // 거대한 base64 이미지는 제외하고 http URL 이미지만 포함하여 URL 길이 제한 방지
     const cleanImages = Array.isArray(propTarget.images)
       ? propTarget.images.filter((img: string) => typeof img === 'string' && img.startsWith('http')).slice(0, 3)
       : [];
+
     const payload = {
       ...propTarget,
       images: cleanImages,
+      isCustomerBriefing: true,
+      addressMode: addrMode,
     };
-    // 민감한 소유자 개인정보는 공유 링크에서 제외 (개인정보 보호)
+
+    // 보안 강화: 외부 고객에게 절대 노출되면 안 되는 소유주/임대인 및 내부 중개 메모 철저 제거
     delete payload.customer;
     delete payload.customerId;
     delete payload.ownerRegNo;
+    delete payload.consultationNotes;
+    delete payload.managerName;
+    delete payload.assignedAgents;
+    delete payload.negotiablePrice;
+    delete payload.negotiableDeposit;
+    delete payload.negotiableMonthlyRent;
+
+    // 주소 모드에 따른 주소 데이터 가공
+    if (addrMode === 'hidden') {
+      payload.address = '소재지 유선 상담 시 안내';
+      payload.detailAddress = '';
+      payload.roadAddress = '';
+      payload.jibunAddress = '';
+    } else if (addrMode === 'dong') {
+      payload.address = getDongLevelAddress(propTarget.address);
+      payload.detailAddress = '(상세주소는 상담 시 안내)';
+      payload.roadAddress = '';
+      payload.jibunAddress = '';
+    }
 
     const jsonStr = JSON.stringify(payload);
     const b64 = toUtf8Base64(jsonStr);
@@ -151,7 +277,7 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
   }
 
   const shareUrl = propIdentifier
-    ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}${pDataQuery}`
+    ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}&addrMode=${addrMode}${pDataQuery}`
     : baseUrl;
   const kakaoKey = getKakaoKey();
 
@@ -164,7 +290,6 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
     }
   }
 
-  // 스크립트가 아직 로딩 중인 경우 잠깐 대기
   if (!window.Kakao) {
     initKakao();
     await new Promise((r) => setTimeout(r, 600));
@@ -186,8 +311,8 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
       window.Kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: `[매물 ${params.propertyNumber}] ${params.title}`,
-          description: `${params.priceText}\n위치: ${params.address}\n유형: ${params.propertyType}`,
+          title: `[매물 #${params.propertyNumber}] ${params.title}`,
+          description: `${params.priceText}\n위치: ${displayAddress}\n유형: ${params.propertyType}\n문의: ${BROKER_OFFICE_INFO.officeName} (${BROKER_OFFICE_INFO.tel})`,
           imageUrl: previewImage,
           link: {
             mobileWebUrl: shareUrl,
@@ -196,7 +321,7 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
         },
         buttons: [
           {
-            title: '매물 상세정보 보기',
+            title: '매물 상세안내 보기',
             link: {
               mobileWebUrl: shareUrl,
               webUrl: shareUrl,
@@ -211,8 +336,15 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
   }
 
   // 카카오 SDK 미설정/도메인 미등록 시 클립보드 복사 폴백
-  const summaryText = `[부동산 매물안내 - 매물번호 #${params.propertyNumber}]\n● 매물유형: ${params.propertyType}\n● 거래정보: ${params.priceText}\n● 소재지: ${params.address}\n● 상세설명: ${params.description}\n\n상세링크: ${shareUrl}`;
-  
+  const summaryText = `[${BROKER_OFFICE_INFO.officeName} 매물안내 - 매물번호 #${params.propertyNumber}]
+● 매물유형: ${params.propertyType}
+● 거래정보: ${params.priceText}
+● 소재지: ${displayAddress}
+● 문의처: ${BROKER_OFFICE_INFO.officeName} ☎ ${BROKER_OFFICE_INFO.tel}
+
+👉 매물 상세안내 확인하기:
+${shareUrl}`;
+
   if (navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(summaryText);
@@ -228,10 +360,52 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
   }
 }
 
-export async function copyPropertyShareLink(property: any): Promise<boolean> {
+export async function copyPropertyShareLink(property: any, addressMode: AddressShareMode = 'dong'): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
   const propId = property.propertyNumber || property.id || '';
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}`;
+  
+  // URL에 pData도 포함하여 DB 상태와 무관하게 100% 동일하게 열리도록 구성
+  let pDataQuery = '';
+  try {
+    const cleanImages = Array.isArray(property.images)
+      ? property.images.filter((img: string) => typeof img === 'string' && img.startsWith('http')).slice(0, 3)
+      : [];
+    const payload = {
+      ...property,
+      images: cleanImages,
+      isCustomerBriefing: true,
+      addressMode,
+    };
+    delete payload.customer;
+    delete payload.customerId;
+    delete payload.ownerRegNo;
+    delete payload.consultationNotes;
+    delete payload.managerName;
+    delete payload.assignedAgents;
+    delete payload.negotiablePrice;
+    delete payload.negotiableDeposit;
+    delete payload.negotiableMonthlyRent;
+
+    if (addressMode === 'hidden') {
+      payload.address = '소재지 유선 상담 시 안내';
+      payload.detailAddress = '';
+      payload.roadAddress = '';
+      payload.jibunAddress = '';
+    } else if (addressMode === 'dong') {
+      payload.address = getDongLevelAddress(property.address);
+      payload.detailAddress = '(상세주소는 상담 시 안내)';
+      payload.roadAddress = '';
+      payload.jibunAddress = '';
+    }
+
+    const jsonStr = JSON.stringify(payload);
+    const b64 = toUtf8Base64(jsonStr);
+    if (b64 && b64.length < 1400) {
+      pDataQuery = `&pData=${encodeURIComponent(b64)}`;
+    }
+  } catch {}
+
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}${pDataQuery}`;
   
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -239,16 +413,22 @@ export async function copyPropertyShareLink(property: any): Promise<boolean> {
   } else if (property.transactionType === '전세') {
     priceStr = `전세 ${property.deposit ? property.deposit.toLocaleString() + '만원' : '협의'}`;
   } else {
-    priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만원' : '0'}/월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만원' : '0'}`;
+    const vat = property.monthlyRentVat ? ' (부가세 별도)' : '';
+    priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vat}`;
   }
 
-  const text = `[부동산 매물안내 - 매물번호 #${property.propertyNumber || propId}]
+  const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
+
+  const text = `[${BROKER_OFFICE_INFO.officeName} 매물안내 - #${property.propertyNumber || propId}]
 ● 매물유형: ${property.propertyType || ''} (${property.transactionType || ''})
 ● 거래금액: ${priceStr}
-● 소재지: ${property.address || ''} ${property.detailAddress || ''}
-${property.consultationNotes ? `● 특징: ${property.consultationNotes}\n` : ''}
-👉 매물 상세정보 확인하기:
-${shareUrl}`;
+● 소재지: ${displayAddress}
+● 담당문의: ${BROKER_OFFICE_INFO.officeName} ☎ ${BROKER_OFFICE_INFO.tel}
+
+👉 매물 상세정보 및 사진 확인하기:
+${shareUrl}
+
+문의주시면 친절하고 정확하게 상담해 드리겠습니다.`;
 
   if (typeof navigator !== 'undefined' && navigator.clipboard) {
     try {
@@ -261,19 +441,23 @@ ${shareUrl}`;
   return true;
 }
 
-export function generateSmsLink(property: {
-  propertyNumber: string;
-  propertyType: string;
-  transactionType: string;
-  price?: number;
-  deposit?: number;
-  monthlyRent?: number;
-  address: string;
-  detailAddress?: string;
-  consultationNotes?: string;
-}): string {
+export function generateSmsLink(
+  property: {
+    propertyNumber: string;
+    propertyType: string;
+    transactionType: string;
+    price?: number;
+    deposit?: number;
+    monthlyRent?: number;
+    monthlyRentVat?: boolean;
+    address: string;
+    detailAddress?: string;
+    consultationNotes?: string;
+  },
+  addressMode: AddressShareMode = 'dong'
+): string {
   const baseUrl = getAppBaseUrl();
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}`;
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}&addrMode=${addressMode}`;
 
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -281,19 +465,24 @@ export function generateSmsLink(property: {
   } else if (property.transactionType === '전세') {
     priceStr = `전세 ${property.deposit ? property.deposit.toLocaleString() + '만원' : '협의'}`;
   } else {
-    priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만원' : '0'}/월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만원' : '0'}`;
+    const vat = property.monthlyRentVat ? ' (부가세 별도)' : '';
+    priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'}/월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vat}`;
   }
 
-  const message = `[공인중개사 매물안내]
-- 매물번호: ${property.propertyNumber}
-- 유형: ${property.propertyType} (${property.transactionType})
-- 금액: ${priceStr}
-- 소재지: ${property.address} ${property.detailAddress || ''}
-${property.consultationNotes ? `- 참고사항: ${property.consultationNotes}\n` : ''}
+  const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
+
+  const message = `[${BROKER_OFFICE_INFO.officeName} 매물안내]
+- 매물번호: #${property.propertyNumber}
+- 매물유형: ${property.propertyType} (${property.transactionType})
+- 금액조건: ${priceStr}
+- 소재지: ${displayAddress}
+- 문의전화: ${BROKER_OFFICE_INFO.tel}
+
 👉 매물 상세정보 보기:
 ${shareUrl}
 
-문의주시면 친절히 상담해 드리겠습니다.`;
+편하게 문의주시면 친절히 상담해 드리겠습니다.`;
 
   return `sms:?body=${encodeURIComponent(message)}`;
 }
+
