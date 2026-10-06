@@ -24,6 +24,7 @@ import {
   PROPERTY_TYPE_LABELS,
   DIRECTION_OPTIONS,
   DIRECTION_CRITERIA_OPTIONS,
+  DIRECTION_CRITERIA_BY_PROPERTY_TYPE,
   getDefaultDirectionCriteria,
   CARRIER_OPTIONS
 } from '@/lib/types';
@@ -168,9 +169,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setDirection(initialData.direction || '남향');
         
         // Direction criteria
-        const criteria = initialData.directionCriteria || getDefaultDirectionCriteria(initialData.propertyType || 'APARTMENT');
+        let criteria = initialData.directionCriteria || getDefaultDirectionCriteria(initialData.propertyType || 'APARTMENT');
+        if (initialData.propertyType === 'LAND' && (criteria === '거실 창문 기준' || criteria === '안방 창문 기준')) {
+          criteria = '진입도로 기준';
+        }
         setDirectionCriteria(criteria);
-        setIsDirectionCriteriaManual(!!initialData.directionCriteria);
+        setIsDirectionCriteriaManual(!!initialData.directionCriteria && initialData.directionCriteria !== '거실 창문 기준');
 
         setAvailableDate(initialData.availableDate ? initialData.availableDate.substring(0, 10) : '');
         setIsImmediateAvailable(!!initialData.isImmediateAvailable);
@@ -310,8 +314,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     if (newType === 'STORE' && transactionType === '전세') {
       setTransactionType('월세');
     }
-    // 방향 기준 자동 세팅: 아파트, 주택 -> 거실 창문 기준 / 상가, 공장, 사무실 등 -> 주출입구 기준
-    if (!isDirectionCriteriaManual) {
+    // 방향 기준 자동 세팅: 토지 -> 진입도로 기준 / 아파트, 주택 -> 거실 창문 기준 / 상가, 공장, 사무실 등 -> 주출입구 기준
+    if (!isDirectionCriteriaManual || (newType === 'LAND' && (directionCriteria === '거실 창문 기준' || directionCriteria === '안방 창문 기준'))) {
       setDirectionCriteria(getDefaultDirectionCriteria(newType));
     }
   };
@@ -1738,28 +1742,30 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       </div>
                     </div>
 
-                    {/* 방향 기준 옵션 */}
+                    {/* 방향 기준 옵션 (토지: 진입도로 / 도로 접면 / 지세 기준 등 토지 전용 기준 제공) */}
                     <div className="pt-3 border-t border-slate-200">
                       <div className="flex flex-wrap items-center justify-between gap-1 mb-2">
                         <label className="text-sm font-bold text-slate-800">
                           방향 기준 옵션
                         </label>
                         <span className="text-xs text-slate-500">
-                          (아파트·주택: 거실 창문 기준 / 상가·공장·사무실: 주출입구 기준 자동세팅)
+                          {propertyType === 'LAND'
+                            ? '(토지 매물: 진입도로 기준 / 도로 접면 기준 / 지세 기준 자동세팅)'
+                            : '(아파트·주택: 거실 창문 / 상가·공장·사무실: 주출입구 / 토지: 진입도로 기준)'}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2.5">
-                        {DIRECTION_CRITERIA_OPTIONS.map((crit) => {
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {(DIRECTION_CRITERIA_BY_PROPERTY_TYPE[propertyType] || DIRECTION_CRITERIA_OPTIONS).map((crit) => {
                           const isSelected = directionCriteria === crit;
                           return (
                             <button
                               key={crit}
                               type="button"
                               onClick={() => handleDirectionCriteriaChange(crit)}
-                              className={`py-2.5 px-2 text-xs sm:text-sm font-bold rounded-xl border transition-all text-center flex items-center justify-center gap-1.5 ${
+                              className={`py-2.5 px-2 text-xs sm:text-sm font-bold rounded-xl border transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
                                 isSelected
-                                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-blue-500/20'
                                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                               }`}
                             >
@@ -1768,89 +1774,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             </button>
                           );
                         })}
-                      </div>
-                    </div>
-
-                    {/* 입주가능일 & 즉시가능 / 협의가능 옵션 */}
-                    <div className="pt-3 border-t border-slate-200">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                        <label className="text-sm font-bold text-slate-800">
-                          입주가능일 및 즉시가능 여부
-                        </label>
-                        
-                        {/* [즉시가능] 토글 버튼 & [입주일협의] 버튼 */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = !isImmediateAvailable;
-                              setIsImmediateAvailable(next);
-                              if (next) {
-                                setIsNegotiableDate(false);
-                                setAvailableDate(new Date().toISOString().substring(0, 10));
-                              }
-                            }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              isImmediateAvailable
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                            }`}
-                          >
-                            <span>⚡</span>
-                            <span>[즉시가능 (즉시입주)]</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = !isNegotiableDate;
-                              setIsNegotiableDate(next);
-                              if (next) {
-                                setIsImmediateAvailable(false);
-                                setAvailableDate('');
-                              }
-                            }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              isNegotiableDate
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                            }`}
-                          >
-                            <span>🤝</span>
-                            <span>[입주일협의]</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-                        <input
-                          type="date"
-                          value={availableDate}
-                          disabled={isNegotiableDate}
-                          onChange={(e) => {
-                            setAvailableDate(e.target.value);
-                            if (e.target.value) {
-                              setIsNegotiableDate(false);
-                            }
-                          }}
-                          className={`w-full text-sm px-3.5 py-2.5 border rounded-xl focus:ring-2 focus:ring-blue-500 font-medium ${
-                            isNegotiableDate
-                              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                              : 'bg-white text-slate-900 border-slate-300'
-                          }`}
-                        />
-                        {isImmediateAvailable && (
-                          <span className="shrink-0 inline-flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                            <span>⚡</span>
-                            <span>즉시입주</span>
-                          </span>
-                        )}
-                        {isNegotiableDate && (
-                          <span className="shrink-0 inline-flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-extrabold bg-blue-100 text-blue-900 border border-blue-300">
-                            <span>🤝</span>
-                            <span>입주일협의</span>
-                          </span>
-                        )}
                       </div>
                     </div>
 

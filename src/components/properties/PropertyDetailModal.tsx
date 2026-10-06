@@ -478,25 +478,27 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[11px] text-slate-500 block">방향 / 기준</span>
                 <span className="font-semibold text-slate-800">
-                  {property.direction || '미정'} ({property.directionCriteria || '기준없음'})
+                  {property.direction || '미정'} ({property.directionCriteria || (property.propertyType === 'LAND' ? '진입도로 기준' : '기준없음')})
                 </span>
               </div>
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">입주 가능일</span>
-                <span className="font-semibold text-slate-800">
-                  {property.isImmediateAvailable ? (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-emerald-800 bg-emerald-100 border border-emerald-300">
-                      ⚡ 즉시입주
-                    </span>
-                  ) : property.isNegotiableDate ? (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-blue-800 bg-blue-100 border border-blue-300">
-                      🤝 입주일협의
-                    </span>
-                  ) : (
-                    property.availableDate ? property.availableDate.substring(0, 10) : '입주일협의'
-                  )}
-                </span>
-              </div>
+              {property.propertyType !== 'LAND' && (property.availableDate || property.isImmediateAvailable || property.isNegotiableDate) && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[11px] text-slate-500 block">입주 가능일</span>
+                  <span className="font-semibold text-slate-800">
+                    {property.isImmediateAvailable ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-emerald-800 bg-emerald-100 border border-emerald-300">
+                        ⚡ 즉시입주
+                      </span>
+                    ) : property.isNegotiableDate ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-blue-800 bg-blue-100 border border-blue-300">
+                        🤝 입주일협의
+                      </span>
+                    ) : (
+                      property.availableDate ? property.availableDate.substring(0, 10) : ''
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[11px] text-slate-500 block">관리비</span>
                 <span className="font-semibold text-slate-800">

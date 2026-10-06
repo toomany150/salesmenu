@@ -80,18 +80,35 @@ export const DIRECTION_OPTIONS = [
 export type DirectionOption = typeof DIRECTION_OPTIONS[number];
 
 export const DIRECTION_CRITERIA_OPTIONS = [
+  '진입도로 기준',
+  '도로 접면 기준',
+  '지세(지형) 기준',
   '거실 창문 기준',
   '주출입구 기준',
   '안방 창문 기준',
 ] as const;
 export type DirectionCriteriaOption = typeof DIRECTION_CRITERIA_OPTIONS[number];
 
+export const DIRECTION_CRITERIA_BY_PROPERTY_TYPE: Record<PropertyType, DirectionCriteriaOption[]> = {
+  APARTMENT: ['거실 창문 기준', '주출입구 기준', '안방 창문 기준'],
+  HOUSE: ['거실 창문 기준', '주출입구 기준', '안방 창문 기준'],
+  STORE: ['주출입구 기준', '진입도로 기준'],
+  OFFICE: ['주출입구 기준', '진입도로 기준'],
+  FACTORY_WAREHOUSE: ['주출입구 기준', '진입도로 기준'],
+  LAND: ['진입도로 기준', '도로 접면 기준', '지세(지형) 기준', '주출입구 기준'],
+  ETC: ['진입도로 기준', '주출입구 기준'],
+};
+
 /**
  * 매물 종류에 따른 기본 방향 기준 세팅값
+ * - 토지: '진입도로 기준'
  * - 아파트, 주택: '거실 창문 기준'
- * - 상가점포, 공장, 사무실, 토지 등: '주출입구 기준'
+ * - 상가점포, 공장, 사무실 등: '주출입구 기준'
  */
 export function getDefaultDirectionCriteria(propertyType: PropertyType): DirectionCriteriaOption {
+  if (propertyType === 'LAND') {
+    return '진입도로 기준';
+  }
   if (propertyType === 'APARTMENT' || propertyType === 'HOUSE') {
     return '거실 창문 기준';
   }

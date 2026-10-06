@@ -379,13 +379,15 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
               </span>
             </div>
 
-            {/* 입주가능일 */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 block">입주 가능일</span>
-              <span className="font-bold text-slate-900">
-                {property.isImmediateAvailable ? '✨ 즉시 입주 가능' : property.isNegotiableDate ? '🤝 입주일 협의' : property.availableDate || '협의 입주'}
-              </span>
-            </div>
+            {/* 입주가능일 (토지 제외 및 값 있을 때만 표시) */}
+            {property.propertyType !== 'LAND' && (property.isImmediateAvailable || property.isNegotiableDate || property.availableDate) && (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 block">입주 가능일</span>
+                <span className="font-bold text-slate-900">
+                  {property.isImmediateAvailable ? '✨ 즉시 입주 가능' : property.isNegotiableDate ? '🤝 입주일 협의' : property.availableDate || '협의 입주'}
+                </span>
+              </div>
+            )}
 
             {/* 건축물용도 */}
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
