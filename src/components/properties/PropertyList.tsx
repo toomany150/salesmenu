@@ -23,7 +23,7 @@ import {
   PROPERTY_TYPE_LABELS, 
   STATUS_LABELS 
 } from '@/lib/types';
-import { shareViaKakao, generateSmsLink, copyPropertyShareLink } from '@/lib/kakao';
+import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
 import { PropertyMapView } from '../map/PropertyMapView';
 import { PropertyFilterPanel } from './PropertyFilterPanel';
 import { SharePropertyModal } from './SharePropertyModal';
@@ -481,9 +481,13 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSharingProperty(property);
+                            const savedMode = (typeof window !== 'undefined' ? localStorage.getItem('pref_address_share_mode') : null) as any || 'dong';
+                            const result = handleSmartSms(property, undefined, savedMode);
+                            if (!result.isMobile) {
+                              alert('매물 안내 문자 문구가 클립보드에 복사되었습니다!\n\n(스마트폰에서 접속 시 터치 한 번으로 문자 앱이 즉시 실행됩니다)');
+                            }
                           }}
-                          title="문자로 매물정보 전송"
+                          title="문자로 매물정보 전송 (스마트폰 즉시 실행 / PC 클립보드 복사)"
                           className="p-1.5 rounded-lg text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />

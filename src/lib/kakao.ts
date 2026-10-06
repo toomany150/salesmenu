@@ -486,3 +486,85 @@ ${shareUrl}
   return `sms:?body=${encodeURIComponent(message)}`;
 }
 
+/**
+ * 모바일(스마트폰/태블릿) 브라우저 판별
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+/**
+ * iOS(iPhone/iPad) 판별 (iOS는 sms URL 스키마에 ? 대신 & 사용)
+ */
+export function isIOSDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+/**
+ * 매물 문자 전송용 완성된 요약 안내 문구 생성
+ */
+export function getSmsText(property: any, addressMode: AddressShareMode = 'dong'): string {
+  const baseUrl = getAppBaseUrl();
+  const propId = property.propertyNumber || property.id || '';
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}`;
+
+  let priceStr = '';
+  if (property.transactionType === '매매') {
+    priceStr = `매매가 ${property.price ? property.price.toLocaleString() + '만원' : '협의'}`;
+  } else if (property.transactionType === '전세') {
+    priceStr = `전세 ${property.deposit ? property.deposit.toLocaleString() + '만원' : '협의'}`;
+  } else {
+    const vat = property.monthlyRentVat ? ' (부가세 별도)' : '';
+    priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'}/월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vat}`;
+  }
+
+  const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
+
+  return `[${BROKER_OFFICE_INFO.officeName} 매물안내 - #${property.propertyNumber || propId}]
+● 매물유형: ${property.propertyType || ''} (${property.transactionType || ''})
+● 금액조건: ${priceStr}
+● 소재지: ${displayAddress}
+● 문의처: ${BROKER_OFFICE_INFO.officeName} ☎ ${BROKER_OFFICE_INFO.tel}
+
+👉 매물 상세정보 및 사진 보기:
+${shareUrl}
+
+편하게 문의주시면 친절하고 정확하게 상담해 드리겠습니다.`;
+}
+
+/**
+ * 스마트 문자 발송 핸들러
+ * - 스마트폰: 설정 팝업 없이 문자 앱(삼성메시지/아이폰메시지)이 즉시 열리며 매물 정보가 채워짐
+ * - PC: 엉뚱한 프로그램 실행을 방지하고 문자 안내 문구를 클립보드에 자동 복사
+ */
+export function handleSmartSms(
+  property: any,
+  recipientPhone?: string,
+  addressMode: AddressShareMode = 'dong'
+): { isMobile: boolean; message: string } {
+  const message = getSmsText(property, addressMode);
+  const isMobile = isMobileDevice();
+
+  if (isMobile) {
+    const isIOS = isIOSDevice();
+    const cleanPhone = recipientPhone ? recipientPhone.replace(/[^0-9]/g, '') : '';
+    const separator = isIOS ? '&' : '?';
+    const smsUrl = cleanPhone
+      ? `sms:${cleanPhone}${separator}body=${encodeURIComponent(message)}`
+      : `sms:${separator}body=${encodeURIComponent(message)}`;
+
+    if (typeof window !== 'undefined') {
+      window.location.href = smsUrl;
+    }
+    return { isMobile: true, message };
+  } else {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(message).catch(() => {});
+    }
+    return { isMobile: false, message };
+  }
+}
+
+

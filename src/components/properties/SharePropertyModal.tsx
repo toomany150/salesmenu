@@ -24,7 +24,8 @@ import {
   generateSmsLink, 
   formatAddressByMode,
   BROKER_OFFICE_INFO,
-  getAppBaseUrl 
+  getAppBaseUrl,
+  handleSmartSms 
 } from '@/lib/kakao';
 
 interface SharePropertyModalProps {
@@ -328,13 +329,19 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
           </button>
 
           {/* SMS Button */}
-          <a
-            href={smsLink}
-            className="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-95"
+          <button
+            type="button"
+            onClick={() => {
+              const result = handleSmartSms(property, undefined, addressMode);
+              if (!result.isMobile) {
+                alert('선택하신 주소 옵션이 반영된 문자 문구가 클립보드에 복사되었습니다!\n\n(스마트폰에서 접속 시 터치 한 번으로 문자 앱이 즉시 실행됩니다)');
+              }
+            }}
+            className="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
           >
             <MessageSquare className="w-4 h-4" />
             <span>💬 문자로 전송</span>
-          </a>
+          </button>
         </div>
 
       </div>

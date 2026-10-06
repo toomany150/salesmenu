@@ -304,6 +304,16 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                   </a>
                   <a
                     href={`sms:${customer.phone}`}
+                    onClick={(e) => {
+                      const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                      if (!isMobile) {
+                        e.preventDefault();
+                        if (customer.phone) {
+                          navigator.clipboard.writeText(customer.phone).catch(() => {});
+                          alert(`고객 연락처(${customer.phone})가 클립보드에 복사되었습니다.\n\n(스마트폰에서 터치 시 문자 앱이 바로 실행됩니다)`);
+                        }
+                      }
+                    }}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-all active:scale-95"
                   >
                     <MessageSquare className="w-3.5 h-3.5 text-blue-600" />

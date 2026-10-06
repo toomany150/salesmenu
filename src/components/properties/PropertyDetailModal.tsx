@@ -26,7 +26,7 @@ import {
   Copy
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
-import { shareViaKakao, generateSmsLink, copyPropertyShareLink } from '@/lib/kakao';
+import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
 import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
 import { useAuth } from '../auth/AuthContext';
 import { maskPhoneNumber, canViewCustomerContact, canDeleteItem, canEditItem } from '@/lib/auth';
@@ -353,9 +353,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => setIsShareModalOpen(true)}
+                onClick={() => {
+                  const savedMode = (typeof window !== 'undefined' ? localStorage.getItem('pref_address_share_mode') : null) as any || 'dong';
+                  const result = handleSmartSms(property, undefined, savedMode);
+                  if (!result.isMobile) {
+                    alert('매물 안내 문자 문구가 클립보드에 복사되었습니다!\n\n(스마트폰에서 접속 시 터치 한 번으로 문자 앱이 즉시 실행됩니다)');
+                  }
+                }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all active:scale-95"
-                title="주소 옵션 선택 후 문자로 전송"
+                title="스마트폰에서는 문자 앱 즉시 실행 / PC에서는 문구 클립보드 복사"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>💬 문자로 전송</span>
