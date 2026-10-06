@@ -64,6 +64,7 @@ export function initKakao(): boolean {
 }
 
 export interface SharePropertyParams {
+  id?: string;
   title: string;
   description: string;
   priceText: string;
@@ -75,7 +76,10 @@ export interface SharePropertyParams {
 export async function shareViaKakao(params: SharePropertyParams): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
-  const shareUrl = window.location.href;
+  const baseUrl = window.location.origin;
+  const shareUrl = params.id 
+    ? `${baseUrl}?propertyId=${encodeURIComponent(params.id)}` 
+    : window.location.href;
   const kakaoKey = getKakaoKey();
 
   // 아직 Kakao 초기화가 안 되어 있다면 즉시 초기화 시도

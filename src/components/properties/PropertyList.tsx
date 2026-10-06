@@ -347,6 +347,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                 const onShareKakao = (e: React.MouseEvent) => {
                   e.stopPropagation();
                   shareViaKakao({
+                    id: property.id,
                     title: `${PROPERTY_TYPE_LABELS[property.propertyType]} (${property.transactionType})`,
                     description: property.consultationNotes || property.address,
                     priceText: `${property.transactionType} ${getPriceDisplay(property)}`,

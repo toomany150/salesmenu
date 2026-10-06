@@ -82,6 +82,21 @@ const DashboardContent: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  // 카카오톡 등 외부 공유 링크로 접근 시 (?propertyId=...) 해당 매물 상세창 자동 열기
+  useEffect(() => {
+    if (typeof window === 'undefined' || properties.length === 0) return;
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const propId = searchParams.get('propertyId');
+      if (propId) {
+        const found = properties.find((p) => p.id === propId || p.propertyNumber === propId);
+        if (found) {
+          setSelectedProperty(found);
+        }
+      }
+    } catch (e) {}
+  }, [properties]);
+
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
 

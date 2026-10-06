@@ -130,6 +130,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const handleKakaoShare = async () => {
     await shareViaKakao({
+      id: property.id,
       title: `${PROPERTY_TYPE_LABELS[property.propertyType]} (${property.transactionType})`,
       description: property.consultationNotes || `${property.address} ${property.detailAddress || ''}`,
       priceText: `${property.transactionType} ${priceText}`,
