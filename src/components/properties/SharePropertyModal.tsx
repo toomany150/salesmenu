@@ -328,16 +328,14 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
             )}
           </button>
 
-          {/* SMS Button */}
+          {/* SMS Button (모바일 스마트폰 전용, PC에서는 삭제/숨김) */}
           <button
             type="button"
             onClick={() => {
-              const result = handleSmartSms(property, undefined, addressMode);
-              if (!result.isMobile) {
-                alert('선택하신 주소 옵션이 반영된 문자 문구가 클립보드에 복사되었습니다!\n\n(스마트폰에서 접속 시 터치 한 번으로 문자 앱이 즉시 실행됩니다)');
-              }
+              handleSmartSms(property, undefined, addressMode);
             }}
-            className="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
+            className="flex md:hidden w-full sm:w-auto py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs items-center justify-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
+            title="스마트폰 문자 앱 즉시 실행"
           >
             <MessageSquare className="w-4 h-4" />
             <span>💬 문자로 전송</span>

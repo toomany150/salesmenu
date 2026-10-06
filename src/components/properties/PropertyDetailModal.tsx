@@ -353,17 +353,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </a>
               )}
 
+              {/* 스마트폰 전용 문자 전송 버튼 (PC 환경에서는 사용자의 요청에 따라 완전 삭제/숨김) */}
               <button
                 type="button"
                 onClick={() => {
                   const savedMode = (typeof window !== 'undefined' ? localStorage.getItem('pref_address_share_mode') : null) as any || 'dong';
-                  const result = handleSmartSms(property, undefined, savedMode);
-                  if (!result.isMobile) {
-                    alert('매물 안내 문자 문구가 클립보드에 복사되었습니다!\n\n(스마트폰에서 접속 시 터치 한 번으로 문자 앱이 즉시 실행됩니다)');
-                  }
+                  handleSmartSms(property, undefined, savedMode);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all active:scale-95"
-                title="스마트폰에서는 문자 앱 즉시 실행 / PC에서는 문구 클립보드 복사"
+                className="inline-flex md:hidden items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all active:scale-95"
+                title="스마트폰 문자 앱 즉시 실행"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>💬 문자로 전송</span>
@@ -505,10 +503,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <span className="font-semibold text-slate-800">
                   {property.isImmediateAvailable ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-emerald-800 bg-emerald-100 border border-emerald-300">
-                      ⚡ 즉시가능
+                      ⚡ 즉시입주
+                    </span>
+                  ) : property.isNegotiableDate ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-blue-800 bg-blue-100 border border-blue-300">
+                      🤝 입주일협의
                     </span>
                   ) : (
-                    property.availableDate ? property.availableDate.substring(0, 10) : '협의'
+                    property.availableDate ? property.availableDate.substring(0, 10) : '입주일협의'
                   )}
                 </span>
               </div>

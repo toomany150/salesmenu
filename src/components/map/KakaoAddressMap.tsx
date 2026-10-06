@@ -101,6 +101,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const kakaoMapRef = useRef<any>(null);
   const kakaoMarkerRef = useRef<any>(null);
+  const kakaoOverlayRef = useRef<any>(null);
   const kakaoCategoryMarkersRef = useRef<any[]>([]);
 
   // Leaflet fallback refs
@@ -297,20 +298,51 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         }
       });
 
-      // Authentic Kakao Blue Marker Pin (Matching Image 2 blue pin)
-      const markerImageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/2018/pc/common/ico_pin_active.png';
-      const imageSize = new window.kakao.maps.Size(28, 38);
-      const imageOption = { offset: new window.kakao.maps.Point(14, 38) };
+      // Authentic Kakao Marker Pin (카카오맵 공식 정품 핀)
+      const markerImageSrc = 'https://t1.daumcdn.net/mapjsapi/images/2x/marker.png';
+      const imageSize = new window.kakao.maps.Size(29, 42);
+      const imageOption = { offset: new window.kakao.maps.Point(14, 42) };
       const markerImage = new window.kakao.maps.MarkerImage(markerImageSrc, imageSize, imageOption);
 
       const marker = new window.kakao.maps.Marker({
         position: centerPos,
         image: markerImage,
         map: map,
+        zIndex: 10,
       });
       kakaoMarkerRef.current = marker;
 
-      // 마커 클릭 시 말풍선 토글
+      // 카카오맵 스타일 매물 위치 안내 커스텀 오버레이 (지도 위에 항상 선명하게 표시)
+      const overlayDiv = document.createElement('div');
+      overlayDiv.style.cssText = 'position: relative; bottom: 48px; cursor: pointer; user-select: none;';
+      overlayDiv.innerHTML = `
+        <div style="background: #ffffff; border: 2px solid #258FFF; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.22); padding: 7px 12px; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif; text-align: center; min-width: 160px; max-width: 280px;">
+          <div style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; background: #EEF6FF; border-radius: 6px; margin-bottom: 3px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: #258FFF; display: inline-block;"></span>
+            <span style="font-size: 11px; font-weight: 800; color: #258FFF;">매물 위치</span>
+          </div>
+          <div style="font-size: 12px; font-weight: 800; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${fullDisplayTitle}
+          </div>
+          <div style="position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 8px solid #258FFF;"></div>
+          <div style="position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #ffffff;"></div>
+        </div>
+      `;
+      overlayDiv.onclick = () => {
+        setShowSpeechBubble((prev) => !prev);
+        map.panTo(centerPos);
+      };
+
+      const customOverlay = new window.kakao.maps.CustomOverlay({
+        position: centerPos,
+        content: overlayDiv,
+        yAnchor: 1,
+        zIndex: 20,
+        map: map,
+      });
+      kakaoOverlayRef.current = customOverlay;
+
+      // 마커 클릭 시에도 상세 말풍선 토글
       window.kakao.maps.event.addListener(marker, 'click', () => {
         setShowSpeechBubble((prev) => !prev);
         map.panTo(centerPos);
@@ -360,6 +392,9 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
 
       if (kakaoMarkerRef.current) {
         kakaoMarkerRef.current.setPosition(movePos);
+      }
+      if (kakaoOverlayRef.current) {
+        kakaoOverlayRef.current.setPosition(movePos);
       }
     }
   }, [currentCoords, mapEngine, address]);
@@ -465,13 +500,30 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         leafletMapRef.current = map;
         setLeafletLoaded(true);
 
-        const customIcon = L.icon({
-          iconUrl: 'https://t1.daumcdn.net/localimg/localimages/07/2018/pc/common/ico_pin_active.png',
-          iconSize: [28, 38],
-          iconAnchor: [14, 38],
+        const svgPinHtml = `
+          <div style="position: relative; width: 32px; height: 42px; transform: translate(-16px, -42px); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); cursor: pointer;">
+            <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16 0C7.16344 0 0 7.16344 0 16C0 26 16 42 16 42C16 42 32 26 32 16C32 7.16344 24.8366 0 16 0Z" fill="#258FFF"/>
+              <circle cx="16" cy="16" r="6" fill="white"/>
+              <circle cx="16" cy="16" r="3.5" fill="#258FFF"/>
+            </svg>
+          </div>
+        `;
+
+        const customIcon = L.divIcon({
+          html: svgPinHtml,
+          className: 'kakao-svg-pin',
+          iconSize: [32, 42],
+          iconAnchor: [16, 42],
         });
 
         const marker = L.marker([currentCoords.lat, currentCoords.lng], { icon: customIcon }).addTo(map);
+        marker.bindTooltip(`📍 매물 위치: ${fullDisplayTitle}`, {
+          permanent: true,
+          direction: 'top',
+          offset: [0, -42],
+          className: 'bg-white text-slate-900 font-extrabold text-xs px-2 py-1 rounded-lg border-2 border-blue-500 shadow-md',
+        });
         leafletMarkerRef.current = marker;
 
         setTimeout(() => map.invalidateSize(), 100);

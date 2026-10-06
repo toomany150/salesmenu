@@ -89,6 +89,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   // Price & Schedule
   const [availableDate, setAvailableDate] = useState('');
   const [isImmediateAvailable, setIsImmediateAvailable] = useState<boolean>(false); // 즉시가능
+  const [isNegotiableDate, setIsNegotiableDate] = useState<boolean>(false); // 입주일 협의
   const [price, setPrice] = useState<string>('');
   const [negotiablePrice, setNegotiablePrice] = useState<string>(''); // 조정 가능한 매매가액 (만원)
   const [deposit, setDeposit] = useState<string>('');
@@ -173,6 +174,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
         setAvailableDate(initialData.availableDate ? initialData.availableDate.substring(0, 10) : '');
         setIsImmediateAvailable(!!initialData.isImmediateAvailable);
+        setIsNegotiableDate(!!initialData.isNegotiableDate || (!initialData.isImmediateAvailable && !initialData.availableDate));
         setPrice(initialData.price !== undefined && initialData.price !== null ? String(initialData.price) : '');
         setNegotiablePrice(initialData.negotiablePrice !== undefined && initialData.negotiablePrice !== null ? String(initialData.negotiablePrice) : '');
         setDeposit(initialData.deposit !== undefined && initialData.deposit !== null ? String(initialData.deposit) : '');
@@ -235,7 +237,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       } else {
         // Create Mode - Defaults
         setPropertyType('APARTMENT');
-        setPropertyNumber(`PROP-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`);
+        setPropertyNumber(''); // 사용자의 요청: 신규 매물 등록 시 매물고유번호칸은 비워두기
         setReceiptDate(new Date().toISOString().substring(0, 10));
         setManagerName(
           currentUser?.role === 'AGENT' && currentUser?.name 
@@ -258,6 +260,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setIsDirectionCriteriaManual(false);
         setAvailableDate('');
         setIsImmediateAvailable(false);
+        setIsNegotiableDate(false);
         setPrice('');
         setNegotiablePrice('');
         setDeposit('');
@@ -732,9 +735,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!propertyNumber.trim()) {
-      setErrorMsg('매물번호를 입력해주세요.');
-      return;
+    let finalPropNumber = propertyNumber.trim();
+    if (!finalPropNumber) {
+      // 사용자가 매물고유번호를 직접 적지 않고 비워둔 경우 자동 고유번호 부여
+      finalPropNumber = `PROP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
     }
     const finalAddress = roadAddress.trim() || jibunAddress.trim() || address.trim();
     if (!finalAddress) {
@@ -800,7 +804,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
     const payload: any = {
       id: initialData?.id,
-      propertyNumber: propertyNumber.trim(),
+      propertyNumber: finalPropNumber,
       receiptDate,
       propertyType,
       transactionType,
@@ -814,8 +818,9 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       longitude: finalLng,
       direction,
       directionCriteria,
-      availableDate: availableDate || undefined,
+      availableDate: isNegotiableDate ? undefined : (availableDate || undefined),
       isImmediateAvailable,
+      isNegotiableDate,
       price: price ? parseFloat(price) : undefined,
       negotiablePrice: negotiablePrice ? parseFloat(negotiablePrice) : undefined,
       deposit: deposit ? parseFloat(deposit) : undefined,
@@ -1278,15 +1283,19 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                        매물번호 (고유번호) *
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-sm font-bold text-slate-800">
+                          매물번호 (고유번호)
+                        </label>
+                        <span className="text-[11px] font-medium text-slate-400">
+                          미입력 시 자동 채번
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={propertyNumber}
                         onChange={(e) => setPropertyNumber(e.target.value)}
-                        placeholder="예: PROP-2026-001"
-                        required
+                        placeholder="직접 입력 (비워두면 자동 생성)"
                         className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-mono font-extrabold text-blue-900"
                       />
                     </div>
@@ -1762,41 +1771,84 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       </div>
                     </div>
 
-                    {/* 입주가능일 & 즉시가능 옵션 */}
+                    {/* 입주가능일 & 즉시가능 / 협의가능 옵션 */}
                     <div className="pt-3 border-t border-slate-200">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                         <label className="text-sm font-bold text-slate-800">
                           입주가능일 및 즉시가능 여부
                         </label>
                         
-                        {/* [즉시가능] 토글 버튼 */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsImmediateAvailable(!isImmediateAvailable);
-                          }}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                            isImmediateAvailable
-                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
-                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span>⚡</span>
-                          <span>[즉시가능 (즉시입주)]</span>
-                        </button>
+                        {/* [즉시가능] 토글 버튼 & [입주일협의] 버튼 */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = !isImmediateAvailable;
+                              setIsImmediateAvailable(next);
+                              if (next) {
+                                setIsNegotiableDate(false);
+                                setAvailableDate(new Date().toISOString().substring(0, 10));
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              isImmediateAvailable
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>⚡</span>
+                            <span>[즉시가능 (즉시입주)]</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = !isNegotiableDate;
+                              setIsNegotiableDate(next);
+                              if (next) {
+                                setIsImmediateAvailable(false);
+                                setAvailableDate('');
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              isNegotiableDate
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            <span>🤝</span>
+                            <span>[입주일협의]</span>
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
                         <input
                           type="date"
                           value={availableDate}
-                          onChange={(e) => setAvailableDate(e.target.value)}
-                          className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                          disabled={isNegotiableDate}
+                          onChange={(e) => {
+                            setAvailableDate(e.target.value);
+                            if (e.target.value) {
+                              setIsNegotiableDate(false);
+                            }
+                          }}
+                          className={`w-full text-sm px-3.5 py-2.5 border rounded-xl focus:ring-2 focus:ring-blue-500 font-medium ${
+                            isNegotiableDate
+                              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                              : 'bg-white text-slate-900 border-slate-300'
+                          }`}
                         />
                         {isImmediateAvailable && (
                           <span className="shrink-0 inline-flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
                             <span>⚡</span>
-                            <span>즉시가능</span>
+                            <span>즉시입주</span>
+                          </span>
+                        )}
+                        {isNegotiableDate && (
+                          <span className="shrink-0 inline-flex items-center gap-1 px-3 py-2.5 rounded-xl text-xs font-extrabold bg-blue-100 text-blue-900 border border-blue-300">
+                            <span>🤝</span>
+                            <span>입주일협의</span>
                           </span>
                         )}
                       </div>

@@ -467,6 +467,7 @@ export interface PropertyItem {
   directionCriteria?: string;
   availableDate?: string;
   isImmediateAvailable?: boolean; // 즉시가능
+  isNegotiableDate?: boolean; // 입주일 협의
   price?: number;
   negotiablePrice?: number; // 조정 가능한 매매가액 (만원)
   deposit?: number;
