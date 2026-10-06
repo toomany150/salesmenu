@@ -15,6 +15,16 @@ import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { LoginModal } from '../auth/LoginModal';
 import { AdminLogModal } from '../auth/AdminLogModal';
 import { initKakao } from '@/lib/kakao';
+import { 
+  getCustomProperties, 
+  saveCustomProperty, 
+  removeCustomProperty, 
+  getDeletedPropertyIds,
+  getCustomCustomers, 
+  saveCustomCustomer, 
+  removeCustomCustomer, 
+  getDeletedCustomerIds 
+} from '@/lib/storage';
 
 type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP';
 
@@ -52,6 +62,17 @@ const DashboardContent: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const deletedPropIds = getDeletedPropertyIds();
+    const deletedCustIds = getDeletedCustomerIds();
+
+    // 1. 로컬에 안전하게 보관된 사용자 등록 매물 및 고객 불러오기
+    const localCustomProps = getCustomProperties().filter(
+      (p) => !deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)
+    );
+    const localCustomCusts = getCustomCustomers().filter(
+      (c) => !deletedCustIds.includes(c.id)
+    );
+
     try {
       const headers: HeadersInit = {};
       if (currentUser) {
@@ -63,27 +84,73 @@ const DashboardContent: React.FC = () => {
         fetch('/api/customers', { headers }),
         fetch('/api/properties', { headers }),
       ]);
-      const deletedPropIds: string[] = typeof window !== 'undefined'
-        ? JSON.parse(localStorage.getItem('cham_deleted_property_ids') || '[]')
-        : [];
-      const deletedCustIds: string[] = typeof window !== 'undefined'
-        ? JSON.parse(localStorage.getItem('cham_deleted_customer_ids') || '[]')
-        : [];
 
       if (custRes.ok) {
         const cData = await custRes.json();
         if (Array.isArray(cData)) {
-          setCustomers(cData.filter((c: any) => !deletedCustIds.includes(c.id)));
+          const custMap = new Map<string, CustomerItem>();
+          cData.forEach((c: any) => {
+            if (!deletedCustIds.includes(c.id)) custMap.set(c.id, c);
+          });
+          localCustomCusts.forEach((c) => {
+            if (!deletedCustIds.includes(c.id)) custMap.set(c.id, c);
+          });
+          setCustomers(Array.from(custMap.values()));
         }
+      } else if (localCustomCusts.length > 0) {
+        setCustomers(localCustomCusts);
       }
+
       if (propRes.ok) {
         const pData = await propRes.json();
         if (Array.isArray(pData)) {
-          setProperties(pData.filter((p: any) => !deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)));
+          const propMap = new Map<string, PropertyItem>();
+          
+          // 1) 서버 매물 추가
+          pData.forEach((p: any) => {
+            const key = p.propertyNumber || p.id;
+            if (!deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)) {
+              propMap.set(key, p);
+            }
+          });
+
+          // 2) 로컬스토리지 영구 보관 매물 오버레이 (Vercel 서버리스 재부팅 시에도 절대 매물이 사라지지 않음)
+          localCustomProps.forEach((cp) => {
+            const key = cp.propertyNumber || cp.id;
+            if (!deletedPropIds.includes(cp.id) && !deletedPropIds.includes(cp.propertyNumber)) {
+              propMap.set(key, cp);
+            }
+          });
+
+          const merged = Array.from(propMap.values());
+          merged.sort((a, b) => {
+            const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+            const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+            return tB - tA;
+          });
+          setProperties(merged);
+
+          // 3) 백그라운드 서버 재동기화: 서버리스 DB 초기화로 서버에 없는 매물 조용히 복원
+          const serverPropKeys = new Set(pData.map((p: any) => p.propertyNumber || p.id));
+          localCustomProps.forEach((cp) => {
+            const key = cp.propertyNumber || cp.id;
+            if (!serverPropKeys.has(key)) {
+              fetch('/api/properties', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                body: JSON.stringify(cp),
+              }).catch(() => {});
+            }
+          });
         }
+      } else if (localCustomProps.length > 0) {
+        setProperties(localCustomProps);
       }
     } catch (err) {
-      console.warn('DB fetch error, using initial mock data:', err);
+      console.warn('DB fetch error, using local storage cache:', err);
+      if (localCustomProps.length > 0) {
+        setProperties(localCustomProps);
+      }
     } finally {
       setLoading(false);
     }
@@ -123,8 +190,9 @@ const DashboardContent: React.FC = () => {
   };
 
   const handlePropertySaved = (savedProp: PropertyItem) => {
+    saveCustomProperty(savedProp);
     setProperties((prev) => {
-      const idx = prev.findIndex((p) => p.id === savedProp.id);
+      const idx = prev.findIndex((p) => p.id === savedProp.id || p.propertyNumber === savedProp.propertyNumber);
       if (idx >= 0) {
         const next = [...prev];
         next[idx] = savedProp;
@@ -147,6 +215,7 @@ const DashboardContent: React.FC = () => {
   };
 
   const handleCustomerSaved = (savedCust: CustomerItem) => {
+    saveCustomCustomer(savedCust);
     setCustomers((prev) => {
       const idx = prev.findIndex((c) => c.id === savedCust.id);
       if (idx >= 0) {
@@ -545,13 +614,7 @@ const DashboardContent: React.FC = () => {
         onPropertyDeleted={(deletedId) => {
           setProperties((prev) => prev.filter((p) => p.id !== deletedId && p.propertyNumber !== deletedId));
           setSelectedProperty(null);
-          try {
-            const list: string[] = JSON.parse(localStorage.getItem('cham_deleted_property_ids') || '[]');
-            if (!list.includes(deletedId)) {
-              list.push(deletedId);
-              localStorage.setItem('cham_deleted_property_ids', JSON.stringify(list));
-            }
-          } catch (e) {}
+          removeCustomProperty(deletedId);
         }}
       />
 
@@ -568,13 +631,7 @@ const DashboardContent: React.FC = () => {
         onCustomerDeleted={(deletedId) => {
           setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
           setSelectedCustomer(null);
-          try {
-            const list: string[] = JSON.parse(localStorage.getItem('cham_deleted_customer_ids') || '[]');
-            if (!list.includes(deletedId)) {
-              list.push(deletedId);
-              localStorage.setItem('cham_deleted_customer_ids', JSON.stringify(list));
-            }
-          } catch (e) {}
+          removeCustomCustomer(deletedId);
         }}
       />
 

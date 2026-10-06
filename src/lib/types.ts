@@ -311,6 +311,7 @@ export interface StoreData {
   gasType?: string; // 가스구분 (도시가스, LPG, 없음)
   monthlyRentVat?: boolean;
   premium?: number;
+  isNoPremium?: boolean; // 권리금 없음 여부
   maintenanceFee?: number;
   isNoMaintenanceFee?: boolean; // 관리비 없음 여부
   maintenanceFeeVat?: boolean;
@@ -472,6 +473,7 @@ export interface PropertyItem {
   negotiableDeposit?: number; // 조정 가능한 보증금/전세금 (만원)
   monthlyRent?: number;
   negotiableMonthlyRent?: number; // 조정 가능한 월 임대료 (만원)
+  monthlyRentVat?: boolean; // 월 임대료 부가세 별도 여부
   isNoMaintenanceFee?: boolean; // 관리비 없음
   consultationNotes?: string;
   landArea?: number;

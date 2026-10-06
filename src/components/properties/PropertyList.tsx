@@ -61,7 +61,9 @@ export const PropertyList: React.FC<PropertyListProps> = ({
       const base = p.deposit ? `${p.deposit.toLocaleString()} 만원` : '협의';
       return p.negotiableDeposit ? `${base} (조정: ${p.negotiableDeposit.toLocaleString()}만)` : base;
     } else {
-      const base = `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}`;
+      const isVat = p.monthlyRentVat || p.storeDetail?.monthlyRentVat || p.officeDetail?.monthlyRentVat;
+      const vatText = isVat ? ' (부가세 별도)' : '';
+      const base = `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
       if (p.negotiableDeposit || p.negotiableMonthlyRent) {
         return `${base} (조정: ${p.negotiableDeposit || 0}만/${p.negotiableMonthlyRent || 0}만)`;
       }

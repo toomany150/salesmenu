@@ -102,7 +102,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   } else if (property.transactionType === '전세') {
     priceText = property.deposit ? `${property.deposit.toLocaleString()} 만원` : '협의';
   } else {
-    priceText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}`;
+    const isVat = property.monthlyRentVat || property.storeDetail?.monthlyRentVat || property.officeDetail?.monthlyRentVat;
+    const vatText = isVat ? ' (부가세 별도)' : '';
+    priceText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
   }
 
   let negotiablePriceText = '';

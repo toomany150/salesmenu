@@ -819,15 +819,44 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
           {/* 권리금 & 관리비 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                권리금 (만원)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-bold text-slate-800">
+                  권리금 (만원)
+                </label>
+                
+                {/* [권리금 없음] 토글 버튼 (4번째 이미지 스타일) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isCurrentlyNoPremium = data.isNoPremium || data.premium === 0;
+                    const nextNoPremium = !isCurrentlyNoPremium;
+                    onChange({
+                      ...data,
+                      isNoPremium: nextNoPremium,
+                      premium: nextNoPremium ? 0 : undefined,
+                    });
+                  }}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold border transition-all cursor-pointer ${
+                    data.isNoPremium || data.premium === 0
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>✓</span>
+                  <span>[권리금 없음] 설정</span>
+                </button>
+              </div>
               <input
                 type="number"
-                value={data.premium || ''}
+                disabled={data.isNoPremium || data.premium === 0}
+                value={data.isNoPremium || data.premium === 0 ? 0 : (data.premium || '')}
                 onChange={(e) => updateField('premium', e.target.value ? parseFloat(e.target.value) : undefined)}
-                placeholder="예: 3000 (무권리 시 0 입력)"
-                className="w-full text-sm px-3.5 py-2.5 bg-amber-50/60 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 font-extrabold text-amber-950"
+                placeholder={data.isNoPremium || data.premium === 0 ? '0 (무권리)' : '예: 3000 (무권리 시 0 입력)'}
+                className={`w-full text-sm px-3.5 py-2.5 border rounded-xl font-bold ${
+                  data.isNoPremium || data.premium === 0
+                    ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-extrabold'
+                    : 'bg-amber-50/60 border-amber-300 focus:ring-2 focus:ring-amber-500 font-extrabold text-amber-950'
+                }`}
               />
             </div>
 
