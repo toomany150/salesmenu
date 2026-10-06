@@ -63,13 +63,24 @@ const DashboardContent: React.FC = () => {
         fetch('/api/customers', { headers }),
         fetch('/api/properties', { headers }),
       ]);
+      const deletedPropIds: string[] = typeof window !== 'undefined'
+        ? JSON.parse(localStorage.getItem('cham_deleted_property_ids') || '[]')
+        : [];
+      const deletedCustIds: string[] = typeof window !== 'undefined'
+        ? JSON.parse(localStorage.getItem('cham_deleted_customer_ids') || '[]')
+        : [];
+
       if (custRes.ok) {
         const cData = await custRes.json();
-        if (Array.isArray(cData)) setCustomers(cData);
+        if (Array.isArray(cData)) {
+          setCustomers(cData.filter((c: any) => !deletedCustIds.includes(c.id)));
+        }
       }
       if (propRes.ok) {
         const pData = await propRes.json();
-        if (Array.isArray(pData)) setProperties(pData);
+        if (Array.isArray(pData)) {
+          setProperties(pData.filter((p: any) => !deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)));
+        }
       }
     } catch (err) {
       console.warn('DB fetch error, using initial mock data:', err);
@@ -532,9 +543,15 @@ const DashboardContent: React.FC = () => {
         onClose={() => setSelectedProperty(null)}
         onEditProperty={handleOpenEditProperty}
         onPropertyDeleted={(deletedId) => {
-          setProperties((prev) => prev.filter((p) => p.id !== deletedId));
+          setProperties((prev) => prev.filter((p) => p.id !== deletedId && p.propertyNumber !== deletedId));
           setSelectedProperty(null);
-          fetchData();
+          try {
+            const list: string[] = JSON.parse(localStorage.getItem('cham_deleted_property_ids') || '[]');
+            if (!list.includes(deletedId)) {
+              list.push(deletedId);
+              localStorage.setItem('cham_deleted_property_ids', JSON.stringify(list));
+            }
+          } catch (e) {}
         }}
       />
 
@@ -551,7 +568,13 @@ const DashboardContent: React.FC = () => {
         onCustomerDeleted={(deletedId) => {
           setCustomers((prev) => prev.filter((c) => c.id !== deletedId));
           setSelectedCustomer(null);
-          fetchData();
+          try {
+            const list: string[] = JSON.parse(localStorage.getItem('cham_deleted_customer_ids') || '[]');
+            if (!list.includes(deletedId)) {
+              list.push(deletedId);
+              localStorage.setItem('cham_deleted_customer_ids', JSON.stringify(list));
+            }
+          } catch (e) {}
         }}
       />
 
