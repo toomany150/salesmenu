@@ -57,7 +57,7 @@ const DashboardContent: React.FC = () => {
       if (currentUser) {
         headers['x-user-role'] = currentUser.role;
         headers['x-user-id'] = currentUser.id;
-        headers['x-user-name'] = currentUser.name;
+        headers['x-user-name'] = encodeURIComponent(currentUser.name || '');
       }
       const [custRes, propRes] = await Promise.all([
         fetch('/api/customers', { headers }),

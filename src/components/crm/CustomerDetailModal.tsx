@@ -79,12 +79,13 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/customers?id=${customer.id}`, {
+      const safeUserName = currentUser?.name ? encodeURIComponent(currentUser.name) : encodeURIComponent('관리자');
+      const res = await fetch(`/api/customers?id=${customer.id}&userName=${safeUserName}`, {
         method: 'DELETE',
         headers: {
           'x-user-role': currentUser?.role || 'ADMIN',
           'x-user-id': currentUser?.id || '',
-          'x-user-name': currentUser?.name || '관리자',
+          'x-user-name': safeUserName,
         },
       });
 

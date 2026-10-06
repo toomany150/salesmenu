@@ -11,7 +11,11 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     const userRole = request.headers.get('x-user-role') || searchParams.get('role');
     const userId = request.headers.get('x-user-id') || searchParams.get('userId');
-    const userName = request.headers.get('x-user-name') || searchParams.get('userName');
+    const rawUserName = request.headers.get('x-user-name') || searchParams.get('userName');
+    let userName = rawUserName || undefined;
+    if (userName) {
+      try { userName = decodeURIComponent(userName); } catch (e) {}
+    }
 
     const whereClause: any = {};
     if (group && (group === 'RECEIVED' || group === 'SEARCHING')) {
@@ -408,7 +412,11 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     const userRole = request.headers.get('x-user-role') || searchParams.get('role');
     const userId = request.headers.get('x-user-id') || searchParams.get('userId');
-    const userName = request.headers.get('x-user-name') || searchParams.get('userName') || '관리자';
+    const rawUserName = request.headers.get('x-user-name') || searchParams.get('userName') || '관리자';
+    let userName = rawUserName;
+    try {
+      userName = decodeURIComponent(rawUserName);
+    } catch (e) {}
 
     if (userRole !== 'ADMIN') {
       return NextResponse.json(
