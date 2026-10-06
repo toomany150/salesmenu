@@ -39,12 +39,16 @@ import { KakaoAddressMap } from '../map/KakaoAddressMap';
 interface CustomerPropertyBriefingProps {
   property: PropertyItem;
   addressMode?: AddressShareMode;
+  currentUser?: any;
+  onSwitchToAdmin?: () => void;
   onOpenLogin?: () => void;
 }
 
 export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> = ({
   property,
   addressMode = 'dong',
+  currentUser,
+  onSwitchToAdmin,
   onOpenLogin,
 }) => {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
@@ -127,24 +131,37 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* 대표님(중개사)이 로그인된 상태에서 링크를 열었을 때: 원클릭 관리/수정 모드 전환 버튼 */}
+            {currentUser && onSwitchToAdmin && (
+              <button
+                type="button"
+                onClick={onSwitchToAdmin}
+                title="중개사 관리자 화면으로 전환하여 매물 수정 및 전체 정보 관리"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-transform active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                <span className="whitespace-nowrap">중개사 관리</span>
+              </button>
+            )}
+
             <a
               href={`tel:${BROKER_OFFICE_INFO.tel}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-transform active:scale-95"
             >
               <Phone className="w-3.5 h-3.5" />
-              <span>📞 전화 상담</span>
+              <span className="whitespace-nowrap">📞 전화 상담</span>
             </a>
 
-            {onOpenLogin && (
+            {!currentUser && onOpenLogin && (
               <button
                 type="button"
                 onClick={onOpenLogin}
                 title="중개사 전용 로그인"
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition-colors"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">중개사 로그인</span>
+                <span className="hidden sm:inline">중개사 로그인</span>
               </button>
             )}
           </div>
@@ -155,12 +172,12 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
       <main className="max-w-4xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
         {/* 2. 매물 타이틀 & 금액 요약 카드 */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white shadow-2xs">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2">
+            <span className="px-2.5 py-0.5 text-xs font-bold rounded-lg bg-blue-600 text-white shadow-2xs">
               {propType}
             </span>
-            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-800 border border-blue-200">
               {property.transactionType}
             </span>
             <span className="font-mono text-xs font-bold text-slate-400">
@@ -173,7 +190,7 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
             )}
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2">
+          <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight mb-2 break-keep leading-snug">
             {property.apartmentDetail?.complexName || 
              property.storeDetail?.storeName || 
              property.officeDetail?.officeName || 
@@ -183,7 +200,7 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
           </h1>
 
           {/* 소재지 표시 */}
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mb-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mb-4 break-keep">
             <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
             <span className="font-semibold text-slate-800">{displayAddress}</span>
 
@@ -211,25 +228,25 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
             )}
           </div>
 
-          {/* 금액 하이라이트 박스 */}
-          <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-blue-50/80 via-sky-50/50 to-indigo-50/60 border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="text-xs font-semibold text-blue-800 block">
+          {/* 금액 하이라이트 박스 (모바일 글자 크기 및 줄바꿈 최적화) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/70 border border-blue-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+            <div className="min-w-0">
+              <span className="text-xs font-bold text-blue-800 block mb-0.5">
                 {property.transactionType} 조건
               </span>
-              <div className="text-2xl sm:text-3xl font-black text-blue-950 mt-0.5">
+              <div className="text-xl sm:text-2xl md:text-3xl font-black text-blue-950 tracking-tight break-keep whitespace-normal sm:whitespace-nowrap">
                 {priceMainText}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {premiumText && (
-                <div className="px-3 py-1.5 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 font-bold text-xs">
+                <div className="px-3 py-1.5 rounded-lg bg-amber-100/90 border border-amber-300 text-amber-950 font-bold text-xs shadow-2xs">
                   {premiumText}
                 </div>
               )}
               {maintenanceText && (
-                <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold text-xs shadow-2xs">
+                <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-xs shadow-2xs">
                   관리비: {maintenanceText}
                 </div>
               )}

@@ -180,17 +180,8 @@ const DashboardContent: React.FC = () => {
 
   const hasAutoOpenedPropRef = useRef(false);
 
-  // 중개사가 로그인하면 고객 전용 뷰 모드 해제 및 관리자 상세창으로 전환
-  useEffect(() => {
-    if (currentUser && isCustomerMode) {
-      setIsCustomerMode(false);
-      if (customerBriefingProp) {
-        setSelectedProperty(customerBriefingProp);
-      }
-    }
-  }, [currentUser, isCustomerMode, customerBriefingProp]);
-
-  // 카카오톡 등 외부 공유 링크로 접근 시 (?propertyId=... 또는 ?pData=...) 해당 매물 상세창 자동 열기
+  // 카카오톡 등 외부 공유 링크로 접근 시 (?propertyId=... 또는 ?pData=...) 
+  // 접속자가 누구든(대표님이 직접 확인하든, 고객이 열든) 100% 안전한 '고객 전용 매물 브리핑 안내장'을 기본 화면으로 표시합니다.
   useEffect(() => {
     if (typeof window === 'undefined' || hasAutoOpenedPropRef.current) return;
     try {
@@ -204,14 +195,9 @@ const DashboardContent: React.FC = () => {
 
       const applyOpenedProperty = (targetProp: PropertyItem) => {
         hasAutoOpenedPropRef.current = true;
-        if (currentUser) {
-          // 중개사 로그인 상태인 경우: 내부 관리자 상세 모달 열기
-          setSelectedProperty(targetProp);
-        } else {
-          // 외부 고객 링크 접속인 경우: 소유주/내부메모 완전 차단된 고객 전용 안내장 화면 표시
-          setCustomerBriefingProp(targetProp);
-          setIsCustomerMode(true);
-        }
+        // 공유 링크로 접속한 경우: 무조건 안전한 고객 전용 매물 안내장(CustomerPropertyBriefing)으로 표시
+        setCustomerBriefingProp(targetProp);
+        setIsCustomerMode(true);
       };
 
       // 1) URL에 직렬화된 pData 매물 정보가 있는 경우: 즉시 모달 열람 (스마트폰 카톡 링크 클릭 시 100% 즉시 열림 보장)
@@ -331,13 +317,19 @@ const DashboardContent: React.FC = () => {
     scrollToDetail();
   };
 
-  // 고객 전용 매물 브리핑 안내장 뷰 (비로그인 상태로 외부 공유 링크 접속 시 내부 CRM 접근 완벽 차단)
-  if (isCustomerMode && customerBriefingProp && !currentUser) {
+  // 고객 전용 매물 브리핑 안내장 뷰
+  // (외부 공유 링크 접속 시 대표님이든 고객이든 안전한 고객 브리핑 화면 우선 표시)
+  if (isCustomerMode && customerBriefingProp) {
     return (
       <>
         <CustomerPropertyBriefing
           property={customerBriefingProp}
           addressMode={customerBriefingAddrMode}
+          currentUser={currentUser}
+          onSwitchToAdmin={() => {
+            setIsCustomerMode(false);
+            setSelectedProperty(customerBriefingProp);
+          }}
           onOpenLogin={() => setIsLoginOpen(true)}
         />
         <LoginModal
