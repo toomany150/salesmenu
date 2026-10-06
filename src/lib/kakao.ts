@@ -7,11 +7,18 @@ declare global {
   }
 }
 
+const DEFAULT_KAKAO_KEY = 'ab4074f3fc327e405a625fc856bee022';
+
+export function getKakaoKey(): string {
+  return process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY || 
+         process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || 
+         DEFAULT_KAKAO_KEY;
+}
+
 export function initKakao(): boolean {
   if (typeof window === 'undefined') return false;
 
-  // 카카오 지도 및 카카오톡 공유 공통 SDK 키로 NEXT_PUBLIC_KAKAO_MAP_KEY 통일 적용
-  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+  const kakaoKey = getKakaoKey();
 
   const isValidKey = (key?: string) => {
     return !!key && 
@@ -32,23 +39,27 @@ export function initKakao(): boolean {
     return window.Kakao.isInitialized();
   }
 
-  // 동적 스크립트 로드
-  const script = document.createElement('script');
-  script.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js';
-  script.integrity = 'sha384-TiCUE00h649CAMonG018J2mAssRse_g30edZNi92OBghGwpczuo20MW4zkMxYMcN';
-  script.crossOrigin = 'anonymous';
-  script.onload = () => {
-    if (window.Kakao && isValidKey(kakaoKey)) {
-      try {
-        if (!window.Kakao.isInitialized()) {
-          window.Kakao.init(kakaoKey);
+  // 동적 스크립트 로드 (layout.tsx에 없을 경우 대비)
+  const existingScript = document.getElementById('kakao-js-sdk');
+  if (!existingScript) {
+    const script = document.createElement('script');
+    script.id = 'kakao-js-sdk';
+    script.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js';
+    script.integrity = 'sha384-TiCUE00h649CAMonG018J2mAssRse_g30edZNi92OBghGwpczuo20MW4zkMxYMcN';
+    script.crossOrigin = 'anonymous';
+    script.onload = () => {
+      if (window.Kakao && isValidKey(kakaoKey)) {
+        try {
+          if (!window.Kakao.isInitialized()) {
+            window.Kakao.init(kakaoKey);
+          }
+        } catch (err) {
+          console.warn('Kakao script onload init error:', err);
         }
-      } catch (err) {
-        console.warn('Kakao script onload init error:', err);
       }
-    }
-  };
-  document.head.appendChild(script);
+    };
+    document.head.appendChild(script);
+  }
   return false;
 }
 
@@ -61,58 +72,79 @@ export interface SharePropertyParams {
   propertyType: string;
 }
 
-export function shareViaKakao(params: SharePropertyParams): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined') return resolve(false);
+export async function shareViaKakao(params: SharePropertyParams): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
 
-    const shareUrl = window.location.href;
-    const isKakaoReady = window.Kakao && window.Kakao.isInitialized();
+  const shareUrl = window.location.href;
+  const kakaoKey = getKakaoKey();
 
-    if (isKakaoReady) {
+  // 아직 Kakao 초기화가 안 되어 있다면 즉시 초기화 시도
+  if (window.Kakao && !window.Kakao.isInitialized()) {
+    try {
+      window.Kakao.init(kakaoKey);
+    } catch (e) {
+      console.warn('Kakao immediate init error:', e);
+    }
+  }
+
+  // 스크립트가 아직 로딩 중인 경우 잠깐 대기
+  if (!window.Kakao) {
+    initKakao();
+    await new Promise((r) => setTimeout(r, 600));
+    if (window.Kakao && !window.Kakao.isInitialized()) {
       try {
-        window.Kakao.Share.sendDefault({
-          objectType: 'feed',
-          content: {
-            title: `[매물 ${params.propertyNumber}] ${params.title}`,
-            description: `${params.priceText}\n위치: ${params.address}\n유형: ${params.propertyType}`,
-            imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=60',
+        window.Kakao.init(kakaoKey);
+      } catch (e) {}
+    }
+  }
+
+  const isKakaoReady = window.Kakao && window.Kakao.isInitialized();
+
+  if (isKakaoReady) {
+    try {
+      window.Kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: `[매물 ${params.propertyNumber}] ${params.title}`,
+          description: `${params.priceText}\n위치: ${params.address}\n유형: ${params.propertyType}`,
+          imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=60',
+          link: {
+            mobileWebUrl: shareUrl,
+            webUrl: shareUrl,
+          },
+        },
+        buttons: [
+          {
+            title: '매물 상세정보 보기',
             link: {
               mobileWebUrl: shareUrl,
               webUrl: shareUrl,
             },
           },
-          buttons: [
-            {
-              title: '매물 상세정보 보기',
-              link: {
-                mobileWebUrl: shareUrl,
-                webUrl: shareUrl,
-              },
-            },
-          ],
-        });
-        return resolve(true);
-      } catch (err) {
-        console.error('Failed to send Kakao share:', err);
-      }
-    }
-
-    // 카카오 SDK 미설정 시 클립보드 복사 또는 안내
-    const summaryText = `[부동산 매물안내 - 매물번호 #${params.propertyNumber}]\n● 매물유형: ${params.propertyType}\n● 거래정보: ${params.priceText}\n● 소재지: ${params.address}\n● 상세설명: ${params.description}\n\n상세링크: ${shareUrl}`;
-    
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(summaryText).then(() => {
-        alert('카카오톡 SDK 키가 설정되지 않아 매물 안내 문구가 클립보드에 복사되었습니다!\n원하는 카카오톡 채팅방에 [붙여넣기] 해주세요.');
-        resolve(true);
-      }).catch(() => {
-        alert('매물 정보 요약:\n\n' + summaryText);
-        resolve(false);
+        ],
       });
-    } else {
-      alert('매물 정보 요약:\n\n' + summaryText);
-      resolve(false);
+      return true;
+    } catch (err) {
+      console.warn('Kakao share send error, falling back to clipboard:', err);
     }
-  });
+  }
+
+  // 카카오 SDK 미설정/도메인 미등록 시 클립보드 복사 폴백
+  const summaryText = `[부동산 매물안내 - 매물번호 #${params.propertyNumber}]\n● 매물유형: ${params.propertyType}\n● 거래정보: ${params.priceText}\n● 소재지: ${params.address}\n● 상세설명: ${params.description}\n\n상세링크: ${shareUrl}`;
+  
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(summaryText);
+      alert('매물 안내 문구가 클립보드에 복사되었습니다!\n원하는 카카오톡 채팅방에 [붙여넣기] 해주세요.');
+      return true;
+    } catch {
+      alert('매물 정보 요약:\n\n' + summaryText);
+      return false;
+    }
+  } else {
+    alert('매물 정보 요약:\n\n' + summaryText);
+    return false;
+  }
 }
 
 export function generateSmsLink(property: {

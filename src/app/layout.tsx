@@ -39,6 +39,13 @@ export default function RootLayout({
           id="kakao-maps-sdk"
           src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || 'ab4074f3fc327e405a625fc856bee022'}&autoload=false&libraries=services,clusterer`}
         />
+        {/* Kakao Javascript SDK for Kakao Share */}
+        <script
+          id="kakao-js-sdk"
+          src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
+          crossOrigin="anonymous"
+          defer
+        />
       </head>
       <body className="antialiased selection:bg-blue-500 selection:text-white font-sans">
         {children}
