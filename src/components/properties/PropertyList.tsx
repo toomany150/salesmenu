@@ -356,6 +356,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                     address: property.address,
                     propertyNumber: property.propertyNumber,
                     propertyType: PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType,
+                    property: property,
                   });
                 };
 

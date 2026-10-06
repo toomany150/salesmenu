@@ -139,6 +139,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       address: `${property.address} ${property.detailAddress || ''}`,
       propertyNumber: property.propertyNumber,
       propertyType: PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType,
+      property: property,
     });
   };
 

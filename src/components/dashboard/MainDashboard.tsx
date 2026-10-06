@@ -26,6 +26,18 @@ import {
   getDeletedCustomerIds 
 } from '@/lib/storage';
 
+function fromUtf8Base64(b64: string): string {
+  try {
+    return decodeURIComponent(
+      Array.prototype.map
+        .call(atob(b64), (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+  } catch {
+    return '';
+  }
+}
+
 type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP';
 
 const DashboardContent: React.FC = () => {
@@ -160,17 +172,68 @@ const DashboardContent: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  // 카카오톡 등 외부 공유 링크로 접근 시 (?propertyId=...) 해당 매물 상세창 자동 열기
+  const hasAutoOpenedPropRef = useRef(false);
+
+  // 카카오톡 등 외부 공유 링크로 접근 시 (?propertyId=... 또는 ?pData=...) 해당 매물 상세창 자동 열기
   useEffect(() => {
-    if (typeof window === 'undefined' || properties.length === 0) return;
+    if (typeof window === 'undefined' || hasAutoOpenedPropRef.current) return;
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const propId = searchParams.get('propertyId');
-      if (propId) {
+      const pDataRaw = searchParams.get('pData');
+
+      if (!propId && !pDataRaw) return;
+
+      // 1) URL에 직렬화된 pData 매물 정보가 있는 경우: 즉시 모달 열람 (스마트폰 카톡 링크 클릭 시 100% 즉시 열림 보장)
+      if (pDataRaw) {
+        try {
+          const jsonStr = fromUtf8Base64(pDataRaw);
+          if (jsonStr) {
+            const parsedProp: PropertyItem = JSON.parse(jsonStr);
+            if (parsedProp && (parsedProp.id || parsedProp.propertyNumber)) {
+              hasAutoOpenedPropRef.current = true;
+              setSelectedProperty(parsedProp);
+              // 매물 목록에도 추가하여 상세창을 닫은 뒤에도 둘러볼 수 있도록 지원
+              setProperties((prev) => {
+                const exists = prev.some(
+                  (p) =>
+                    (parsedProp.id && p.id === parsedProp.id) ||
+                    (parsedProp.propertyNumber && p.propertyNumber === parsedProp.propertyNumber)
+                );
+                return exists ? prev : [parsedProp, ...prev];
+              });
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('pData parse error:', err);
+        }
+      }
+
+      // 2) 현재 메모리/로컬스토리지에 있는 매물 목록에서 검색
+      if (propId && properties.length > 0) {
         const found = properties.find((p) => p.id === propId || p.propertyNumber === propId);
         if (found) {
+          hasAutoOpenedPropRef.current = true;
           setSelectedProperty(found);
+          return;
         }
+      }
+
+      // 3) 만약 현재 목록에 없는 매물번호/ID라면 서버 API에서 직접 단건 검색 시도
+      if (propId && !hasAutoOpenedPropRef.current) {
+        fetch(`/api/properties?search=${encodeURIComponent(propId)}`)
+          .then((res) => res.json())
+          .then((items) => {
+            if (Array.isArray(items) && items.length > 0 && !hasAutoOpenedPropRef.current) {
+              const matched = items.find((p: any) => p.id === propId || p.propertyNumber === propId) || items[0];
+              if (matched) {
+                hasAutoOpenedPropRef.current = true;
+                setSelectedProperty(matched);
+              }
+            }
+          })
+          .catch(() => {});
       }
     } catch (e) {}
   }, [properties]);

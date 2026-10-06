@@ -63,6 +63,40 @@ export function initKakao(): boolean {
   return false;
 }
 
+const DEFAULT_PUBLIC_APP_URL = 'https://salesmenu.vercel.app';
+
+export function getAppBaseUrl(): string {
+  const defaultUrl = process.env.NEXT_PUBLIC_APP_URL || DEFAULT_PUBLIC_APP_URL;
+  if (typeof window === 'undefined') {
+    return defaultUrl;
+  }
+  const hostname = window.location.hostname;
+  // 로컬 개발 환경(localhost, 127.0.0.1, 내부 사설 IP)에서 카카오톡 공유 시,
+  // 수신자(스마트폰 등 외부 기기)는 localhost에 접속할 수 없으므로 실제 배포된 공개 도메인으로 전송합니다.
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.startsWith('172.')
+  ) {
+    return defaultUrl;
+  }
+  return window.location.origin;
+}
+
+function toUtf8Base64(str: string): string {
+  try {
+    return btoa(
+      encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+        String.fromCharCode(parseInt(p1, 16))
+      )
+    );
+  } catch {
+    return '';
+  }
+}
+
 export interface SharePropertyParams {
   id?: string;
   title: string;
@@ -71,15 +105,54 @@ export interface SharePropertyParams {
   address: string;
   propertyNumber: string;
   propertyType: string;
+  property?: any;
 }
 
 export async function shareViaKakao(params: SharePropertyParams): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
-  const baseUrl = window.location.origin;
-  const shareUrl = params.id 
-    ? `${baseUrl}?propertyId=${encodeURIComponent(params.id)}` 
-    : window.location.href;
+  const baseUrl = getAppBaseUrl();
+  const propIdentifier = params.propertyNumber || params.id || '';
+
+  // 수신자 스마트폰에서 Vercel 서버리스 DB 동기화 여부와 무관하게 100% 즉시 상세 모달이 열리도록
+  // 경량화된 매물 데이터(pData)를 URL 파라미터에 안전하게 인코딩하여 포함합니다.
+  let pDataQuery = '';
+  const propTarget = params.property || {
+    id: params.id,
+    propertyNumber: params.propertyNumber,
+    propertyType: params.propertyType,
+    transactionType: params.priceText?.includes('전세') ? '전세' : params.priceText?.includes('매매') ? '매매' : '월세',
+    status: 'AVAILABLE',
+    address: params.address,
+    consultationNotes: params.description,
+  };
+
+  try {
+    // 거대한 base64 이미지는 제외하고 http URL 이미지만 포함하여 URL 길이 제한 방지
+    const cleanImages = Array.isArray(propTarget.images)
+      ? propTarget.images.filter((img: string) => typeof img === 'string' && img.startsWith('http')).slice(0, 3)
+      : [];
+    const payload = {
+      ...propTarget,
+      images: cleanImages,
+    };
+    // 민감한 소유자 개인정보는 공유 링크에서 제외 (개인정보 보호)
+    delete payload.customer;
+    delete payload.customerId;
+    delete payload.ownerRegNo;
+
+    const jsonStr = JSON.stringify(payload);
+    const b64 = toUtf8Base64(jsonStr);
+    if (b64 && b64.length < 1400) {
+      pDataQuery = `&pData=${encodeURIComponent(b64)}`;
+    }
+  } catch (err) {
+    console.warn('pData encoding notice:', err);
+  }
+
+  const shareUrl = propIdentifier
+    ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}${pDataQuery}`
+    : baseUrl;
   const kakaoKey = getKakaoKey();
 
   // 아직 Kakao 초기화가 안 되어 있다면 즉시 초기화 시도
@@ -104,6 +177,10 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
 
   const isKakaoReady = window.Kakao && window.Kakao.isInitialized();
 
+  const previewImage = (params.property?.images?.[0] && typeof params.property.images[0] === 'string' && params.property.images[0].startsWith('http'))
+    ? params.property.images[0]
+    : 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=60';
+
   if (isKakaoReady) {
     try {
       window.Kakao.Share.sendDefault({
@@ -111,7 +188,7 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
         content: {
           title: `[매물 ${params.propertyNumber}] ${params.title}`,
           description: `${params.priceText}\n위치: ${params.address}\n유형: ${params.propertyType}`,
-          imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=60',
+          imageUrl: previewImage,
           link: {
             mobileWebUrl: shareUrl,
             webUrl: shareUrl,
