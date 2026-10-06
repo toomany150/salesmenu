@@ -14,7 +14,8 @@ import {
   Columns,
   Edit3,
   Camera,
-  ImageIcon
+  ImageIcon,
+  Copy
 } from 'lucide-react';
 import { 
   PropertyItem, 
@@ -22,7 +23,7 @@ import {
   PROPERTY_TYPE_LABELS, 
   STATUS_LABELS 
 } from '@/lib/types';
-import { shareViaKakao, generateSmsLink } from '@/lib/kakao';
+import { shareViaKakao, generateSmsLink, copyPropertyShareLink } from '@/lib/kakao';
 import { PropertyMapView } from '../map/PropertyMapView';
 import { PropertyFilterPanel } from './PropertyFilterPanel';
 import { useAuth } from '../auth/AuthContext';
@@ -481,6 +482,17 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
                         </a>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyPropertyShareLink(property);
+                          }}
+                          title="매물 링크 복사 (카톡/문자용)"
+                          className="p-1.5 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           type="button"
                           onClick={onShareKakao}

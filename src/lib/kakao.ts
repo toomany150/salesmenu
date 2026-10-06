@@ -228,6 +228,39 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
   }
 }
 
+export async function copyPropertyShareLink(property: any): Promise<boolean> {
+  const baseUrl = getAppBaseUrl();
+  const propId = property.propertyNumber || property.id || '';
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}`;
+  
+  let priceStr = '';
+  if (property.transactionType === '매매') {
+    priceStr = `매매가 ${property.price ? property.price.toLocaleString() + '만원' : '협의'}`;
+  } else if (property.transactionType === '전세') {
+    priceStr = `전세 ${property.deposit ? property.deposit.toLocaleString() + '만원' : '협의'}`;
+  } else {
+    priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만원' : '0'}/월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만원' : '0'}`;
+  }
+
+  const text = `[부동산 매물안내 - 매물번호 #${property.propertyNumber || propId}]
+● 매물유형: ${property.propertyType || ''} (${property.transactionType || ''})
+● 거래금액: ${priceStr}
+● 소재지: ${property.address || ''} ${property.detailAddress || ''}
+${property.consultationNotes ? `● 특징: ${property.consultationNotes}\n` : ''}
+👉 매물 상세정보 확인하기:
+${shareUrl}`;
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('고객 안내 문구와 매물 링크가 클립보드에 복사되었습니다!\n\n카카오톡 채팅방에 [붙여넣기]하시면 고객이 링크를 눌러 매물을 바로 확인할 수 있습니다.');
+      return true;
+    } catch (e) {}
+  }
+  prompt('아래 매물 안내 문구를 복사하여 카카오톡에 붙여넣어 주세요:', text);
+  return true;
+}
+
 export function generateSmsLink(property: {
   propertyNumber: string;
   propertyType: string;
@@ -239,6 +272,9 @@ export function generateSmsLink(property: {
   detailAddress?: string;
   consultationNotes?: string;
 }): string {
+  const baseUrl = getAppBaseUrl();
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}`;
+
   let priceStr = '';
   if (property.transactionType === '매매') {
     priceStr = `매매가 ${property.price ? property.price.toLocaleString() + '만원' : '협의'}`;
@@ -253,7 +289,9 @@ export function generateSmsLink(property: {
 - 유형: ${property.propertyType} (${property.transactionType})
 - 금액: ${priceStr}
 - 소재지: ${property.address} ${property.detailAddress || ''}
-${property.consultationNotes ? `- 참고사항: ${property.consultationNotes}` : ''}
+${property.consultationNotes ? `- 참고사항: ${property.consultationNotes}\n` : ''}
+👉 매물 상세정보 보기:
+${shareUrl}
 
 문의주시면 친절히 상담해 드리겠습니다.`;
 

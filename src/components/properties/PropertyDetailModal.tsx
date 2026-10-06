@@ -22,10 +22,11 @@ import {
   ImageIcon,
   Lock,
   Trash2,
-  Building2
+  Building2,
+  Copy
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
-import { shareViaKakao, generateSmsLink } from '@/lib/kakao';
+import { shareViaKakao, generateSmsLink, copyPropertyShareLink } from '@/lib/kakao';
 import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
 import { useAuth } from '../auth/AuthContext';
 import { maskPhoneNumber, canViewCustomerContact, canDeleteItem, canEditItem } from '@/lib/auth';
@@ -353,6 +354,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>💬 문자로 전송</span>
               </a>
+
+              <button
+                type="button"
+                onClick={() => copyPropertyShareLink(property)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-all active:scale-95"
+                title="카톡/문자 전송용 매물 링크 및 요약 복사"
+              >
+                <Copy className="w-3.5 h-3.5 text-slate-600" />
+                <span>🔗 링크 복사</span>
+              </button>
 
               <button
                 type="button"
