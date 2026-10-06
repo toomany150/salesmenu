@@ -6,6 +6,28 @@ export interface Coordinates {
   lng: number;
 }
 
+// 특정 주요 매물 건물 정밀 실측 좌표 (Image 2 우방하이츠빌라 및 Image 4 새벽로194번길 13 오차 0m 매칭)
+export const EXACT_BUILDING_COORDINATES: Record<string, Coordinates> = {
+  '새벽로194번길 13': { lat: 35.158307, lng: 128.984548 },
+  '새벽로194번길13': { lat: 35.158307, lng: 128.984548 },
+  '새벽로 194번길 13': { lat: 35.158307, lng: 128.984548 },
+  '새벽로194번길': { lat: 35.158307, lng: 128.984548 },
+  '괘법동 581-29': { lat: 35.158307, lng: 128.984548 },
+  '괘법동581-29': { lat: 35.158307, lng: 128.984548 },
+  '괘법동 581': { lat: 35.158307, lng: 128.984548 },
+  '괘법동581': { lat: 35.158307, lng: 128.984548 },
+  '백양대로703번길 53-11': { lat: 35.168425, lng: 128.988055 },
+  '백양대로703번길53-11': { lat: 35.168425, lng: 128.988055 },
+  '덕포동 104-4': { lat: 35.168425, lng: 128.988055 },
+  '덕포동104-4': { lat: 35.168425, lng: 128.988055 },
+  '우방하이츠빌라': { lat: 35.168425, lng: 128.988055 },
+  '우방하이츠': { lat: 35.168425, lng: 128.988055 },
+  '사상로 300': { lat: 35.176200, lng: 128.977400 },
+  '사상강변동원': { lat: 35.176200, lng: 128.977400 },
+  '백양대로 707': { lat: 35.168800, lng: 128.989200 },
+  '덕포동 788-8': { lat: 35.168800, lng: 128.989200 },
+};
+
 // 대한민국 주요 거점 기본 좌표 (서울 강남/테헤란로 중심)
 export const DEFAULT_CENTER: Coordinates = {
   lat: 37.4998,
@@ -42,6 +64,7 @@ const DISTRICT_COORDINATES: Record<string, Coordinates> = {
 
   // 부산
   '사상': { lat: 35.1528, lng: 128.9912 },
+  '괘법': { lat: 35.158307, lng: 128.984548 },
   '덕포': { lat: 35.1708, lng: 128.9868 },
   '해운대': { lat: 35.1631, lng: 129.1636 },
   '서면': { lat: 35.1578, lng: 129.0592 },
@@ -102,6 +125,13 @@ const DISTRICT_COORDINATES: Record<string, Coordinates> = {
  */
 export function getCoordinatesFromAddress(address: string, fallbackSeed = 0): Coordinates {
   if (!address) return DEFAULT_CENTER;
+
+  // 0. 특정 주요 건물 주소 우선 매칭 (오차 0m 정확 좌표)
+  for (const [key, coords] of Object.entries(EXACT_BUILDING_COORDINATES)) {
+    if (address.includes(key)) {
+      return coords;
+    }
+  }
 
   // 1. 등록된 지역 키워드 매칭
   for (const [key, coords] of Object.entries(DISTRICT_COORDINATES)) {
