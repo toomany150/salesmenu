@@ -537,6 +537,7 @@ export interface CustomerDemandItem {
   regionReason?: string;
   minBudget?: number;
   maxBudget?: number;
+  maxBudgetReason?: string;
   targetPrice?: number;
   targetJeonse?: number;
   targetDeposit?: number;

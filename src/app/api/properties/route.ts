@@ -262,6 +262,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let validUserId: string | null = null;
+    if (createdById) {
+      const uExists = await prisma.user.findUnique({ where: { id: createdById } }).catch(() => null);
+      if (uExists) validUserId = uExists.id;
+    }
+
     // 접수 고객 직접 입력 시 고객 DB 자동 등록/연동 (요구사항 10: 매도인/임대인/임차인(권리금) 자동 연계 및 가격/메모 매핑)
     let finalCustomerId = customerId || null;
     if (!finalCustomerId && customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {
@@ -294,63 +300,69 @@ export async function POST(request: NextRequest) {
       const custNegoMonthlyRent = customerInput.negotiableMonthlyRent !== undefined ? customerInput.negotiableMonthlyRent : (body.negotiableMonthlyRent ? parseFloat(body.negotiableMonthlyRent) : null);
       const custPremium = customerInput.premium !== undefined ? customerInput.premium : (storePremiumVal ? parseFloat(storePremiumVal) : null);
 
-      const customerDataToSave = {
-        name: custName,
-        phone: custPhone,
-        carrier: custCarrier,
-        type: autoCustomerType,
-        subType: autoCustomerSubType,
-        group: 'RECEIVED',
-        memo: custMemo,
-        price: custPrice,
-        negotiablePrice: custNegoPrice,
-        deposit: custDeposit,
-        negotiableDeposit: custNegoDeposit,
-        monthlyRent: custMonthlyRent,
-        negotiableMonthlyRent: custNegoMonthlyRent,
-        premium: custPremium,
-        transactionType: transactionType || null,
-        managerName: managerName || '사무실',
-        assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
-        createdById: createdById || null,
-        creatorName: creatorName || null,
-      };
+    const customerDataToSave = {
+      name: custName,
+      phone: custPhone,
+      carrier: custCarrier,
+      type: autoCustomerType,
+      subType: autoCustomerSubType,
+      group: 'RECEIVED',
+      memo: custMemo,
+      price: custPrice,
+      negotiablePrice: custNegoPrice,
+      deposit: custDeposit,
+      negotiableDeposit: custNegoDeposit,
+      monthlyRent: custMonthlyRent,
+      negotiableMonthlyRent: custNegoMonthlyRent,
+      premium: custPremium,
+      transactionType: transactionType || null,
+      managerName: managerName || '사무실',
+      assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
+      createdById: validUserId,
+      creatorName: creatorName || null,
+    };
 
-      if (customerInput.phone?.trim()) {
-        const existingCust = await prisma.customer.findFirst({
-          where: { phone: customerInput.phone.trim() },
+    if (customerInput.phone?.trim()) {
+      const existingCust = await prisma.customer.findFirst({
+        where: { phone: customerInput.phone.trim() },
+      });
+      if (existingCust) {
+        await prisma.customer.update({
+          where: { id: existingCust.id },
+          data: {
+            carrier: custCarrier || existingCust.carrier,
+            subType: autoCustomerSubType || existingCust.subType,
+            memo: custMemo || existingCust.memo,
+            price: custPrice !== null ? custPrice : existingCust.price,
+            negotiablePrice: custNegoPrice !== null ? custNegoPrice : existingCust.negotiablePrice,
+            deposit: custDeposit !== null ? custDeposit : existingCust.deposit,
+            negotiableDeposit: custNegoDeposit !== null ? custNegoDeposit : existingCust.negotiableDeposit,
+            monthlyRent: custMonthlyRent !== null ? custMonthlyRent : existingCust.monthlyRent,
+            negotiableMonthlyRent: custNegoMonthlyRent !== null ? custNegoMonthlyRent : existingCust.negotiableMonthlyRent,
+            premium: custPremium !== null ? custPremium : existingCust.premium,
+            transactionType: transactionType || existingCust.transactionType,
+          },
         });
-        if (existingCust) {
-          await prisma.customer.update({
-            where: { id: existingCust.id },
-            data: {
-              carrier: custCarrier || existingCust.carrier,
-              subType: autoCustomerSubType || existingCust.subType,
-              memo: custMemo || existingCust.memo,
-              price: custPrice !== null ? custPrice : existingCust.price,
-              negotiablePrice: custNegoPrice !== null ? custNegoPrice : existingCust.negotiablePrice,
-              deposit: custDeposit !== null ? custDeposit : existingCust.deposit,
-              negotiableDeposit: custNegoDeposit !== null ? custNegoDeposit : existingCust.negotiableDeposit,
-              monthlyRent: custMonthlyRent !== null ? custMonthlyRent : existingCust.monthlyRent,
-              negotiableMonthlyRent: custNegoMonthlyRent !== null ? custNegoMonthlyRent : existingCust.negotiableMonthlyRent,
-              premium: custPremium !== null ? custPremium : existingCust.premium,
-              transactionType: transactionType || existingCust.transactionType,
-            },
-          });
-          finalCustomerId = existingCust.id;
-        } else {
-          const newCust = await prisma.customer.create({
-            data: customerDataToSave,
-          });
-          finalCustomerId = newCust.id;
-        }
+        finalCustomerId = existingCust.id;
       } else {
         const newCust = await prisma.customer.create({
           data: customerDataToSave,
         });
         finalCustomerId = newCust.id;
       }
+    } else {
+      const newCust = await prisma.customer.create({
+        data: customerDataToSave,
+      });
+      finalCustomerId = newCust.id;
     }
+  }
+
+  let validCustomerId: string | null = null;
+  if (finalCustomerId) {
+    const cExists = await prisma.customer.findUnique({ where: { id: finalCustomerId } }).catch(() => null);
+    if (cExists) validCustomerId = cExists.id;
+  }
 
     const newProperty = await prisma.property.create({
       data: {
@@ -382,10 +394,10 @@ export async function POST(request: NextRequest) {
         totalFloorArea: totalFloorArea ? parseFloat(totalFloorArea) : null,
         approvalDate: approvalDate ? new Date(approvalDate) : null,
         buildingRegisterUse,
-        customerId: finalCustomerId,
+        customerId: validCustomerId,
         managerName: managerName || '사무실',
         assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
-        createdById: createdById || null,
+        createdById: validUserId,
         creatorName: creatorName || null,
         // 종류별 관계 생성
         apartmentDetail:
@@ -616,17 +628,21 @@ export async function POST(request: NextRequest) {
       '127.0.0.1';
     const userAgent = request.headers.get('user-agent') || 'Unknown';
 
-    await recordAccessLog({
-      userId: createdById,
-      userName: creatorName || managerName || '익명',
-      userRole: currentUser?.role || 'AGENT',
-      action: 'CREATE_PROPERTY',
-      targetType: 'PROPERTY',
-      targetId: newProperty.propertyNumber,
-      details: `매물 #${newProperty.propertyNumber} (${newProperty.address}) 등록 완료 [담당: ${newProperty.managerName}]`,
-      ipAddress,
-      userAgent,
-    });
+    try {
+      await recordAccessLog({
+        userId: validUserId || undefined,
+        userName: creatorName || managerName || '익명',
+        userRole: currentUser?.role || 'AGENT',
+        action: 'CREATE_PROPERTY',
+        targetType: 'PROPERTY',
+        targetId: newProperty.propertyNumber,
+        details: `매물 #${newProperty.propertyNumber} (${newProperty.address}) 등록 완료 [담당: ${newProperty.managerName}]`,
+        ipAddress,
+        userAgent,
+      });
+    } catch (logErr) {
+      console.warn('Access log recording error in POST property (ignored):', logErr);
+    }
 
     return NextResponse.json(formatPropertyOutput(newProperty), { status: 201 });
   } catch (error: any) {
@@ -808,6 +824,16 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    let validCustomerId: string | null | undefined = undefined;
+    if (finalCustomerId !== undefined) {
+      if (finalCustomerId) {
+        const cExists = await prisma.customer.findUnique({ where: { id: finalCustomerId } }).catch(() => null);
+        validCustomerId = cExists ? cExists.id : null;
+      } else {
+        validCustomerId = null;
+      }
+    }
+
     const updatedProperty = await prisma.property.update({
       where: { id: targetId },
       data: {
@@ -839,7 +865,7 @@ export async function PUT(request: NextRequest) {
         totalFloorArea: totalFloorArea !== undefined ? (totalFloorArea ? parseFloat(totalFloorArea) : null) : undefined,
         approvalDate: approvalDate !== undefined ? (approvalDate ? new Date(approvalDate) : null) : undefined,
         buildingRegisterUse: buildingRegisterUse !== undefined ? buildingRegisterUse : undefined,
-        customerId: finalCustomerId,
+        customerId: validCustomerId !== undefined ? validCustomerId : undefined,
         managerName: managerName !== undefined ? managerName : undefined,
         assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : undefined,
 
@@ -1269,17 +1295,26 @@ export async function PUT(request: NextRequest) {
       '127.0.0.1';
     const userAgent = request.headers.get('user-agent') || 'Unknown';
 
-    await recordAccessLog({
-      userId: currentUser?.id,
-      userName: currentUser?.name || updatedProperty.managerName || '익명',
-      userRole: currentUser?.role || 'AGENT',
-      action: 'UPDATE_PROPERTY',
-      targetType: 'PROPERTY',
-      targetId: updatedProperty.propertyNumber,
-      details: `매물 #${updatedProperty.propertyNumber} (${updatedProperty.address}) 정보 수정 완료`,
-      ipAddress,
-      userAgent,
-    });
+    try {
+      let logUserId: string | undefined = undefined;
+      if (currentUser?.id) {
+        const u = await prisma.user.findUnique({ where: { id: currentUser.id } }).catch(() => null);
+        if (u) logUserId = u.id;
+      }
+      await recordAccessLog({
+        userId: logUserId,
+        userName: currentUser?.name || updatedProperty.managerName || '익명',
+        userRole: currentUser?.role || 'AGENT',
+        action: 'UPDATE_PROPERTY',
+        targetType: 'PROPERTY',
+        targetId: updatedProperty.propertyNumber,
+        details: `매물 #${updatedProperty.propertyNumber} (${updatedProperty.address}) 정보 수정 완료`,
+        ipAddress,
+        userAgent,
+      });
+    } catch (logErr) {
+      console.warn('Access log recording error in PUT property (ignored):', logErr);
+    }
 
     return NextResponse.json(formatPropertyOutput(updatedProperty));
   } catch (error: any) {

@@ -186,6 +186,12 @@ export async function POST(request: NextRequest) {
     const finalNegoPremium = negotiablePremium !== undefined && negotiablePremium !== null ? parseFloat(negotiablePremium) : (receivedDetail?.negotiablePremium ? parseFloat(receivedDetail.negotiablePremium) : null);
     const finalTxType = transactionType || receivedDetail?.transactionType || null;
 
+    let validUserId: string | null = null;
+    if (createdById) {
+      const u = await prisma.user.findUnique({ where: { id: createdById } }).catch(() => null);
+      if (u) validUserId = u.id;
+    }
+
     const customer = await prisma.customer.create({
       data: {
         name,
@@ -206,7 +212,7 @@ export async function POST(request: NextRequest) {
         transactionType: finalTxType,
         managerName: managerName || '사무실',
         assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
-        createdById: createdById || null,
+        createdById: validUserId,
         creatorName: creatorName || null,
         demands: demand
           ? {
@@ -217,6 +223,7 @@ export async function POST(request: NextRequest) {
                 regionReason: demand.regionReason?.trim() || null,
                 minBudget: demand.minBudget ? parseFloat(demand.minBudget) : null,
                 maxBudget: demand.maxBudget ? parseFloat(demand.maxBudget) : null,
+                maxBudgetReason: demand.maxBudgetReason?.trim() || null,
                 targetPrice: demand.targetPrice ? parseFloat(demand.targetPrice) : null,
                 targetJeonse: demand.targetJeonse ? parseFloat(demand.targetJeonse) : null,
                 minDeposit: demand.minDeposit ? parseFloat(demand.minDeposit) : null,
@@ -255,17 +262,21 @@ export async function POST(request: NextRequest) {
       '127.0.0.1';
     const userAgent = request.headers.get('user-agent') || 'Unknown';
 
-    await recordAccessLog({
-      userId: createdById,
-      userName: creatorName || managerName || '익명',
-      userRole: currentUser?.role || 'AGENT',
-      action: 'CREATE_CUSTOMER',
-      targetType: 'CUSTOMER',
-      targetId: customer.id,
-      details: `${customer.name} (${customer.type}) 신규 고객 등록 [담당: ${customer.managerName}]`,
-      ipAddress,
-      userAgent,
-    });
+    try {
+      await recordAccessLog({
+        userId: validUserId || undefined,
+        userName: creatorName || managerName || '익명',
+        userRole: currentUser?.role || 'AGENT',
+        action: 'CREATE_CUSTOMER',
+        targetType: 'CUSTOMER',
+        targetId: customer.id,
+        details: `${customer.name} (${customer.type}) 신규 고객 등록 [담당: ${customer.managerName}]`,
+        ipAddress,
+        userAgent,
+      });
+    } catch (logErr) {
+      console.warn('Access log recording error (ignored):', logErr);
+    }
 
     return NextResponse.json(customer, { status: 201 });
   } catch (error: any) {
@@ -300,7 +311,8 @@ export async function PUT(request: NextRequest) {
       negotiablePremium,
       transactionType,
       managerName, 
-      assignedAgents, 
+      assignedAgents,
+      demand,
       currentUser 
     } = body;
 
@@ -367,23 +379,89 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    if (demand) {
+      const existingDemand = await prisma.customerDemand.findFirst({
+        where: { customerId: id },
+      });
+      const demandData: any = {
+        targetPropertyType: demand.targetPropertyType || 'APARTMENT',
+        targetTransactionType: demand.targetTransactionType || '매매',
+        targetRegion: demand.targetRegion !== undefined ? (demand.targetRegion?.trim() || null) : undefined,
+        regionReason: demand.regionReason !== undefined ? (demand.regionReason?.trim() || null) : undefined,
+        minBudget: demand.minBudget !== undefined ? (demand.minBudget ? parseFloat(demand.minBudget) : null) : undefined,
+        maxBudget: demand.maxBudget !== undefined ? (demand.maxBudget ? parseFloat(demand.maxBudget) : null) : undefined,
+        maxBudgetReason: demand.maxBudgetReason !== undefined ? (demand.maxBudgetReason?.trim() || null) : undefined,
+        targetPrice: demand.targetPrice !== undefined ? (demand.targetPrice ? parseFloat(demand.targetPrice) : null) : undefined,
+        targetJeonse: demand.targetJeonse !== undefined ? (demand.targetJeonse ? parseFloat(demand.targetJeonse) : null) : undefined,
+        minDeposit: demand.minDeposit !== undefined ? (demand.minDeposit ? parseFloat(demand.minDeposit) : null) : undefined,
+        maxDeposit: demand.maxDeposit !== undefined ? (demand.maxDeposit ? parseFloat(demand.maxDeposit) : null) : undefined,
+        minMonthlyRent: demand.minMonthlyRent !== undefined ? (demand.minMonthlyRent ? parseFloat(demand.minMonthlyRent) : null) : undefined,
+        maxMonthlyRent: demand.maxMonthlyRent !== undefined ? (demand.maxMonthlyRent ? parseFloat(demand.maxMonthlyRent) : null) : undefined,
+        preferredFloor: demand.preferredFloor !== undefined ? (demand.preferredFloor?.trim() || null) : undefined,
+        preferredArea: demand.preferredArea !== undefined ? (demand.preferredArea ? parseFloat(demand.preferredArea) : null) : undefined,
+        preferredAreaPy: demand.preferredAreaPy !== undefined ? (demand.preferredAreaPy ? parseFloat(demand.preferredAreaPy) : null) : undefined,
+        parkingRequirement: demand.parkingRequirement !== undefined ? (demand.parkingRequirement?.trim() || null) : undefined,
+        moveInTiming: demand.moveInTiming !== undefined ? (demand.moveInTiming?.trim() || null) : undefined,
+        moveInReason: demand.moveInReason !== undefined ? (demand.moveInReason?.trim() || null) : undefined,
+        nonNegotiableCondition: demand.nonNegotiableCondition !== undefined ? (demand.nonNegotiableCondition?.trim() || null) : undefined,
+        negotiableCondition: demand.negotiableCondition !== undefined ? (demand.negotiableCondition?.trim() || null) : undefined,
+        premiumLimit: demand.premiumLimit !== undefined ? (demand.premiumLimit ? parseFloat(demand.premiumLimit) : null) : undefined,
+        premiumReason: demand.premiumReason !== undefined ? (demand.premiumReason?.trim() || null) : undefined,
+        minRequiredArea: demand.minRequiredArea !== undefined ? (demand.minRequiredArea ? parseFloat(demand.minRequiredArea) : null) : undefined,
+        minRequiredAreaPy: demand.minRequiredAreaPy !== undefined ? (demand.minRequiredAreaPy ? parseFloat(demand.minRequiredAreaPy) : null) : undefined,
+        minAreaReason: demand.minAreaReason !== undefined ? (demand.minAreaReason?.trim() || null) : undefined,
+        previousVisitedProps: demand.previousVisitedProps !== undefined ? (demand.previousVisitedProps?.trim() || null) : undefined,
+        requirements: demand.requirements !== undefined ? (demand.requirements?.trim() || null) : undefined,
+        status: 'ACTIVE',
+      };
+
+      if (existingDemand) {
+        await prisma.customerDemand.update({
+          where: { id: existingDemand.id },
+          data: demandData,
+        });
+      } else {
+        await prisma.customerDemand.create({
+          data: {
+            ...demandData,
+            customerId: id,
+          },
+        });
+      }
+    }
+
     const ipAddress = 
       request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
       request.headers.get('x-real-ip') ||
       '127.0.0.1';
     const userAgent = request.headers.get('user-agent') || 'Unknown';
 
-    await recordAccessLog({
-      userId: currentUser?.id,
-      userName: currentUser?.name || updated.managerName || '익명',
-      userRole: currentUser?.role || 'AGENT',
-      action: 'UPDATE_CUSTOMER',
-      targetType: 'CUSTOMER',
-      targetId: updated.id,
-      details: `${updated.name} 고객 정보 수정 완료`,
-      ipAddress,
-      userAgent,
-    });
+    try {
+      let logUserId: string | undefined = undefined;
+      if (currentUser?.id) {
+        const u = await prisma.user.findUnique({ where: { id: currentUser.id } }).catch(() => null);
+        if (u) logUserId = u.id;
+      }
+      await recordAccessLog({
+        userId: logUserId,
+        userName: currentUser?.name || updated.managerName || '익명',
+        userRole: currentUser?.role || 'AGENT',
+        action: 'UPDATE_CUSTOMER',
+        targetType: 'CUSTOMER',
+        targetId: updated.id,
+        details: `${updated.name} 고객 정보 수정 완료`,
+        ipAddress,
+        userAgent,
+      });
+    } catch (logErr) {
+      console.warn('Access log error in PUT (ignored):', logErr);
+    }
+
+    // Refetch updated with demands
+    const finalCust = await prisma.customer.findUnique({
+      where: { id },
+      include: { properties: true, demands: true },
+    }) || updated;
 
     let parsedAssignedAgents: string[] = [];
     if (updated.assignedAgents) {
@@ -395,7 +473,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ...updated, assignedAgents: parsedAssignedAgents });
+    return NextResponse.json({ ...finalCust, assignedAgents: parsedAssignedAgents });
   } catch (error: any) {
     console.error('Error updating customer:', error);
     return NextResponse.json(

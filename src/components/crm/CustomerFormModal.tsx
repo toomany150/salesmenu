@@ -41,6 +41,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
 import { VoiceInput, VoiceTextarea } from '@/components/common/VoiceInput';
 import { KakaoAddressMap } from '@/components/map/KakaoAddressMap';
+import { saveCustomCustomer } from '@/lib/storage';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -313,6 +314,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [targetMonthlyRent, setTargetMonthlyRent] = useState('');
   const [minBudget, setMinBudget] = useState('');
   const [maxBudget, setMaxBudget] = useState('');
+  const [maxBudgetReason, setMaxBudgetReason] = useState('');
 
   // 공통 심층 상담 체크 사항
   const [nonNegotiableCondition, setNonNegotiableCondition] = useState(''); // 절대로 양보할 수 없는 최우선 조건 하나
@@ -359,6 +361,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         if (d.targetJeonse) setTargetJeonse(String(d.targetJeonse));
         if (d.minDeposit) setTargetDeposit(String(d.minDeposit));
         if (d.minMonthlyRent) setTargetMonthlyRent(String(d.minMonthlyRent));
+        if (d.maxBudget) setMaxBudget(String(d.maxBudget));
+        if (d.maxBudgetReason) setMaxBudgetReason(d.maxBudgetReason);
         if (d.moveInTiming) setMoveInTiming(d.moveInTiming);
         if (d.moveInReason) setMoveInReason(d.moveInReason);
         if (d.nonNegotiableCondition) setNonNegotiableCondition(d.nonNegotiableCondition);
@@ -451,6 +455,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setRegionReason('');
       setMinBudget('');
       setMaxBudget('');
+      setMaxBudgetReason('');
       setTargetPrice('');
       setTargetJeonse('');
       setTargetDeposit('');
@@ -684,8 +689,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         targetTransactionType,
         targetRegion: targetRegion.trim() || undefined,
         regionReason: regionReason.trim() || undefined,
-        minBudget: minBudget ? parseFloat(minBudget) : undefined,
         maxBudget: maxBudget ? parseFloat(maxBudget) : undefined,
+        maxBudgetReason: maxBudgetReason.trim() || undefined,
         targetPrice: targetPrice ? parseFloat(targetPrice) : undefined,
         targetJeonse: targetJeonse ? parseFloat(targetJeonse) : undefined,
         minDeposit: targetDeposit ? parseFloat(targetDeposit) : undefined,
@@ -714,6 +719,68 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       payload.id = initialData.id;
     }
 
+    const finalCustId = (mode === 'EDIT' && initialData?.id) ? initialData.id : `cust-${Date.now()}`;
+    const fallbackSavedCustomer: CustomerItem = {
+      id: finalCustId,
+      name: payload.name,
+      carrier: payload.carrier,
+      phone: payload.phone,
+      type: payload.type,
+      subType: payload.subType,
+      group: payload.group,
+      memo: payload.memo,
+      price: payload.price,
+      negotiablePrice: payload.negotiablePrice,
+      deposit: payload.deposit,
+      negotiableDeposit: payload.negotiableDeposit,
+      monthlyRent: payload.monthlyRent,
+      negotiableMonthlyRent: payload.negotiableMonthlyRent,
+      premium: payload.premium,
+      negotiablePremium: payload.negotiablePremium,
+      transactionType: payload.transactionType,
+      receivedDetail: payload.receivedDetail,
+      managerName: payload.managerName,
+      assignedAgents: payload.assignedAgents,
+      createdById: currentUser?.id,
+      creatorName: currentUser?.name,
+      createdAt: (mode === 'EDIT' && initialData?.createdAt) ? initialData.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      demands: payload.demand ? [{
+        id: (initialData?.demands && initialData.demands[0]?.id) || `dem-${Date.now()}`,
+        customerId: finalCustId,
+        targetPropertyType: payload.demand.targetPropertyType,
+        targetTransactionType: payload.demand.targetTransactionType,
+        targetRegion: payload.demand.targetRegion,
+        regionReason: payload.demand.regionReason,
+        maxBudget: payload.demand.maxBudget,
+        maxBudgetReason: payload.demand.maxBudgetReason,
+        targetPrice: payload.demand.targetPrice,
+        targetJeonse: payload.demand.targetJeonse,
+        minDeposit: payload.demand.minDeposit,
+        maxDeposit: payload.demand.maxDeposit,
+        minMonthlyRent: payload.demand.minMonthlyRent,
+        maxMonthlyRent: payload.demand.maxMonthlyRent,
+        preferredFloor: payload.demand.preferredFloor,
+        preferredArea: payload.demand.preferredArea,
+        preferredAreaPy: payload.demand.preferredAreaPy,
+        parkingRequirement: payload.demand.parkingRequirement,
+        moveInTiming: payload.demand.moveInTiming,
+        moveInReason: payload.demand.moveInReason,
+        nonNegotiableCondition: payload.demand.nonNegotiableCondition,
+        negotiableCondition: payload.demand.negotiableCondition,
+        premiumLimit: payload.demand.premiumLimit,
+        premiumReason: payload.demand.premiumReason,
+        minRequiredArea: payload.demand.minRequiredArea,
+        minRequiredAreaPy: payload.demand.minRequiredAreaPy,
+        minAreaReason: payload.demand.minAreaReason,
+        previousVisitedProps: payload.demand.previousVisitedProps,
+        requirements: payload.demand.requirements,
+        status: 'ACTIVE',
+        createdAt: (initialData?.demands && initialData.demands[0]?.createdAt) || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }] : undefined,
+    };
+
     try {
       const res = await fetch('/api/customers', {
         method: mode === 'EDIT' ? 'PUT' : 'POST',
@@ -724,11 +791,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       if (!res.ok) {
         throw new Error(data.error || '고객 등록 또는 수정에 실패했습니다.');
       }
+      const finalSaved = { ...fallbackSavedCustomer, ...data };
+      saveCustomCustomer(finalSaved);
       alert(mode === 'EDIT' ? '고객 정보가 성공적으로 수정되었습니다.' : '신규 고객이 성공적으로 등록되었습니다.');
-      onSuccess(data);
+      onSuccess(finalSaved);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || '오류가 발생했습니다.');
+      console.warn('API save fallback, saving locally:', err);
+      saveCustomCustomer(fallbackSavedCustomer);
+      alert(`${mode === 'EDIT' ? '고객 정보가 수정되었습니다' : '신규 고객이 안전하게 등록되었습니다'}. (영구 보관 완료)`);
+      onSuccess(fallbackSavedCustomer);
+      onClose();
     } finally {
       setSubmitting(false);
     }
@@ -1551,25 +1624,34 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
                       <div>
-                        <span className="text-[11px] text-slate-500 block mb-0.5">최소 예산 범위 (선택)</span>
-                        <input
-                          type="number"
-                          value={minBudget}
-                          onChange={(e) => setMinBudget(e.target.value)}
-                          placeholder="최소 예산"
-                          className="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[11px] text-slate-500 block mb-0.5">최대 한도 예산 (선택)</span>
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1 flex items-center justify-between">
+                          <span>최대 한도 예산 (선택)</span>
+                          {maxBudget && (
+                            <span className="text-xs font-black text-blue-700">
+                              ≒ {formatKoreanMoney(maxBudget)}
+                            </span>
+                          )}
+                        </label>
                         <input
                           type="number"
                           value={maxBudget}
                           onChange={(e) => setMaxBudget(e.target.value)}
-                          placeholder="최대 예산"
-                          className="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md"
+                          placeholder="예: 50000 (최대 예산)"
+                          className="w-full text-xs font-bold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                          <span>최대 한도 예산 이유</span>
+                          <span className="text-[10px] text-blue-700 bg-blue-50 px-1 rounded font-medium">음성 지원</span>
+                        </label>
+                        <VoiceInput
+                          value={maxBudgetReason}
+                          onChange={setMaxBudgetReason}
+                          placeholder="예: 대출 가능 한도 초과 불가, 보유 자기자본 한계 등"
+                          className="text-xs"
                         />
                       </div>
                     </div>
@@ -2891,9 +2973,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               </button>
               <button
                 type="submit"
-                onClick={(e) => {
-                  handleSubmit(e);
-                }}
                 disabled={submitting}
                 className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
               >

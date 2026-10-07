@@ -118,6 +118,7 @@ model CustomerDemand {
   // 예산 조건 (단위: 만원)
   minBudget             Float?    // 최소 매매가/희망예산
   maxBudget             Float?    // 최대 매매가/희망예산
+  maxBudgetReason       String?   // 최대 한도 예산 이유
   targetPrice           Float?    // 희망 매매가액 (만원)
   targetJeonse          Float?    // 희망 전세가액 (만원)
   minDeposit            Float?    // 최소 보증금

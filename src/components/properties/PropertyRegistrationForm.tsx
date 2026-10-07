@@ -12,13 +12,16 @@ import {
   Copy,
   Edit3,
   Building,
-  Sparkles
+  Sparkles,
+  Search,
+  UserCheck
 } from 'lucide-react';
 import { 
   PropertyType, 
   TransactionType, 
   CustomerItem, 
   PropertyItem,
+  MobileCarrier,
   PublicBuildingLedgerResult,
   PublicBuildingFloorInfo,
   PublicBuildingUnitInfo,
@@ -36,7 +39,7 @@ import { KakaoAddressMap } from '../map/KakaoAddressMap';
 import { PropertyImageUploader } from './PropertyImageUploader';
 import { useAuth } from '../auth/AuthContext';
 import { VoiceTextarea } from '../common/VoiceInput';
-import { saveCustomProperty } from '@/lib/storage';
+import { saveCustomProperty, saveCustomCustomer, getCustomCustomers } from '@/lib/storage';
 
 // Subforms
 import { ApartmentForm } from './forms/ApartmentForm';
@@ -50,7 +53,7 @@ interface PropertyRegistrationFormProps {
   customers: CustomerItem[];
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (savedProperty: PropertyItem) => void;
+  onSuccess: (savedProperty: PropertyItem, createdCustomer?: CustomerItem) => void;
   initialData?: PropertyItem | null;
   mode?: 'CREATE' | 'EDIT';
 }
@@ -145,6 +148,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerCarrier, setCustomerCarrier] = useState<string>('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
+  const [allCustomers, setAllCustomers] = useState<CustomerItem[]>(customers);
 
   // Public data fields (7대 대장 연동 항목)
   const [landArea, setLandArea] = useState<number | undefined>();
@@ -181,6 +186,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   // Initialize or reset states when modal opens or initialData changes
   useEffect(() => {
     if (isOpen) {
+      const localCusts = getCustomCustomers();
+      const map = new Map<string, CustomerItem>();
+      (customers || []).forEach((c) => map.set(c.id, c));
+      localCusts.forEach((c) => map.set(c.id, c));
+      const mergedCusts = Array.from(map.values());
+      setAllCustomers(mergedCusts);
+      setCustomerSearchQuery('');
+
       if (initialData) {
         // Edit Mode
         setPropertyType(initialData.propertyType || 'APARTMENT');
@@ -235,6 +248,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         } else if (initialData.customerId) {
           setCustomerMode('SELECT');
           setCustomerId(initialData.customerId);
+          const found = mergedCusts.find((c) => c.id === initialData.customerId);
+          if (found) {
+            setCustomerName(found.name || '');
+            setCustomerPhone(found.phone || '');
+            setCustomerCarrier(found.carrier || '');
+          }
         } else {
           setCustomerMode('DIRECT');
           setCustomerId('');
@@ -312,6 +331,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setCustomerName('');
         setCustomerPhone('');
         setCustomerCarrier('');
+        setCustomerSearchQuery('');
         setLedgerData(null);
         setLandArea(undefined);
         setTotalFloorArea(undefined);
@@ -794,9 +814,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       finalLng = fallback.lng;
     }
 
-    // Customer payload (요구사항 10: 고객 등록 자동 연계 및 매핑)
+    // Customer payload (요구사항: 직접입력 신규고객 CRM 연동 전송/저장 및 기존고객 연동)
     let finalCustomerId = customerMode === 'SELECT' ? (customerId || undefined) : undefined;
-    let customerInput = undefined;
+    let customerInput: any = undefined;
+    let linkedCustomer: CustomerItem | undefined = undefined;
 
     if (customerMode === 'DIRECT' && (customerName.trim() || customerPhone.trim())) {
       // 거래유형 자동 선택:
@@ -818,24 +839,77 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         autoCustomerSubType = '임대인';
       }
 
-      customerInput = {
+      const custId = `cust-${Date.now()}`;
+      const newCustomerItem: CustomerItem = {
+        id: custId,
         name: customerName.trim() || '접수 의뢰고객',
         phone: customerPhone.trim() || '010-0000-0000',
-        carrier: customerCarrier.trim() || undefined,
+        carrier: (customerCarrier.trim() as MobileCarrier) || undefined,
         type: autoCustomerType,
         subType: autoCustomerSubType,
-        group: 'RECEIVED', // [물건 접수] 매도인/임대인/임차인란에 연계
-        memo: consultationNotes.trim() || undefined, // 상담내용 및 매물 메모 -> 상담 메모 및 고객 특이사항
-        price: price ? parseFloat(price) : undefined, // 희망 매매가액
-        negotiablePrice: negotiablePrice ? parseFloat(negotiablePrice) : undefined, // 조정할 수 있는 매매가액
+        group: 'RECEIVED', // [물건 접수] 매도인/임대인란에 연계
+        managerName: managerName || '개업공인중개사 (대표)',
+        assignedAgents,
+        memo: consultationNotes.trim() ? `[매물 #${finalPropNumber} 접수] ${consultationNotes.trim()}` : `[매물 #${finalPropNumber} (${finalAddress})] 접수 고객`,
+        price: price ? parseFloat(price) : undefined,
+        negotiablePrice: negotiablePrice ? parseFloat(negotiablePrice) : undefined,
         deposit: deposit ? parseFloat(deposit) : undefined,
         negotiableDeposit: negotiableDeposit ? parseFloat(negotiableDeposit) : undefined,
         monthlyRent: monthlyRent ? parseFloat(monthlyRent) : undefined,
         negotiableMonthlyRent: negotiableMonthlyRent ? parseFloat(negotiableMonthlyRent) : undefined,
         premium: storePremiumVal || undefined,
-        managerName: managerName || '개업공인중개사 (대표)',
-        assignedAgents,
+        transactionType,
+        receivedDetail: {
+          propertyType,
+          transactionType,
+          roadAddress: roadAddress.trim() || undefined,
+          jibunAddress: jibunAddress.trim() || undefined,
+          detailAddress: detailAddress.trim() || undefined,
+          price: price ? parseFloat(price) : undefined,
+          deposit: deposit ? parseFloat(deposit) : undefined,
+          monthlyRent: monthlyRent ? parseFloat(monthlyRent) : undefined,
+          premium: storePremiumVal || undefined,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
+
+      // 1. 신규 고객 로컬스토리지 영구 보관 (새고객등록 CRM 탭 즉시 전송/저장)
+      saveCustomCustomer(newCustomerItem);
+
+      // 2. 백그라운드 서버 API 전송 (서버 DB에도 안전 등록)
+      fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCustomerItem),
+      }).catch((err) => console.warn('Customer registration sync notice:', err));
+
+      customerInput = {
+        name: newCustomerItem.name,
+        phone: newCustomerItem.phone,
+        carrier: newCustomerItem.carrier,
+        type: newCustomerItem.type,
+        subType: newCustomerItem.subType,
+        group: newCustomerItem.group,
+        memo: newCustomerItem.memo,
+        price: newCustomerItem.price,
+        negotiablePrice: newCustomerItem.negotiablePrice,
+        deposit: newCustomerItem.deposit,
+        negotiableDeposit: newCustomerItem.negotiableDeposit,
+        monthlyRent: newCustomerItem.monthlyRent,
+        negotiableMonthlyRent: newCustomerItem.negotiableMonthlyRent,
+        premium: newCustomerItem.premium,
+        managerName: newCustomerItem.managerName,
+        assignedAgents: newCustomerItem.assignedAgents,
+      };
+      finalCustomerId = custId;
+      linkedCustomer = newCustomerItem;
+    } else if (customerMode === 'SELECT' && customerId) {
+      const found = allCustomers.find((c) => c.id === customerId);
+      if (found) {
+        linkedCustomer = found;
+        finalCustomerId = found.id;
+      }
     }
 
     const payload: any = {
@@ -930,14 +1004,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       floorCount: payload.floorCount,
       underFloorCount: payload.underFloorCount,
       floorText: payload.floorText,
-      customerId: payload.customerId,
-      customer: customerInput ? {
-        id: `cust-${Date.now()}`,
-        name: customerInput.name,
-        phone: customerInput.phone,
-        carrier: customerInput.carrier,
-        type: customerInput.type,
-      } : undefined,
+      customerId: finalCustomerId,
+      customer: linkedCustomer,
       apartmentDetail: payload.apartmentDetail,
       houseDetail: payload.houseDetail,
       storeDetail: payload.storeDetail,
@@ -965,18 +1033,25 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         throw new Error(data.error || `${isEditMode ? '매물 수정' : '매물 등록'}에 실패했습니다.`);
       }
 
-      const finalSaved = { ...fallbackSavedProperty, ...data };
+      let finalCustomerResult: CustomerItem | undefined = linkedCustomer;
+      if (data?.customer) {
+        const mergedCustomer = { ...(linkedCustomer || {}), ...data.customer } as CustomerItem;
+        saveCustomCustomer(mergedCustomer);
+        finalCustomerResult = mergedCustomer;
+      }
+
+      const finalSaved = { ...fallbackSavedProperty, ...data, customer: finalCustomerResult || fallbackSavedProperty.customer };
       saveCustomProperty(finalSaved);
 
       alert(isEditMode ? '매물 정보가 성공적으로 수정되었습니다.' : '매물이 성공적으로 등록되었습니다.');
-      onSuccess(finalSaved);
+      onSuccess(finalSaved, finalCustomerResult);
       onClose();
     } catch (err: any) {
       console.warn('API save fallback, saving locally:', err);
       // 서버 에러나 Vercel 환경에서도 로컬스토리지에 안전하게 저장하여 매물 사라짐 완전 차단
       saveCustomProperty(fallbackSavedProperty);
       alert(`${isEditMode ? '매물 정보가 수정되었습니다' : '매물이 안전하게 등록/저장되었습니다'}. (영구 보관 완료)`);
-      onSuccess(fallbackSavedProperty);
+      onSuccess(fallbackSavedProperty, linkedCustomer);
       onClose();
     } finally {
       setSubmitting(false);
@@ -1332,22 +1407,135 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3 bg-white rounded-xl border border-slate-200">
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        기존 등록된 고객 선택
-                      </label>
-                      <select
-                        value={customerId}
-                        onChange={(e) => setCustomerId(e.target.value)}
-                        className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">고객 미지정 (직접 접수)</option>
-                        {customers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.type === 'SELLER' ? '매도' : c.type === 'LESSOR' ? '임대' : '기타'} - {c.phone})
+                    <div className="p-3.5 bg-white rounded-xl border border-blue-200/80 shadow-2xs space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Search className="w-3.5 h-3.5 text-blue-600" />
+                            <span>기존 등록 고객 검색 & 선택</span>
+                          </label>
+                          <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            총 {allCustomers.length}명 등록됨
+                          </span>
+                        </div>
+
+                        {/* 고객 빠른 검색창 */}
+                        <div className="relative mb-2">
+                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            value={customerSearchQuery}
+                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                            placeholder="고객 이름, 휴대폰 번호, 통신사, 고객유형(매도/임대/매수) 검색..."
+                            className="w-full text-xs pl-8.5 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                          />
+                        </div>
+
+                        {/* 고객 선택 드롭다운 */}
+                        <select
+                          value={customerId}
+                          onChange={(e) => {
+                            const selectedId = e.target.value;
+                            setCustomerId(selectedId);
+                            const found = allCustomers.find((c) => c.id === selectedId);
+                            if (found) {
+                              setCustomerName(found.name || '');
+                              setCustomerPhone(found.phone || '');
+                              setCustomerCarrier(found.carrier || '');
+                            } else {
+                              setCustomerName('');
+                              setCustomerPhone('');
+                              setCustomerCarrier('');
+                            }
+                          }}
+                          className="w-full text-xs px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900 cursor-pointer"
+                        >
+                          <option value="">
+                            ▼ 연결할 기존 고객을 선택하세요 ({allCustomers.filter((c) => {
+                              if (!customerSearchQuery.trim()) return true;
+                              const q = customerSearchQuery.toLowerCase();
+                              return (
+                                c.name?.toLowerCase().includes(q) ||
+                                c.phone?.includes(q) ||
+                                (c.carrier && c.carrier.toLowerCase().includes(q)) ||
+                                (c.type && (c.type === 'SELLER' ? '매도' : c.type === 'LESSOR' ? '임대' : c.type === 'BUYER' ? '매수' : '임차').includes(q))
+                              );
+                            }).length}명 검색됨)
                           </option>
-                        ))}
-                      </select>
+                          {allCustomers
+                            .filter((c) => {
+                              if (!customerSearchQuery.trim()) return true;
+                              const q = customerSearchQuery.toLowerCase();
+                              return (
+                                c.name?.toLowerCase().includes(q) ||
+                                c.phone?.includes(q) ||
+                                (c.carrier && c.carrier.toLowerCase().includes(q)) ||
+                                (c.type && (c.type === 'SELLER' ? '매도' : c.type === 'LESSOR' ? '임대' : c.type === 'BUYER' ? '매수' : '임차').includes(q))
+                              );
+                            })
+                            .map((c) => {
+                              const typeText = c.type === 'SELLER' ? '매도인' : c.type === 'LESSOR' ? '임대인' : c.type === 'BUYER' ? '매수인' : c.type === 'LESSEE' ? '임차인' : '일반고객';
+                              return (
+                                <option key={c.id} value={c.id}>
+                                  {c.name} ({typeText} | {c.phone}{c.carrier ? ` / ${c.carrier}` : ''})
+                                </option>
+                              );
+                            })}
+                        </select>
+                      </div>
+
+                      {/* 선택된 고객 카드 미리보기 및 해제 버튼 */}
+                      {(() => {
+                        const selectedCust = allCustomers.find((c) => c.id === customerId);
+                        if (!selectedCust) {
+                          return (
+                            <p className="text-[11px] text-slate-500 pt-1">
+                              💡 위 목록에서 고객을 선택하면 본 매물과 해당 고객이 즉시 연결되어 CRM에서 바로 관리할 수 있습니다.
+                            </p>
+                          );
+                        }
+                        const typeLabel = selectedCust.type === 'SELLER' ? '매도인' : selectedCust.type === 'LESSOR' ? '임대인' : selectedCust.type === 'BUYER' ? '매수인' : selectedCust.type === 'LESSEE' ? '임차인' : '일반고객';
+                        return (
+                          <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                                <UserCheck className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-extrabold text-slate-900">{selectedCust.name}</span>
+                                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-800 rounded">
+                                    {typeLabel}
+                                  </span>
+                                  {selectedCust.carrier && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-white text-slate-700 border border-slate-200 rounded">
+                                      {selectedCust.carrier}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-600 font-mono mt-0.5">
+                                  {selectedCust.phone}
+                                  {selectedCust.memo && (
+                                    <span className="ml-2 text-slate-500 font-sans truncate">| {selectedCust.memo}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomerId('');
+                                setCustomerName('');
+                                setCustomerPhone('');
+                                setCustomerCarrier('');
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-white border border-rose-200 hover:bg-rose-50 rounded-lg shrink-0 cursor-pointer transition-colors shadow-2xs"
+                            >
+                              선택 해제
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

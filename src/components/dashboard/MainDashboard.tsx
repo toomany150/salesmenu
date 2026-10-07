@@ -265,8 +265,20 @@ const DashboardContent: React.FC = () => {
     setSelectedProperty(null);
   };
 
-  const handlePropertySaved = (savedProp: PropertyItem) => {
+  const handlePropertySaved = (savedProp: PropertyItem, createdCustomer?: CustomerItem) => {
     saveCustomProperty(savedProp);
+    if (createdCustomer) {
+      saveCustomCustomer(createdCustomer);
+      setCustomers((prev) => {
+        const idx = prev.findIndex((c) => c.id === createdCustomer.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = createdCustomer;
+          return next;
+        }
+        return [createdCustomer, ...prev];
+      });
+    }
     setProperties((prev) => {
       const idx = prev.findIndex((p) => p.id === savedProp.id || p.propertyNumber === savedProp.propertyNumber);
       if (idx >= 0) {

@@ -723,6 +723,16 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                               ) : '협의'
                             )}
                           </span>
+                          {demand.maxBudget ? (
+                            <span className="text-[10px] text-slate-500 block mt-0.5">
+                              최대한도: {formatKoreanMoney(demand.maxBudget)}
+                              {demand.maxBudgetReason ? ` (${demand.maxBudgetReason})` : ''}
+                            </span>
+                          ) : demand.maxBudgetReason ? (
+                            <span className="text-[10px] text-slate-500 block mt-0.5">
+                              최대한도 이유: {demand.maxBudgetReason}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
 
