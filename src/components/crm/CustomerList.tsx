@@ -1,7 +1,7 @@
 // src/components/crm/CustomerList.tsx
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   Phone, 
   MessageSquare, 
@@ -9,36 +9,91 @@ import {
   Building, 
   Target, 
   Search, 
-  Calendar,
-  Sparkles,
+  Lock, 
   ChevronRight,
-  Lock,
+  UserCheck,
+  Filter,
+  Users,
   Building2,
-  UserCheck
+  Check
 } from 'lucide-react';
 import { CustomerItem, CustomerGroup, PROPERTY_TYPE_LABELS } from '@/lib/types';
 import { useAuth } from '../auth/AuthContext';
 import { maskPhoneNumber, canViewCustomerContact, canAccessItem } from '@/lib/auth';
+import { CustomerFilterPanel, CustomerFilterCriteria, INITIAL_CUSTOMER_FILTER_CRITERIA } from './CustomerFilterPanel';
+
+export type CustomerListGroupMode = 'ALL' | CustomerGroup;
 
 interface CustomerListProps {
   customers: CustomerItem[];
-  activeGroup: CustomerGroup;
+  activeGroup?: CustomerListGroupMode;
+  initialShowFilter?: boolean;
   onSelectCustomer: (customer: CustomerItem) => void;
   onOpenNewCustomer: () => void;
+  onGroupChange?: (group: CustomerListGroupMode) => void;
+  onFilterToggle?: (isOpen: boolean) => void;
 }
 
 export const CustomerList: React.FC<CustomerListProps> = ({
   customers,
-  activeGroup,
+  activeGroup = 'ALL',
+  initialShowFilter = false,
   onSelectCustomer,
   onOpenNewCustomer,
+  onGroupChange,
+  onFilterToggle,
 }) => {
   const { currentUser, availableAgents } = useAuth();
+  const [currentGroup, setCurrentGroup] = useState<CustomerListGroupMode>(activeGroup);
+  const [showFilterPanel, setShowFilterPanel] = useState(initialShowFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [managerFilter, setManagerFilter] = useState('ALL');
+  const [filteredFromPanel, setFilteredFromPanel] = useState<CustomerItem[] | null>(null);
+  const [filterCriteria, setFilterCriteria] = useState<CustomerFilterCriteria | null>(null);
 
-  // Filter by active group: [물건 접수] vs [물건 찾음]
-  const groupCustomers = customers.filter((c) => c.group === activeGroup);
+  // Sync activeGroup when changed from parent
+  useEffect(() => {
+    setCurrentGroup(activeGroup);
+  }, [activeGroup]);
+
+  // Sync initialShowFilter when changed from parent
+  useEffect(() => {
+    if (initialShowFilter !== undefined) {
+      setShowFilterPanel(initialShowFilter);
+    }
+  }, [initialShowFilter]);
+
+  const handleGroupTabClick = (group: CustomerListGroupMode) => {
+    setCurrentGroup(group);
+    if (onGroupChange) {
+      onGroupChange(group);
+    }
+  };
+
+  const handleToggleFilter = () => {
+    const next = !showFilterPanel;
+    setShowFilterPanel(next);
+    if (onFilterToggle) {
+      onFilterToggle(next);
+    }
+  };
+
+  // Group counts
+  const totalCount = customers.length;
+  const receivedCount = useMemo(() => customers.filter((c) => c.group === 'RECEIVED').length, [customers]);
+  const searchingCount = useMemo(() => customers.filter((c) => c.group === 'SEARCHING').length, [customers]);
+
+  // Base list filtered by currentGroup tab
+  const baseGroupCustomers = useMemo(() => {
+    if (currentGroup === 'ALL') return customers;
+    return customers.filter((c) => c.group === currentGroup);
+  }, [customers, currentGroup]);
+
+  // Handle filter changes from CustomerFilterPanel
+  const handleFilterPanelChange = useCallback((filtered: CustomerItem[], criteria: CustomerFilterCriteria) => {
+    setFilteredFromPanel(filtered);
+    setFilterCriteria(criteria);
+  }, []);
 
   // Available managers list
   const allManagers = useMemo(() => {
@@ -51,36 +106,150 @@ export const CustomerList: React.FC<CustomerListProps> = ({
     return Array.from(set);
   }, [customers, availableAgents]);
 
-  const filteredCustomers = groupCustomers.filter((c) => {
-    // 0. 보안 접근 제어: 대표는 전체, 사무실(공용)은 전체, 그 외는 본인 및 추가관리자만 열람
-    if (!canAccessItem(currentUser, c)) {
-      return false;
+  // Final filtered list
+  const filteredCustomers = useMemo(() => {
+    // 1. If panel filter applied, intersect with baseGroupCustomers
+    let list = baseGroupCustomers;
+    if (showFilterPanel && filteredFromPanel) {
+      const panelIds = new Set(filteredFromPanel.map((c) => c.id));
+      list = list.filter((c) => panelIds.has(c.id));
     }
 
-    // 1. Manager filter
-    if (managerFilter !== 'ALL') {
-      const mgr = c.managerName || '사무실';
-      if (mgr !== managerFilter) return false;
-    }
+    return list.filter((c) => {
+      // 0. 보안 접근 제어
+      if (!canAccessItem(currentUser, c)) {
+        return false;
+      }
 
-    // 2. Search query
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      (c.memo && c.memo.toLowerCase().includes(q)) ||
-      (c.managerName && c.managerName.toLowerCase().includes(q))
-    );
-  });
+      // 1. Manager filter
+      if (managerFilter !== 'ALL') {
+        const mgr = c.managerName || '사무실';
+        if (mgr !== managerFilter) return false;
+      }
 
-  const isReceived = activeGroup === 'RECEIVED';
+      // 2. Search query (quick bar)
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        (c.memo && c.memo.toLowerCase().includes(q)) ||
+        (c.managerName && c.managerName.toLowerCase().includes(q))
+      );
+    });
+  }, [baseGroupCustomers, showFilterPanel, filteredFromPanel, currentUser, managerFilter, searchQuery]);
 
   return (
     <div className="space-y-4">
-      {/* Search and Action Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 1. 그룹 전환 탭 ([전체 고객] / [물건 접수] / [물건 찾음]) & 조건검색 필터 토글 */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         
+        {/* 그룹 전환 탭 버튼들 */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/80 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => handleGroupTabClick('ALL')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              currentGroup === 'ALL'
+                ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-500'
+                : 'text-slate-700 hover:bg-white hover:text-blue-600'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>전체 고객</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+              currentGroup === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {totalCount}명
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleGroupTabClick('RECEIVED')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              currentGroup === 'RECEIVED'
+                ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-500'
+                : 'text-slate-700 hover:bg-white hover:text-blue-600'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>물건 접수 (매도·임대)</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+              currentGroup === 'RECEIVED' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {receivedCount}명
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleGroupTabClick('SEARCHING')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              currentGroup === 'SEARCHING'
+                ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-500'
+                : 'text-slate-700 hover:bg-white hover:text-indigo-600'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>물건 찾음 (매수·임차)</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+              currentGroup === 'SEARCHING' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {searchingCount}명
+            </span>
+          </button>
+        </div>
+
+        {/* 조건 필터 토글 버튼 & 새 고객 등록 버튼 */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleToggleFilter}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 border-2 ${
+              showFilterPanel
+                ? 'bg-slate-900 text-white border-slate-900 shadow-md shadow-slate-900/20 ring-2 ring-slate-800'
+                : 'bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-900 border-blue-300 shadow-2xs'
+            }`}
+          >
+            <Filter className={`w-3.5 h-3.5 ${showFilterPanel ? 'text-blue-400' : 'text-blue-600'}`} />
+            <span>조건 필터 검색</span>
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+              showFilterPanel ? 'bg-blue-600 text-white' : 'bg-blue-200/80 text-blue-900'
+            }`}>
+              {showFilterPanel ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenNewCustomer}
+            className="px-3.5 py-2 text-xs font-black text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+          >
+            ＋ 새 고객 등록
+          </button>
+        </div>
+
+      </div>
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 2. 고객 조건 필터 패널 (토글 시 노출) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {showFilterPanel && (
+        <div className="animate-in fade-in duration-200">
+          <CustomerFilterPanel
+            customers={baseGroupCustomers}
+            onFilterChange={handleFilterPanelChange}
+          />
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 3. 상단 퀵 검색 및 담당자 필터 바 */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-2xl">
           {/* Keyword Search */}
           <div className="relative flex-1">
@@ -89,7 +258,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`${isReceived ? '매도/임대인' : '매수/임차인'} 이름, 전화번호, 메모 검색...`}
+              placeholder="고객 이름, 전화번호, 메모, 희망조건 검색..."
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-medium"
             />
           </div>
@@ -102,7 +271,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
               onChange={(e) => setManagerFilter(e.target.value)}
               className="text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="ALL">전체 권한자 ({groupCustomers.length}명)</option>
+              <option value="ALL">전체 권한자 ({baseGroupCustomers.length}명)</option>
               <option value="사무실">🏢 사무실 (공용/워크인)</option>
               {allManagers.filter((m) => m !== '사무실').map((mgr) => (
                 <option key={mgr} value={mgr}>👤 {mgr}</option>
@@ -113,25 +282,18 @@ export const CustomerList: React.FC<CustomerListProps> = ({
 
         <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
           <span className="text-xs text-slate-500 font-medium">
-            검색 결과: <span className="font-bold text-slate-900">{filteredCustomers.length}</span>명
+            검색 결과: <span className="font-extrabold text-blue-600 text-sm">{filteredCustomers.length}</span>명
           </span>
-          <button
-            onClick={onOpenNewCustomer}
-            className={`px-3.5 py-2 text-xs font-bold rounded-lg text-white transition-all shadow-sm ${
-              isReceived 
-                ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20' 
-                : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
-            }`}
-          >
-            ＋ {isReceived ? '매도/임대인 등록' : '매수/임차인 등록'}
-          </button>
         </div>
       </div>
 
-      {/* Customer List Cards */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 4. 고객 카드 그리드 */}
+      {/* ────────────────────────────────────────────────────────── */}
       {filteredCustomers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCustomers.map((customer) => {
+            const isReceived = customer.group === 'RECEIVED';
             const typeLabel = 
               customer.type === 'SELLER' ? '매도인' :
               customer.type === 'LESSOR' ? '임대인' :
@@ -145,24 +307,35 @@ export const CustomerList: React.FC<CustomerListProps> = ({
             return (
               <div
                 key={customer.id}
-                className="bg-white rounded-2xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all p-4.5 flex flex-col justify-between group cursor-pointer"
+                className="bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all p-4.5 flex flex-col justify-between group cursor-pointer"
                 onClick={() => onSelectCustomer(customer)}
               >
                 <div>
-                  {/* Top: Name, Carrier badge, Manager Badge, Type badge */}
+                  {/* Top: Name, Carrier badge, Group Badge, Manager Badge, Type badge */}
                   <div className="flex items-start justify-between gap-2 mb-2.5">
                     <div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* 물건 접수 vs 물건 찾음 뱃지 */}
+                        <span className={`px-2 py-0.5 text-[10px] font-black rounded-md ${
+                          isReceived
+                            ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                            : 'bg-indigo-100 text-indigo-900 border border-indigo-200'
+                        }`}>
+                          {isReceived ? '접수 의뢰' : '물건 탐색'}
+                        </span>
+
                         <span className="font-black text-base text-slate-900 group-hover:text-blue-600 transition-colors">
                           {customer.name}
                         </span>
+
                         {customer.carrier && (
-                          <span className="px-2 py-0.5 text-[11px] font-bold bg-slate-100 text-slate-700 rounded-md border border-slate-200">
+                          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded border border-slate-200">
                             {customer.carrier}
                           </span>
                         )}
+
                         {/* 담당자 뱃지 */}
-                        <span className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
                           managerName.includes('개업공인중개사')
                             ? 'bg-purple-100 text-purple-900 border border-purple-300'
                             : managerName === '사무실'
@@ -178,7 +351,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
 
                         {/* 추가 권한자 뱃지 */}
                         {Array.isArray(customer.assignedAgents) && customer.assignedAgents.length > 0 && (
-                          <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 rounded-md border border-blue-200">
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold bg-blue-50 text-blue-700 rounded border border-blue-200">
                             👥 {customer.assignedAgents.join(', ')}
                           </span>
                         )}
@@ -305,10 +478,10 @@ export const CustomerList: React.FC<CustomerListProps> = ({
             <User className="w-6 h-6" />
           </div>
           <h4 className="text-sm font-bold text-slate-900">
-            {isReceived ? '조건에 일치하는 매도/임대인 고객이 없습니다.' : '조건에 일치하는 매수/임차인 고객이 없습니다.'}
+            조건에 일치하는 고객이 없습니다.
           </h4>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-            담당 권한자나 검색어를 변경해보시거나, 새로운 고객을 등록해주세요.
+            조건 필터나 검색어를 변경해보시거나, 새로운 고객을 등록해주세요.
           </p>
           <button
             onClick={onOpenNewCustomer}

@@ -39,7 +39,7 @@ function fromUtf8Base64(b64: string): string {
   }
 }
 
-type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP';
+type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP' | 'ALL_CUSTOMERS' | 'CUSTOMER_SEARCH';
 
 const DashboardContent: React.FC = () => {
   const { currentUser } = useAuth();
@@ -47,9 +47,12 @@ const DashboardContent: React.FC = () => {
   // Main view state:
   // HOME: 깔끔한 대시보드 요약 화면 (중복 목록 미노출)
   // ALL_PROPERTIES: 자세한 매물현황 (필터 + 목록 + 지도)
+  // ALL_CUSTOMERS: 자세한 고객현황 (전체 등록 고객 관리장)
+  // CUSTOMER_SEARCH: 고객장 실시간 조건 검색 (조건 필터 패널 노출)
   // RECEIVED_GROUP: 자세한 고객현황 [물건 접수] 매도인 / 임대인
   // SEARCHING_GROUP: 자세한 고객현황 [물건 찾음] 매수인 / 임차인
   const [activeTab, setActiveTab] = useState<MainViewTab>('HOME');
+  const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
 
   // Data States
   const [customers, setCustomers] = useState<CustomerItem[]>(INITIAL_CUSTOMERS);
@@ -529,9 +532,12 @@ const DashboardContent: React.FC = () => {
               {/* 고객검색(조건필터) 버튼 (2번째 이미지와 나란히 배치) */}
               <button
                 type="button"
-                onClick={() => handleSelectTabWithScroll(activeTab === 'SEARCHING_GROUP' ? 'SEARCHING_GROUP' : 'RECEIVED_GROUP')}
+                onClick={() => {
+                  setCustomerFilterOpen(true);
+                  handleSelectTabWithScroll('CUSTOMER_SEARCH');
+                }}
                 className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs sm:text-sm font-black rounded-xl transition-all cursor-pointer ${
-                  activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP'
+                  activeTab === 'CUSTOMER_SEARCH' || (customerFilterOpen && (activeTab === 'ALL_CUSTOMERS' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP'))
                     ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25 ring-2 ring-slate-800'
                     : 'bg-white hover:bg-slate-50 text-slate-800 border-2 border-blue-300 shadow-2xs'
                 }`}
@@ -589,9 +595,12 @@ const DashboardContent: React.FC = () => {
             {/* 2) 고객현황 버튼 (요청대로 '고객현황'으로 명칭 변경) */}
             <button
               type="button"
-              onClick={() => handleSelectTabWithScroll(activeTab === 'SEARCHING_GROUP' ? 'SEARCHING_GROUP' : 'RECEIVED_GROUP')}
+              onClick={() => {
+                setCustomerFilterOpen(false);
+                handleSelectTabWithScroll('ALL_CUSTOMERS');
+              }}
               className={`flex items-center justify-between py-3.5 px-5 rounded-xl font-black text-sm sm:text-base transition-all cursor-pointer border-2 ${
-                activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP'
+                activeTab === 'ALL_CUSTOMERS' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP' || activeTab === 'CUSTOMER_SEARCH'
                   ? 'bg-blue-600 text-white border-blue-700 shadow-lg shadow-blue-500/25 ring-2 ring-blue-400 scale-[1.01]'
                   : 'bg-gradient-to-r from-blue-50/70 to-indigo-50/50 hover:from-blue-100/80 hover:to-indigo-100/60 text-slate-900 border-blue-300 hover:border-blue-500 shadow-xs'
               }`}
@@ -602,7 +611,7 @@ const DashboardContent: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
-                  activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP'
+                  activeTab === 'ALL_CUSTOMERS' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP' || activeTab === 'CUSTOMER_SEARCH'
                     ? 'bg-white/20 text-white'
                     : 'bg-blue-200/80 text-blue-900'
                 }`}>
@@ -620,40 +629,53 @@ const DashboardContent: React.FC = () => {
         {/* ────────────────────────────────────────────────────────── */}
         <div ref={detailSectionRef} className="scroll-mt-20">
           
-          {/* A. 자세한 고객현황 (물건 접수 / 물건 찾음) */}
-          {(activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP') && (
+          {/* A. 자세한 고객현황 (전체 고객 / 조건 검색 / 물건 접수 / 물건 찾음) */}
+          {(activeTab === 'ALL_CUSTOMERS' || activeTab === 'CUSTOMER_SEARCH' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP') && (
             <div className="space-y-4 animate-in fade-in duration-200 bg-white/70 p-3 sm:p-5 rounded-2xl border-2 border-blue-200 shadow-sm">
               <div className="flex items-center justify-between bg-blue-50 p-3 rounded-xl border border-blue-200">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
                   <span className="text-xs sm:text-sm font-black text-blue-950">
-                    [자세한 고객현황] {activeTab === 'RECEIVED_GROUP' ? '매도·임대·권리금 접수 고객 관리장' : '매수·임차·권리금 탐색 고객 관리장'}
+                    {activeTab === 'CUSTOMER_SEARCH'
+                      ? '[자세한 고객현황] 고객장 실시간 조건 검색 (물건종류·거래형태·면적·지역·입주시기·주차)'
+                      : activeTab === 'ALL_CUSTOMERS'
+                      ? '[자세한 고객현황] 등록 고객 전체 관리장'
+                      : activeTab === 'RECEIVED_GROUP'
+                      ? '[자세한 고객현황] 매도·임대·권리금 접수 고객 관리장'
+                      : '[자세한 고객현황] 매수·임차·권리금 탐색 고객 관리장'}
                   </span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('HOME')}
+                  onClick={() => {
+                    setActiveTab('HOME');
+                    setCustomerFilterOpen(false);
+                  }}
                   className="px-3 py-1 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg border border-slate-300 shadow-2xs transition-colors cursor-pointer"
                 >
                   ✕ 현황판 접기
                 </button>
               </div>
 
-              {activeTab === 'RECEIVED_GROUP' ? (
-                <CustomerList
-                  customers={customers}
-                  activeGroup="RECEIVED"
-                  onSelectCustomer={(c) => setSelectedCustomer(c)}
-                  onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
-                />
-              ) : (
-                <CustomerList
-                  customers={customers}
-                  activeGroup="SEARCHING"
-                  onSelectCustomer={(c) => setSelectedCustomer(c)}
-                  onOpenNewCustomer={() => setIsCustomerRegOpen(true)}
-                />
-              )}
+              <CustomerList
+                customers={customers}
+                activeGroup={
+                  activeTab === 'RECEIVED_GROUP'
+                    ? 'RECEIVED'
+                    : activeTab === 'SEARCHING_GROUP'
+                    ? 'SEARCHING'
+                    : 'ALL'
+                }
+                initialShowFilter={activeTab === 'CUSTOMER_SEARCH' || customerFilterOpen}
+                onGroupChange={(grp) => {
+                  if (grp === 'ALL') setActiveTab('ALL_CUSTOMERS');
+                  else if (grp === 'RECEIVED') setActiveTab('RECEIVED_GROUP');
+                  else if (grp === 'SEARCHING') setActiveTab('SEARCHING_GROUP');
+                }}
+                onFilterToggle={(isOpen) => setCustomerFilterOpen(isOpen)}
+                onSelectCustomer={(c) => setSelectedCustomer(c)}
+                onOpenNewCustomer={handleOpenNewCustomer}
+              />
             </div>
           )}
 
