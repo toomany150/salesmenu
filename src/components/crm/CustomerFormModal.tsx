@@ -243,7 +243,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     setLedgerError(null);
     try {
       const typeParam = recvPropertyType ? `&propertyType=${encodeURIComponent(recvPropertyType)}` : '';
-      const res = await fetch(`/api/public-data/building-ledger?address=${encodeURIComponent(target)}${typeParam}`);
+      const detailParam = recvDetailAddress ? `&detailAddress=${encodeURIComponent(recvDetailAddress)}` : '';
+      const res = await fetch(`/api/public-data/building-ledger?address=${encodeURIComponent(target)}${typeParam}${detailParam}`);
       const data: PublicBuildingLedgerResult = await res.json();
       if (!res.ok) {
         throw new Error((data as any).error || '대장 정보 조회 중 오류가 발생했습니다.');

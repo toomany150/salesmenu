@@ -646,13 +646,18 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     // Sub-data updates
     if (propertyType === 'APARTMENT') {
       const complex = data.complexName || detailAddress || roadAddress || jibunAddress || '';
+      const aptExcl = data.exclusiveArea;
+      const aptExclPy = data.exclusiveAreaPyeong || (aptExcl ? +(aptExcl * 0.3025).toFixed(2) : undefined);
+      const aptSupp = data.supplyArea || data.exclusiveArea;
+      const aptSuppPy = data.supplyAreaPyeong || (aptSupp ? +(aptSupp * 0.3025).toFixed(2) : undefined);
+
       setApartmentData((prev: any) => ({
         ...prev,
         complexName: complex || prev.complexName,
-        exclusiveArea: data.exclusiveArea !== undefined ? data.exclusiveArea : prev.exclusiveArea,
-        exclusiveAreaPyeong: data.exclusiveAreaPyeong !== undefined ? data.exclusiveAreaPyeong : prev.exclusiveAreaPyeong,
-        supplyArea: (data.supplyArea || data.buildingArea) !== undefined ? (data.supplyArea || data.buildingArea) : prev.supplyArea,
-        supplyAreaPyeong: data.supplyAreaPyeong !== undefined ? data.supplyAreaPyeong : prev.supplyAreaPyeong,
+        exclusiveArea: aptExcl !== undefined ? aptExcl : prev.exclusiveArea,
+        exclusiveAreaPyeong: aptExclPy !== undefined ? aptExclPy : prev.exclusiveAreaPyeong,
+        supplyArea: aptSupp !== undefined ? aptSupp : prev.supplyArea,
+        supplyAreaPyeong: aptSuppPy !== undefined ? aptSuppPy : prev.supplyAreaPyeong,
         pyeongType: data.pyeongType || prev.pyeongType,
         roomCount: data.roomCount !== undefined ? data.roomCount : prev.roomCount,
         bathroomCount: data.bathroomCount !== undefined ? data.bathroomCount : prev.bathroomCount,

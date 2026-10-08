@@ -225,7 +225,8 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setErrorMsg(null);
     try {
       const typeParam = propertyType ? `&propertyType=${encodeURIComponent(propertyType)}` : '';
-      const res = await fetch(`/api/public-data/building-ledger?address=${encodeURIComponent(targetAddress.trim())}${typeParam}`);
+      const detailParam = detailAddress ? `&detailAddress=${encodeURIComponent(detailAddress)}` : '';
+      const res = await fetch(`/api/public-data/building-ledger?address=${encodeURIComponent(targetAddress.trim())}${typeParam}${detailParam}`);
       const data: PublicBuildingLedgerResult = await res.json();
       if (!res.ok) {
         throw new Error((data as any).error || '대장 정보 조회 중 오류가 발생했습니다.');
@@ -292,10 +293,24 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
           <span className="text-slate-400">예시:</span>
           <button
             type="button"
-            onClick={() => setExampleAddress('부산 사상구 백양대로703번길 53-11', '부산 사상구 덕포동 104-4')}
+            onClick={() => setExampleAddress('서울특별시 강남구 삼성로 212', '서울특별시 강남구 대치동 316')}
             className="text-blue-600 hover:underline px-1.5 py-0.5 bg-blue-100/70 text-blue-900 font-extrabold rounded-md border border-blue-300"
           >
-            백양대로 53-11 (가·나동 빌라)
+            은마아파트 (대치동)
+          </button>
+          <button
+            type="button"
+            onClick={() => setExampleAddress('서울특별시 강남구 역삼로 310', '서울특별시 강남구 역삼동 755')}
+            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+          >
+            역삼로 310 (한솔필리아)
+          </button>
+          <button
+            type="button"
+            onClick={() => setExampleAddress('부산 사상구 새벽로194번길 13', '부산 사상구 괘법동 581-29')}
+            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+          >
+            새벽로 13 (일반건축물)
           </button>
           <button
             type="button"
@@ -303,20 +318,6 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
             className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
           >
             사상강변동원
-          </button>
-          <button
-            type="button"
-            onClick={() => setExampleAddress('부산 사상구 백양대로 707', '부산 사상구 덕포동 788-8')}
-            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
-          >
-            백양대로 707
-          </button>
-          <button
-            type="button"
-            onClick={() => setExampleAddress('서울특별시 강남구 역삼로 310', '서울특별시 강남구 역삼동 779-1')}
-            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200"
-          >
-            역삼동 아파트
           </button>
         </div>
       </div>
