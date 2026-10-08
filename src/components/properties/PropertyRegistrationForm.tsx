@@ -391,16 +391,24 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: currentLedger?.approvalDate || prev.approvalDate,
       }));
     } else if (propertyType === 'APARTMENT') {
+      const pyeongVal = Math.round(exclPyeong);
+      const suppPyeongVal = Math.round(suppPyeong);
+      const autoPyeongType = `${suppPyeongVal}평형 (${Math.round(exclArea)}타입)`;
+
       setApartmentData((prev: any) => ({
         ...prev,
         complexName: currentLedger?.complexName || prev.complexName,
-        buildingNo: unit.dong || prev.buildingNo,
-        unitNo: unit.ho,
-        currentFloor: unit.floor,
+        buildingNo: unit.dong ? (unit.dong.endsWith('동') ? unit.dong : `${unit.dong}동`) : prev.buildingNo,
+        unitNo: unit.ho ? (unit.ho.endsWith('호') ? unit.ho : `${unit.ho}호`) : prev.unitNo,
+        currentFloor: unit.floor || prev.currentFloor,
         exclusiveArea: exclArea,
         exclusiveAreaPyeong: exclPyeong,
         supplyArea: suppArea,
         supplyAreaPyeong: suppPyeong,
+        pyeongType: prev.pyeongType || autoPyeongType,
+        parkingCount: currentLedger?.parkingCount !== undefined ? currentLedger.parkingCount : prev.parkingCount,
+        parkingPerHousehold: currentLedger?.parkingPerHousehold || prev.parkingPerHousehold,
+        elevatorCount: currentLedger?.elevatorCount !== undefined ? currentLedger.elevatorCount : prev.elevatorCount,
         approvalDate: currentLedger?.approvalDate || prev.approvalDate,
       }));
     } else if (propertyType === 'STORE') {
@@ -620,14 +628,30 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       const aptSupp = data.supplyArea || data.exclusiveArea;
       const aptSuppPy = data.supplyAreaPyeong || (aptSupp ? +(aptSupp * 0.3025).toFixed(2) : undefined);
 
+      // 선택된 동 또는 기본 첫 동
+      const targetDong = (data as any).selectedDong || (data.dongList && data.dongList.length > 0 ? data.dongList[0] : undefined);
+      // 유닛이 있으면 해당 동의 첫 호수 또는 매칭 호수
+      const targetUnit = data.unitList && data.unitList.length > 0
+        ? (targetDong ? data.unitList.find((u) => u.dong && (u.dong === targetDong || u.dong.replace(/동$/, '') === targetDong.replace(/동$/, ''))) || data.unitList[0] : data.unitList[0])
+        : undefined;
+
+      const effectiveExcl = targetUnit?.exclusiveArea ?? aptExcl;
+      const effectiveExclPy = targetUnit?.exclusiveAreaPyeong ?? aptExclPy;
+      const effectiveSupp = targetUnit?.supplyArea ?? aptSupp;
+      const effectiveSuppPy = targetUnit?.supplyAreaPyeong ?? aptSuppPy;
+      const suppPyeongNum = effectiveSuppPy ? Math.round(effectiveSuppPy) : (effectiveSupp ? Math.round(effectiveSupp * 0.3025) : 34);
+      const autoPyeongType = `${suppPyeongNum}평형 (${Math.round(effectiveExcl || 84)}타입)`;
+
       setApartmentData((prev: any) => ({
         ...prev,
         complexName: complex || prev.complexName,
-        exclusiveArea: aptExcl !== undefined ? aptExcl : prev.exclusiveArea,
-        exclusiveAreaPyeong: aptExclPy !== undefined ? aptExclPy : prev.exclusiveAreaPyeong,
-        supplyArea: aptSupp !== undefined ? aptSupp : prev.supplyArea,
-        supplyAreaPyeong: aptSuppPy !== undefined ? aptSuppPy : prev.supplyAreaPyeong,
-        pyeongType: data.pyeongType || prev.pyeongType,
+        buildingNo: targetDong || targetUnit?.dong || prev.buildingNo,
+        unitNo: targetUnit?.ho || prev.unitNo,
+        exclusiveArea: effectiveExcl !== undefined ? effectiveExcl : prev.exclusiveArea,
+        exclusiveAreaPyeong: effectiveExclPy !== undefined ? effectiveExclPy : prev.exclusiveAreaPyeong,
+        supplyArea: effectiveSupp !== undefined ? effectiveSupp : prev.supplyArea,
+        supplyAreaPyeong: effectiveSuppPy !== undefined ? effectiveSuppPy : prev.supplyAreaPyeong,
+        pyeongType: data.pyeongType || prev.pyeongType || autoPyeongType,
         roomCount: data.roomCount !== undefined ? data.roomCount : prev.roomCount,
         bathroomCount: data.bathroomCount !== undefined ? data.bathroomCount : prev.bathroomCount,
         elevatorCount: data.elevatorCount !== undefined ? data.elevatorCount : prev.elevatorCount,

@@ -247,6 +247,14 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setSelectedUnitKey(null);
     setHoSearchQuery('');
 
+    // 동 선택 시 4번째 이미지 폼에 선택된 동 정보가 즉시 연동되도록 상위 통보
+    if (fetchedData) {
+      onApplyData({
+        ...fetchedData,
+        selectedDong: dongName,
+      } as any);
+    }
+
     const targetAddress = roadAddress || jibunAddress;
     if (!targetAddress) return;
 
@@ -260,9 +268,10 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       );
       if (res.ok) {
         const data: PublicBuildingLedgerResult = await res.json();
-        if (data.unitList && data.unitList.length > 0) {
-          setFetchedData((prev) => (prev ? { ...prev, unitList: data.unitList } : data));
-        }
+        // 동에 맞는 최신 데이터(unitList, floorList, 주차정보 등)를 로컬 상태에 갱신
+        setFetchedData((prev) => (prev ? { ...prev, ...data, unitList: (data.unitList && data.unitList.length > 0) ? data.unitList : prev.unitList } : data));
+        // 상위 매물 등록 폼에도 최신 데이터 주입
+        onApplyData(data);
       }
     } catch (err) {
       console.warn('동별 호수 조회 실패:', err);
@@ -733,7 +742,13 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                     {fetchedData.unitList && (
                       <span className="text-[11px] text-slate-500 font-medium">
                         (호실 수: {
-                          fetchedData.unitList.filter((u) => !selectedDong || !u.dong || u.dong === selectedDong).length
+                          fetchedData.unitList.filter((u) => {
+                            if (!selectedDong) return true;
+                            if (!u.dong) return true;
+                            const sClean = selectedDong.replace(/동$/, '').trim();
+                            const uClean = u.dong.replace(/동$/, '').trim();
+                            return sClean === uClean || u.dong === selectedDong;
+                          }).length
                         }개)
                       </span>
                     )}
@@ -759,7 +774,13 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                 ) : fetchedData.unitList && fetchedData.unitList.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-80 overflow-y-auto p-1 custom-scrollbar">
                     {fetchedData.unitList
-                      .filter((unit) => !selectedDong || !unit.dong || unit.dong === selectedDong)
+                      .filter((unit) => {
+                        if (!selectedDong) return true;
+                        if (!unit.dong) return true;
+                        const sClean = selectedDong.replace(/동$/, '').trim();
+                        const uClean = unit.dong.replace(/동$/, '').trim();
+                        return sClean === uClean || unit.dong === selectedDong;
+                      })
                       .filter((unit) => !hoSearchQuery || unit.ho.toLowerCase().includes(hoSearchQuery.toLowerCase()))
                       .map((unit, idx) => {
                         const unitKey = `${unit.dong || ''}_${unit.ho}`;
@@ -948,7 +969,27 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {fetchedData.floorList.map((item, idx) => {
+                {[...fetchedData.floorList]
+                  .sort((a, b) => {
+                    const getFloorScore = (fName: string) => {
+                      const isUnder =
+                        fName.includes('지하') ||
+                        fName.includes('B') ||
+                        fName.includes('b') ||
+                        /^지\s*\d+/.test(fName) ||
+                        (fName.startsWith('지') && !fName.startsWith('지상'));
+                      const match = fName.match(/\d+/);
+                      const val = match ? parseInt(match[0], 10) : 0;
+                      if (isUnder) return -val;
+                      if (fName.includes('옥탑')) return 1000 + val;
+                      return val;
+                    };
+                    const scoreA = getFloorScore(a.floor);
+                    const scoreB = getFloorScore(b.floor);
+                    if (scoreA !== scoreB) return scoreA - scoreB;
+                    return a.floor.localeCompare(b.floor, 'ko');
+                  })
+                  .map((item, idx) => {
                   const isSelected = selectedFloorName === item.floor;
                   return (
                     <div
