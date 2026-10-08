@@ -1,6 +1,6 @@
 // src/app/api/properties/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma';
 import { INITIAL_PROPERTIES } from '@/lib/mockData';
 import { recordAccessLog, maskPhoneNumber } from '@/lib/auth';
 
@@ -203,6 +203,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureDatabaseSchema();
     const body = await request.json();
     const {
       propertyNumber,
@@ -657,6 +658,7 @@ export async function POST(request: NextRequest) {
 // 매물 수정 (PUT)
 export async function PUT(request: NextRequest) {
   try {
+    await ensureDatabaseSchema();
     const body = await request.json();
     const {
       id,
