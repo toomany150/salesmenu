@@ -58,6 +58,36 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   // 도로명 / 지번 개별 복사 피드백 상태
   const [copiedType, setCopiedType] = useState<'road' | 'jibun' | null>(null);
 
+  // 소유자 직접 입력/수정 상태 (세 번째 이미지 지원)
+  const [customOwnerMap, setCustomOwnerMap] = useState<Record<string, string>>({});
+  const [isEditingOwner, setIsEditingOwner] = useState(false);
+  const [editingOwnerText, setEditingOwnerText] = useState('');
+
+  const handleSaveCustomOwner = () => {
+    const trimmed = editingOwnerText.trim();
+    if (!trimmed || !fetchedData) return;
+    
+    const key = selectedUnitKey || '__default__';
+    setCustomOwnerMap((prev) => ({ ...prev, [key]: trimmed }));
+    
+    // fetchedData 업데이트 및 부모 폼에 즉시 반영
+    const updated: PublicBuildingLedgerResult = {
+      ...fetchedData,
+      ownerName: trimmed,
+    };
+    if (updated.unitList && selectedUnitKey) {
+      updated.unitList = updated.unitList.map((u) => {
+        if (`${u.dong || ''}_${u.ho}` === selectedUnitKey) {
+          return { ...u, ownerName: trimmed };
+        }
+        return u;
+      });
+    }
+    setFetchedData(updated);
+    onApplyData(updated);
+    setIsEditingOwner(false);
+  };
+
   const handleCopyAddress = (text: string, type: 'road' | 'jibun') => {
     if (!text) return;
     const cleanText = text.trim();
@@ -807,21 +837,30 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                               </span>
                             </div>
 
-                            <div className="space-y-0.5 mt-1">
-                              <div className={`text-[11px] font-extrabold flex items-center justify-between ${
-                                isSelected ? 'text-blue-100' : 'text-blue-700'
+                            <div className="space-y-1 mt-1">
+                              {/* 1. 공급면적 */}
+                              <div className={`text-[11px] font-black flex items-center justify-between ${
+                                isSelected ? 'text-indigo-100' : 'text-indigo-700'
                               }`}>
-                                <span>전용</span>
+                                <span className="text-[10px] font-bold">공급</span>
+                                <span>{unit.supplyArea || unit.exclusiveArea}㎡ ({unit.supplyAreaPyeong || +((unit.supplyArea || unit.exclusiveArea) * 0.3025).toFixed(1)}평)</span>
+                              </div>
+                              {/* 2. 전용면적 */}
+                              <div className={`text-[11px] font-extrabold flex items-center justify-between ${
+                                isSelected ? 'text-blue-100' : 'text-blue-800'
+                              }`}>
+                                <span className="text-[10px] font-bold">전용</span>
                                 <span>{unit.exclusiveArea}㎡</span>
                               </div>
-                              <div className={`text-[10px] flex items-center justify-between ${
+                              {/* 3. 실평수 */}
+                              <div className={`text-[10px] font-semibold flex items-center justify-between ${
                                 isSelected ? 'text-blue-200' : 'text-slate-500'
                               }`}>
                                 <span>실평수</span>
                                 <span>{unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평</span>
                               </div>
                               {unit.ownerName && (
-                                <div className={`text-[10px] truncate pt-1 border-t ${
+                                <div className={`text-[10px] truncate pt-0.5 border-t ${
                                   isSelected ? 'text-white/90 border-blue-500' : 'text-slate-600 border-slate-200'
                                 }`}>
                                   소유: {unit.ownerName}
@@ -899,14 +938,16 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
           {/* 3. 대장상 소유주 정보 및 소유권 변동일 (2번째 이미지 완벽 연동, 선택된 전유부 소유자 자동 반영) */}
           {(() => {
             const currentSelected = fetchedData.unitList?.find((u) => `${u.dong || ''}_${u.ho}` === selectedUnitKey);
-            const activeOwnerName = currentSelected?.ownerName || fetchedData.ownerName || '임정원';
-            const activeOwnerRegNo = currentSelected?.ownerRegNo || fetchedData.ownerRegNo || '590917-1******';
-            const activeChangeDate = currentSelected?.ownershipChangeDate || fetchedData.ownershipChangeDate || '2015-04-20';
-            const activeChangeReason = currentSelected?.ownershipChangeReason || fetchedData.ownershipChangeReason || '매매 (소유권이전)';
+            const customName = selectedUnitKey ? customOwnerMap[selectedUnitKey] : customOwnerMap['__default__'];
+            const activeOwnerName = customName || currentSelected?.ownerName || fetchedData.ownerName || '소유자(등기부/대장 실확인 필요)';
+            const activeOwnerRegNo = currentSelected?.ownerRegNo || fetchedData.ownerRegNo || '******-*******';
+            const activeChangeDate = currentSelected?.ownershipChangeDate || fetchedData.ownershipChangeDate || fetchedData.approvalDate || '소유권이전일';
+            const activeChangeReason = currentSelected?.ownershipChangeReason || fetchedData.ownershipChangeReason || '소유권이전';
+            const isNeedCheck = !activeOwnerName || activeOwnerName.includes('실확인 필요');
 
             return (
               <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/70">
+                <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/70 flex-wrap gap-1">
                   <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
                     <UserCheck className="w-4 h-4 text-amber-700" />
                     대장상 소유자 정보 (소유권 현황)
@@ -916,25 +957,89 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                       </span>
                     )}
                   </span>
-                  <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded font-bold border border-amber-200">
-                    {currentSelected
-                      ? '집합건축물대장(전유부) 소유자란'
-                      : (fetchedData.isCollectiveBuilding ? '집합건축물대장(표제부) 소유자현황' : '건축물대장(갑) 소유자란')}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs pt-0.5">
-                  <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
-                    <span className="text-[10px] text-slate-500 block font-medium">성명 (명칭)</span>
-                    <span className="font-black text-slate-900 text-sm mt-0.5 block">
-                      {activeOwnerName}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded font-bold border border-amber-200">
+                      {currentSelected
+                        ? '집합건축물대장(전유부) 소유자란'
+                        : (fetchedData.isCollectiveBuilding ? '집합건축물대장(표제부) 소유자현황' : '건축물대장(갑) 소유자란')}
                     </span>
+                    {!isEditingOwner && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingOwnerText(isNeedCheck ? '' : activeOwnerName);
+                          setIsEditingOwner(true);
+                        }}
+                        className="text-[10px] text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 px-2 py-0.5 rounded border border-blue-300 font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                        title="건축물대장이나 등기부상의 실 소유자명을 직접 입력/수정합니다"
+                      >
+                        <Edit3 className="w-3 h-3 text-blue-600" />
+                        소유자 {isNeedCheck ? '직접입력' : '수정'}
+                      </button>
+                    )}
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs pt-0.5">
+                  {/* 성명 (명칭) */}
+                  <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 block font-medium">성명 (명칭)</span>
+                      {isNeedCheck && !isEditingOwner && (
+                        <span className="text-[9px] text-amber-600 bg-amber-50 px-1 rounded font-medium">오픈API 비공개</span>
+                      )}
+                    </div>
+                    {isEditingOwner ? (
+                      <div className="mt-1 flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={editingOwnerText}
+                          onChange={(e) => setEditingOwnerText(e.target.value)}
+                          placeholder="소유자명 입력"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSaveCustomOwner();
+                            }
+                          }}
+                          className="w-full text-xs px-2 py-1 border border-blue-400 rounded focus:ring-1 focus:ring-blue-500 font-bold bg-blue-50/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveCustomOwner}
+                          className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded shrink-0 cursor-pointer"
+                        >
+                          저장
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingOwner(false)}
+                          className="px-1.5 py-1 text-slate-500 hover:text-slate-700 text-[10px] rounded shrink-0 cursor-pointer"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className={`font-black text-sm block ${
+                          isNeedCheck ? 'text-amber-800 text-xs font-semibold' : 'text-slate-900'
+                        }`}>
+                          {activeOwnerName}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 주민(법인)등록번호 */}
                   <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
                     <span className="text-[10px] text-slate-500 block font-medium">주민(법인)등록번호</span>
                     <span className="font-bold text-slate-800 text-xs mt-0.5 block tracking-wide">
                       {activeOwnerRegNo}
                     </span>
                   </div>
+
+                  {/* 소유권 변동일 */}
                   <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
                     <span className="text-[10px] text-slate-500 block font-medium flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-blue-600" />
@@ -944,6 +1049,8 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                       {activeChangeDate}
                     </span>
                   </div>
+
+                  {/* 변동원인 */}
                   <div className="bg-white/95 p-2.5 rounded-lg border border-amber-200/70 shadow-2xs">
                     <span className="text-[10px] text-slate-500 block font-medium">변동원인</span>
                     <span className="font-bold text-slate-800 text-xs mt-0.5 block">
@@ -951,12 +1058,18 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {isNeedCheck && !isEditingOwner && (
+                  <div className="text-[10px] text-amber-800 bg-amber-100/70 rounded px-2.5 py-1 flex items-center justify-between">
+                    <span>💡 국토교통부 공공데이터는 개인정보보호법상 소유자 실명이 비공개됩니다. [소유자 직접입력]을 눌러 실제 대장 소유자를 등록하실 수 있습니다.</span>
+                  </div>
+                )}
               </div>
             );
           })()}
 
-          {/* 4. 층수에 따른 용도 및 면적 전체 표시 (층별개요) */}
-          {fetchedData.floorList && fetchedData.floorList.length > 0 && (
+          {/* 4. 층수에 따른 용도 및 면적 전체 표시 (층별개요: 일반 상가/사무실/단독 건물에서만 표시, 아파트 등 집합건물은 호실 선택 체계이므로 제외) */}
+          {fetchedData.floorList && fetchedData.floorList.length > 0 && !fetchedData.isCollectiveBuilding && propertyType !== 'APARTMENT' && (
             <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 flex-wrap gap-1">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">

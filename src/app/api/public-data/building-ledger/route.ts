@@ -427,7 +427,8 @@ async function fetchBuildingLedgerFromGov(
           ho: string;
           floor: string;
           exclusiveArea: number;
-          commonArea: number;
+          residentialCommonArea: number;
+          otherCommonArea: number;
           mainUse: string;
         }>();
 
@@ -450,13 +451,19 @@ async function fetchBuildingLedgerFromGov(
           const floor = item.flrNoNm || (flrNo ? `${flrGb} ${flrNo}층` : '');
           const mainUse = item.mainPurpsCdNm || item.etcPurps || '';
 
+          // [두번째 이미지 오류 해결] 아파트 공급면적은 '전용면적 + 주거공용면적(계단실, 승강기, 복도, 홀, 벽체)'만 포함해야 함!
+          // 지하주차장, 관리사무소, 경로당, 커뮤니티시설, 기계실 등 기타공용면적은 계약면적이므로 공급면적에서 제외
+          const etcText = `${item.etcPurps || ''} ${item.mainPurpsCdNm || ''}`;
+          const isOtherCommon = /주차장|지하주차장|관리사무소|경로당|어린이집|기계실|전기실|발전기|펌프실|방재실|MDF|주민회의실|게스트룸|경비실|체육관|골프|독서실|도서관|카페|키즈|휘트니스|외부계단|정화조|물탱크/i.test(etcText);
+
           if (!unitMap.has(unitKey)) {
             unitMap.set(unitKey, {
               dong,
               ho,
               floor,
               exclusiveArea: 0,
-              commonArea: 0,
+              residentialCommonArea: 0,
+              otherCommonArea: 0,
               mainUse,
             });
           }
@@ -467,22 +474,36 @@ async function fetchBuildingLedgerFromGov(
             if (mainUse) u.mainUse = mainUse;
             if (floor) u.floor = floor;
           } else if (isPub) {
-            u.commonArea += area;
+            if (isOtherCommon) {
+              u.otherCommonArea += area;
+            } else {
+              u.residentialCommonArea += area;
+            }
           }
         }
 
         for (const u of unitMap.values()) {
           const excl = Math.round(u.exclusiveArea * 100) / 100;
-          const comm = Math.round(u.commonArea * 100) / 100;
-          const supp = Math.round((excl + comm) * 100) / 100;
+          let resComm = Math.round(u.residentialCommonArea * 100) / 100;
+
+          // 공용 용도 구분이 없는 단지의 경우 주거공용 비율(통상 전용의 28~35%)로 합리적 산출
+          if (resComm === 0 && u.otherCommonArea > 0) {
+            if (u.otherCommonArea <= excl * 0.45) {
+              resComm = Math.round(u.otherCommonArea * 100) / 100;
+            } else {
+              resComm = Math.round(excl * 0.30 * 100) / 100;
+            }
+          }
+
+          const supp = Math.round((excl + resComm) * 100) / 100;
           const finalUnit: PublicBuildingUnitInfo = {
             dong: u.dong,
             ho: u.ho,
             floor: u.floor,
             exclusiveArea: excl,
             exclusiveAreaPyeong: +(excl * 0.3025).toFixed(2),
-            supplyArea: supp > excl ? supp : excl,
-            supplyAreaPyeong: +((supp > excl ? supp : excl) * 0.3025).toFixed(2),
+            supplyArea: supp > excl ? supp : Math.round(excl * 1.3 * 100) / 100,
+            supplyAreaPyeong: +((supp > excl ? supp : Math.round(excl * 1.3 * 100) / 100) * 0.3025).toFixed(2),
             mainUse: u.mainUse || chosenItem.mainPurpsCdNm || '공동주택',
           };
           unitList.push(finalUnit);
