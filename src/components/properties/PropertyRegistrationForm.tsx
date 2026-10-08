@@ -85,37 +85,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [images, setImages] = useState<string[]>([]);
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
-  const [copiedAddressType, setCopiedAddressType] = useState<'road' | 'jibun' | null>(null);
-
-  const handleCopySummaryAddress = (text: string, type: 'road' | 'jibun') => {
-    if (!text) return;
-    const clean = text.trim();
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(clean).then(() => {
-        setCopiedAddressType(type);
-        setTimeout(() => setCopiedAddressType(null), 2000);
-      }).catch(() => fallbackCopySummary(clean, type));
-    } else {
-      fallbackCopySummary(clean, type);
-    }
-  };
-
-  const fallbackCopySummary = (text: string, type: 'road' | 'jibun') => {
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopiedAddressType(type);
-      setTimeout(() => setCopiedAddressType(null), 2000);
-    } catch {
-      alert('주소 복사에 실패했습니다.');
-    }
-  };
 
   // Direction & Criteria States (요청 1)
   const [direction, setDirection] = useState<string>('남향');
@@ -1145,127 +1114,66 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   onSelectUnit={handleSelectUnitFromLedger}
                 />
 
-                {/* 3. 소재지 주소 확인 및 실시간 카카오 지도 연동 */}
+                {/* 3. 상세주소 입력 및 실시간 카카오 지도 연동 (소재지 주소는 상단 대장 조회에서만 단일 입력) */}
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                      소재지 주소 확인 및 실시간 카카오 지도 위치
+                      상세주소 확인 및 실시간 카카오 지도 위치
                     </h4>
                     <span className="text-[11px] text-slate-500">
-                      주소를 입력하면 지도가 즉시 해당 위치로 이동합니다.
+                      상단에서 입력한 주소의 위치가 지도에 실시간 표시됩니다.
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2 space-y-1.5">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-semibold text-slate-700">
-                        선택된 주소 요약
+                        상세주소 (동/호수/층)
                       </label>
-                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-800 rounded shrink-0">주소1 도로명</span>
-                            <span className="font-semibold text-slate-900 truncate">{roadAddress || '(위의 대장 연동란에서 입력/검색)'}</span>
-                          </div>
-                          {roadAddress && (
-                            <button
-                              type="button"
-                              onClick={() => handleCopySummaryAddress(roadAddress, 'road')}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-blue-700 bg-white hover:bg-blue-50 active:scale-95 border border-blue-300 rounded shadow-2xs shrink-0 cursor-pointer"
-                              title="도로명 주소 복사"
-                            >
-                              {copiedAddressType === 'road' ? (
-                                <>
-                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
-                                  <span className="text-emerald-700">복사 완료</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2.5 h-2.5 text-blue-600" />
-                                  <span>도로명 복사</span>
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded shrink-0">주소2 지번</span>
-                            <span className="text-slate-700 truncate">{jibunAddress || '-'}</span>
-                          </div>
-                          {jibunAddress && (
-                            <button
-                              type="button"
-                              onClick={() => handleCopySummaryAddress(jibunAddress, 'jibun')}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-amber-800 bg-white hover:bg-amber-50 active:scale-95 border border-amber-300 rounded shadow-2xs shrink-0 cursor-pointer"
-                              title="지번 주소 복사"
-                            >
-                              {copiedAddressType === 'jibun' ? (
-                                <>
-                                  <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
-                                  <span className="text-emerald-700">복사 완료</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2.5 h-2.5 text-amber-700" />
-                                  <span>지번 복사</span>
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-semibold text-slate-700">
-                          상세주소 (동/호수/층)
-                        </label>
-                        {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
-                          <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                            🏢 집합건물 전유부
-                          </span>
-                        )}
-                      </div>
-
-                      {/* 집합건물 전유부 빠른 선택 드롭다운 */}
                       {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
-                        <div className="mb-1.5">
-                          <select
-                            value={ledgerData.unitList.some(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === detailAddress) ? detailAddress : ''}
-                            onChange={(e) => {
-                              if (!e.target.value) return;
-                              const found = ledgerData.unitList?.find(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === e.target.value);
-                              if (found) {
-                                handleSelectUnitFromLedger(found);
-                              }
-                            }}
-                            className="w-full text-xs font-bold px-2 py-1.5 bg-blue-50/70 border border-blue-300 rounded-lg text-blue-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                          >
-                            <option value="">▼ 호수 바로 선택 (동/호수/전용면적)</option>
-                            {ledgerData.unitList.map((u, i) => {
-                              const val = `${u.dong ? u.dong + ' ' : ''}${u.ho}`;
-                              const label = `${val} (${u.floor} / 전용 ${u.exclusiveArea}㎡ / ${u.ownerName || '소유자'})`;
-                              return (
-                                <option key={i} value={val}>{label}</option>
-                              );
-                            })}
-                          </select>
-                        </div>
+                        <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                          🏢 집합건물 전유부
+                        </span>
                       )}
-
-                      <input
-                        type="text"
-                        value={detailAddress}
-                        onChange={(e) => handleDetailAddressChange(e.target.value)}
-                        placeholder="예: 가동 201호 / 110동 2906호 / 1층"
-                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-[48px]"
-                      />
-                      <p className="text-[10px] text-blue-600 mt-1 font-medium">
-                        💡 위에서 동·호수를 클릭하거나 직접 입력 시 해당층수·대장상면적·주용도가 자동 반영됩니다 (수정 가능).
-                      </p>
                     </div>
+
+                    {/* 집합건물 전유부 빠른 선택 드롭다운 */}
+                    {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
+                      <div className="mb-1.5">
+                        <select
+                          value={ledgerData.unitList.some(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === detailAddress) ? detailAddress : ''}
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            const found = ledgerData.unitList?.find(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === e.target.value);
+                            if (found) {
+                              handleSelectUnitFromLedger(found);
+                            }
+                          }}
+                          className="w-full text-xs font-bold px-2 py-1.5 bg-blue-50/70 border border-blue-300 rounded-lg text-blue-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="">▼ 호수 바로 선택 (동/호수/전용면적)</option>
+                          {ledgerData.unitList.map((u, i) => {
+                            const val = `${u.dong ? u.dong + ' ' : ''}${u.ho}`;
+                            const label = `${val} (${u.floor} / 전용 ${u.exclusiveArea}㎡ / ${u.ownerName || '소유자'})`;
+                            return (
+                              <option key={i} value={val}>{label}</option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+
+                    <input
+                      type="text"
+                      value={detailAddress}
+                      onChange={(e) => handleDetailAddressChange(e.target.value)}
+                      placeholder="예: 101동 1304호 / 1층"
+                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-[48px]"
+                    />
+                    <p className="text-[10px] text-blue-600 mt-1 font-medium">
+                      💡 상단 대장 조회에서 동·호수를 클릭하거나 직접 입력 시 해당층수·대장상면적·주용도가 자동 반영됩니다.
+                    </p>
                   </div>
 
                   {/* 실시간 카카오 지도 임베드 (첨부한 두번째 형태) */}

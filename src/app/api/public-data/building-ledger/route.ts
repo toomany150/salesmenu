@@ -42,10 +42,13 @@ function extractDongHo(rawAddress: string, detailAddress?: string): { targetDong
 }
 
 // 카카오 로컬 검색 API를 통해 주소 문자열에서 시군구코드(5자리), 법정동코드(5자리), 번(4자리), 지(4자리) 정확히 추출
-async function parseAddressToGovParams(address: string, detailAddress?: string): Promise<GovAddressParams | null> {
+async function parseAddressToGovParams(address: string, detailAddress?: string, requestedDong?: string): Promise<GovAddressParams | null> {
   const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY || process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || 'ab4074f3fc327e405a625fc856bee022';
   
-  const { targetDong, targetHo } = extractDongHo(address, detailAddress);
+  let { targetDong, targetHo } = extractDongHo(address, detailAddress);
+  if (requestedDong && requestedDong.trim() && requestedDong.trim() !== 'ALL') {
+    targetDong = requestedDong.trim().replace(/동$/, '');
+  }
 
   // 동/호수나 부가 정보를 제거한 순수 주소로 검색 품질 향상
   const cleanedQuery = address
@@ -145,10 +148,40 @@ async function fetchBuildingLedgerFromGov(
 
   for (const it of titleList) {
     const dNm = (it.dongNm || '').trim();
-    if (dNm && !allDongNames.includes(dNm)) {
-      allDongNames.push(dNm.endsWith('동') ? dNm : `${dNm}동`);
+    if (!dNm) continue;
+
+    // 부속건물 및 비주거 편의시설 제외 (경로당, 지하주차장, 외부계단, 경비실 등)
+    const isAuxiliary =
+      it.mainAtchGbCd === '1' ||
+      /주차장|경로당|계단|경비실|관리사무소|변전실|어린이집|기계실|펌프실|정화조/i.test(dNm);
+    if (isAuxiliary) continue;
+
+    // 동 명칭 정규화 (중복 '동' 접미사 방지)
+    const cleanDong = dNm.includes('동') ? dNm : `${dNm}동`;
+    if (!allDongNames.includes(cleanDong)) {
+      allDongNames.push(cleanDong);
     }
   }
+
+  // 필터링 후 남은 동이 없으면 원본으로 복구
+  if (allDongNames.length === 0) {
+    for (const it of titleList) {
+      const dNm = (it.dongNm || '').trim();
+      if (!dNm) continue;
+      const cleanDong = dNm.includes('동') ? dNm : `${dNm}동`;
+      if (!allDongNames.includes(cleanDong)) {
+        allDongNames.push(cleanDong);
+      }
+    }
+  }
+
+  // 숫자 기준 자연스러운 오름차순 정렬 (예: 101동, 102동 ... 402동)
+  allDongNames.sort((a, b) => {
+    const numA = parseInt(a.replace(/[^0-9]/g, '') || '0', 10);
+    const numB = parseInt(b.replace(/[^0-9]/g, '') || '0', 10);
+    if (numA !== numB) return numA - numB;
+    return a.localeCompare(b, 'ko');
+  });
 
   if (targetDong) {
     const cleanTargetDong = targetDong.replace(/동$/, '');
@@ -161,11 +194,23 @@ async function fetchBuildingLedgerFromGov(
       chosenItem = matchedByDong;
     }
   } else {
-    // 사용자가 동을 지정하지 않은 경우: 주건축물 우선 + 연면적이 가장 큰 주동 선택
-    const mainBuildings = titleList.filter((it) => it.mainAtchGbCd === '0' || it.mainAtchGbCdNm === '주건축물');
-    if (mainBuildings.length > 0) {
-      mainBuildings.sort((a, b) => (parseFloat(b.totArea) || 0) - (parseFloat(a.totArea) || 0));
-      chosenItem = mainBuildings[0];
+    // 사용자가 동을 지정하지 않은 경우: 정렬된 첫번째 동 매칭 시도, 없으면 주건축물 우선
+    if (allDongNames.length > 0) {
+      const firstDongClean = allDongNames[0].replace(/동$/, '');
+      const matchedFirst = titleList.find((it) => {
+        const dNm = (it.dongNm || '').trim().replace(/동$/, '');
+        return dNm === firstDongClean;
+      });
+      if (matchedFirst) {
+        chosenItem = matchedFirst;
+      }
+    }
+    if (!chosenItem) {
+      const mainBuildings = titleList.filter((it) => it.mainAtchGbCd === '0' || it.mainAtchGbCdNm === '주건축물');
+      if (mainBuildings.length > 0) {
+        mainBuildings.sort((a, b) => (parseFloat(b.totArea) || 0) - (parseFloat(a.totArea) || 0));
+        chosenItem = mainBuildings[0];
+      }
     }
   }
 
@@ -234,12 +279,13 @@ async function fetchBuildingLedgerFromGov(
 
   if (isCollective) {
     try {
+      const activeDong = targetDong || (allDongNames.length > 0 ? allDongNames[0].replace(/동$/, '') : undefined);
       let exposUrl = `https://apis.data.go.kr/1613000/BldRgstHubService/getBrExposPubuseAreaInfo?serviceKey=${encodeURIComponent(
         apiKey
-      )}&sigunguCd=${sigunguCd}&bjdongCd=${bjdongCd}&platGbCd=${platGbCd}&bun=${bun}&ji=${ji}&numOfRows=100&pageNo=1&_type=json`;
+      )}&sigunguCd=${sigunguCd}&bjdongCd=${bjdongCd}&platGbCd=${platGbCd}&bun=${bun}&ji=${ji}&numOfRows=500&pageNo=1&_type=json`;
       
-      if (targetDong) {
-        exposUrl += `&dongNm=${encodeURIComponent(targetDong.replace(/동$/, ''))}`;
+      if (activeDong) {
+        exposUrl += `&dongNm=${encodeURIComponent(activeDong.replace(/동$/, ''))}`;
       }
 
       const exposRes = await fetch(exposUrl, {
@@ -454,6 +500,7 @@ export async function GET(request: NextRequest) {
   const address = searchParams.get('address');
   const propertyType = searchParams.get('propertyType');
   const detailAddress = searchParams.get('detailAddress') || '';
+  const dong = searchParams.get('dong') || '';
 
   if (!address || address.trim().length === 0) {
     return NextResponse.json(
@@ -480,7 +527,7 @@ export async function GET(request: NextRequest) {
 
   if (apiKey && apiKey !== 'your-data-go-kr-api-key') {
     try {
-      const govParams = await parseAddressToGovParams(cleanAddr, detailAddress);
+      const govParams = await parseAddressToGovParams(cleanAddr, detailAddress, dong);
       if (govParams) {
         const liveGovData = await fetchBuildingLedgerFromGov(apiKey, govParams, cleanAddr, propertyType);
         if (liveGovData) {
