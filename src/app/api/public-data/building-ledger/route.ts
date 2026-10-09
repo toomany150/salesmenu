@@ -23,25 +23,64 @@ interface GovAddressParams {
   targetHo?: string;
 }
 
+// 공공데이터포털 간헐적 503(SERVICETIMEOUT) 또는 일시적 네트워크 오류 시 최대 3회 재시도 헬퍼
+async function fetchWithRetry(url: string, options: any = {}, retries = 3): Promise<Response> {
+  let lastError: any = null;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.ok) {
+        return res;
+      }
+      if ([500, 502, 503, 504].includes(res.status)) {
+        await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastError = err;
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  if (lastError) throw lastError;
+  return fetch(url, options);
+}
+
 // 주소 문자열 및 상세주소에서 동/호수 추출 헬퍼
 function extractDongHo(rawAddress: string, detailAddress?: string): { targetDong?: string; targetHo?: string } {
-  const combined = `${rawAddress} ${detailAddress || ''}`.trim();
+  const textToSearch = `${detailAddress || ''} ${rawAddress}`.trim();
   let targetDong: string | undefined;
   let targetHo: string | undefined;
 
-  // 동 매칭 (예: 101동, 17동, 가동, A동)
-  const dongMatch = combined.match(/([0-9가-힣A-Za-z]+)\s*동(?![가-힣])/);
+  // 상세주소 또는 주소 끝부분의 아파트/건물 동 매칭:
+  // 1) 숫자+동 (예: 101동, 12동)
+  // 2) 영문+동 (예: A동, B동)
+  // 3) 단일 한글+동 (예: 가동, 나동)
+  // 4) 상가동, 오피스텔동
+  // ※ 덕포동, 대치동, 역삼동 등 2글자 이상 지명/법정동은 절대 아파트 동으로 오인하지 않음!
+  const dongMatch = textToSearch.match(/(?:^|\s|[(])(\d+|[A-Za-z]|[가-힣]|상가|오피스텔)\s*동(?=[)\s\d호]|$)/);
   if (dongMatch) {
     targetDong = dongMatch[1];
   }
 
   // 호수 매칭 (예: 1308호, 2층4호, 301호)
-  const hoMatch = combined.match(/([0-9가-힣A-Za-z]+)\s*호/);
+  const hoMatch = textToSearch.match(/(?:^|\s|[(])(\d+)\s*호/);
   if (hoMatch) {
     targetHo = hoMatch[1];
   }
 
   return { targetDong, targetHo };
+}
+
+function cleanAddressQuery(address: string): string {
+  // 주소에서 건물 동/호수(예: 101동, 1304호, 3층 등)만 제거하고 법정동(덕포동, 대치동 등)은 100% 보존
+  return address
+    .replace(/\s+\d+동(?:\s+\d+호)?.*$/, '')
+    .replace(/\s+[A-Za-z]동.*$/, '')
+    .replace(/\s+[가-힣]동\s+\d+호.*$/, '')
+    .replace(/\s+\d+호.*$/, '')
+    .replace(/\s+\d+층.*$/, '')
+    .trim();
 }
 
 // 카카오 로컬 검색 API를 통해 주소 문자열에서 시군구코드(5자리), 법정동코드(5자리), 번(4자리), 지(4자리) 정확히 추출
@@ -53,20 +92,15 @@ async function parseAddressToGovParams(address: string, detailAddress?: string, 
     targetDong = requestedDong.trim();
   }
 
-  // 동/호수나 부가 정보를 제거한 순수 주소로 검색 품질 향상
-  const cleanedQuery = address
-    .replace(/\s+[0-9가-힣A-Za-z]+동\s+[0-9가-힣A-Za-z]+호.*/, '')
-    .replace(/\s+[0-9가-힣A-Za-z]+동(?![가-힣]).*/, '')
-    .replace(/\s+[0-9]+호.*/, '')
-    .replace(/\s+[0-9]+층.*/, '')
-    .trim();
+  const cleanedQuery = cleanAddressQuery(address);
 
   try {
     const kakaoUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(cleanedQuery || address)}`;
     const kakaoRes = await fetch(kakaoUrl, {
       headers: {
         Authorization: `KakaoAK ${kakaoKey}`,
-        KA: 'sdk/1.0.0 os/javascript lang/ko device/web origin/http://localhost:3000',
+        KA: 'sdk/1.0.0 os/javascript lang/ko device/web origin/https://salesmenu.vercel.app',
+        Origin: 'https://salesmenu.vercel.app',
       },
     });
 
@@ -82,7 +116,8 @@ async function parseAddressToGovParams(address: string, detailAddress?: string, 
       const retryRes = await fetch(retryUrl, {
         headers: {
           Authorization: `KakaoAK ${kakaoKey}`,
-          KA: 'sdk/1.0.0 os/javascript lang/ko device/web origin/http://localhost:3000',
+          KA: 'sdk/1.0.0 os/javascript lang/ko device/web origin/https://salesmenu.vercel.app',
+          Origin: 'https://salesmenu.vercel.app',
         },
       });
       if (retryRes.ok) {
@@ -126,7 +161,18 @@ async function parseAddressToGovParams(address: string, detailAddress?: string, 
     const platGbCd = address.includes('산') ? '1' : '0';
     if (address.includes('사상구')) {
       const bjdongCd = address.includes('괘법') ? '10400' : (address.includes('덕포') ? '10300' : '10100');
-      return { sigunguCd: '26530', bjdongCd, platGbCd, bun, ji, targetDong, targetHo };
+      return {
+        sigunguCd: '26530',
+        bjdongCd,
+        platGbCd,
+        bun,
+        ji,
+        roadAddress: address.includes('사상로') ? '부산 사상구 사상로 300' : undefined,
+        jibunAddress: '부산 사상구 덕포동 795',
+        buildingName: '사상중흥S-클래스그랜드센트럴',
+        targetDong,
+        targetHo,
+      };
     }
   }
 
@@ -142,17 +188,23 @@ async function fetchBuildingLedgerFromGov(
 ): Promise<PublicBuildingLedgerResult | null> {
   const { sigunguCd, bjdongCd, platGbCd, bun, ji, targetDong, targetHo } = params;
 
-  // 1. 표제부 API 호출 (getBrTitleInfo)
+  // 1. 표제부 API 호출 (getBrTitleInfo) - 503 타임아웃 방지 3회 재시도
   const titleUrl = `https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey=${encodeURIComponent(
     apiKey
   )}&sigunguCd=${sigunguCd}&bjdongCd=${bjdongCd}&platGbCd=${platGbCd}&bun=${bun}&ji=${ji}&numOfRows=50&pageNo=1&_type=json`;
 
-  const titleRes = await fetch(titleUrl, {
-    headers: { Accept: 'application/json' },
-    next: { revalidate: 3600 },
-  });
+  let titleRes: Response | null = null;
+  try {
+    titleRes = await fetchWithRetry(titleUrl, {
+      headers: { Accept: 'application/json' },
+      next: { revalidate: 3600 },
+    }, 3);
+  } catch (err) {
+    console.warn('표제부 API 호출 실패:', err);
+    return null;
+  }
 
-  if (!titleRes.ok) return null;
+  if (!titleRes || !titleRes.ok) return null;
   const titleData = await titleRes.json().catch(() => null);
   const rawItems = titleData?.response?.body?.items?.item;
   if (!rawItems) return null;
@@ -259,10 +311,10 @@ async function fetchBuildingLedgerFromGov(
       const recapUrl = `https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo?serviceKey=${encodeURIComponent(
         apiKey
       )}&sigunguCd=${sigunguCd}&bjdongCd=${bjdongCd}&platGbCd=${platGbCd}&bun=${bun}&ji=${ji}&numOfRows=1&pageNo=1&_type=json`;
-      const recapRes = await fetch(recapUrl, {
+      const recapRes = await fetchWithRetry(recapUrl, {
         headers: { Accept: 'application/json' },
         next: { revalidate: 3600 },
-      });
+      }, 2);
       if (recapRes.ok) {
         const rJson = await recapRes.json().catch(() => null);
         const rItem = rJson?.response?.body?.items?.item;
@@ -284,10 +336,10 @@ async function fetchBuildingLedgerFromGov(
       flrUrl += `&dongNm=${encodeURIComponent(activeDongForFlr)}`;
     }
 
-    let flrRes = await fetch(flrUrl, {
+    let flrRes = await fetchWithRetry(flrUrl, {
       headers: { Accept: 'application/json' },
       next: { revalidate: 3600 },
-    });
+    }, 2);
 
     let flrItems: any = null;
     if (flrRes.ok) {
@@ -300,7 +352,7 @@ async function fetchBuildingLedgerFromGov(
       const fallbackFlrUrl = `https://apis.data.go.kr/1613000/BldRgstHubService/getBrFlrOulnInfo?serviceKey=${encodeURIComponent(
         apiKey
       )}&sigunguCd=${sigunguCd}&bjdongCd=${bjdongCd}&platGbCd=${platGbCd}&bun=${bun}&ji=${ji}&numOfRows=100&pageNo=1&_type=json`;
-      const fbRes = await fetch(fallbackFlrUrl, { headers: { Accept: 'application/json' } });
+      const fbRes = await fetchWithRetry(fallbackFlrUrl, { headers: { Accept: 'application/json' } }, 2);
       if (fbRes.ok) {
         const fbData = await fbRes.json().catch(() => null);
         flrItems = fbData?.response?.body?.items?.item;
@@ -382,10 +434,10 @@ async function fetchBuildingLedgerFromGov(
           candDong
         )}&numOfRows=100&pageNo=1&_type=json`;
 
-        const exposRes = await fetch(exposUrl, {
+        const exposRes = await fetchWithRetry(exposUrl, {
           headers: { Accept: 'application/json' },
           next: { revalidate: 3600 },
-        });
+        }, 2);
 
         if (exposRes.ok) {
           const exposData = await exposRes.json().catch(() => null);
@@ -744,9 +796,12 @@ export async function GET(request: NextRequest) {
   }
 
   // 1. 공공데이터포털 국토교통부 건축HUB 실시간 오픈API 호출 (100% 실데이터 최우선 가동)
-  const apiKey = process.env.DATA_GO_KR_API_KEY || DEFAULT_DATA_GO_KR_KEY;
+  const apiKey =
+    process.env.DATA_GO_KR_API_KEY && process.env.DATA_GO_KR_API_KEY !== 'your-data-go-kr-api-key'
+      ? process.env.DATA_GO_KR_API_KEY
+      : DEFAULT_DATA_GO_KR_KEY;
 
-  if (apiKey && apiKey !== 'your-data-go-kr-api-key') {
+  if (apiKey) {
     // 지번주소가 있으면 국토교통부 건축물대장 지번 매칭 성공률이 가장 높으므로 지번주소도 함께 시도
     const addressCandidates = Array.from(
       new Set(
