@@ -7,6 +7,9 @@ import { PublicBuildingFloorInfo, PublicBuildingUnitInfo, PublicBuildingLedgerRe
 // 사용자 직접 수정/저장된 건축물대장 런타임 저장소
 const CUSTOM_USER_LEDGER_STORE = new Map<string, any>();
 
+// 공공데이터포털 건축HUB 실시간 연동 기본 인증키 (Vercel 환경변수 누락 시에도 100% 정상 작동하도록 fallback 지원)
+const DEFAULT_DATA_GO_KR_KEY = '4de555ece087423fee940e78733bdb484d9196e0dc54fb0e64b78754894af96d';
+
 interface GovAddressParams {
   sigunguCd: string;
   bjdongCd: string;
@@ -67,31 +70,48 @@ async function parseAddressToGovParams(address: string, detailAddress?: string, 
       },
     });
 
+    let doc = null;
     if (kakaoRes.ok) {
       const data = await kakaoRes.json();
-      const doc = data?.documents?.[0];
-      if (doc?.address) {
-        const addr = doc.address;
-        const bCode = addr.b_code || '';
-        if (bCode.length >= 10) {
-          const sigunguCd = bCode.substring(0, 5);
-          const bjdongCd = bCode.substring(5, 10);
-          const platGbCd = addr.mountain_yn === 'Y' ? '1' : '0';
-          const bun = (addr.main_address_no || '0').padStart(4, '0');
-          const ji = (addr.sub_address_no || '0').padStart(4, '0');
-          return {
-            sigunguCd,
-            bjdongCd,
-            platGbCd,
-            bun,
-            ji,
-            roadAddress: doc.road_address?.address_name,
-            jibunAddress: addr.address_name,
-            buildingName: doc.road_address?.building_name || '',
-            targetDong,
-            targetHo,
-          };
-        }
+      doc = data?.documents?.[0];
+    }
+
+    // 만약 cleanedQuery로 검색되지 않았을 경우 원본 주소로 2차 시도
+    if (!doc && cleanedQuery !== address) {
+      const retryUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(address)}`;
+      const retryRes = await fetch(retryUrl, {
+        headers: {
+          Authorization: `KakaoAK ${kakaoKey}`,
+          KA: 'sdk/1.0.0 os/javascript lang/ko device/web origin/http://localhost:3000',
+        },
+      });
+      if (retryRes.ok) {
+        const retryData = await retryRes.json();
+        doc = retryData?.documents?.[0];
+      }
+    }
+
+    if (doc?.address) {
+      const addr = doc.address;
+      const bCode = addr.b_code || '';
+      if (bCode.length >= 10) {
+        const sigunguCd = bCode.substring(0, 5);
+        const bjdongCd = bCode.substring(5, 10);
+        const platGbCd = addr.mountain_yn === 'Y' ? '1' : '0';
+        const bun = (addr.main_address_no || '0').padStart(4, '0');
+        const ji = (addr.sub_address_no || '0').padStart(4, '0');
+        return {
+          sigunguCd,
+          bjdongCd,
+          platGbCd,
+          bun,
+          ji,
+          roadAddress: doc.road_address?.address_name,
+          jibunAddress: addr.address_name,
+          buildingName: doc.road_address?.building_name || '',
+          targetDong,
+          targetHo,
+        };
       }
     }
   } catch (err) {
@@ -700,6 +720,8 @@ export async function GET(request: NextRequest) {
   const propertyType = searchParams.get('propertyType');
   const detailAddress = searchParams.get('detailAddress') || '';
   const dong = searchParams.get('dong') || '';
+  const jibunAddress = searchParams.get('jibunAddress') || '';
+  const roadAddress = searchParams.get('roadAddress') || '';
 
   if (!address || address.trim().length === 0) {
     return NextResponse.json(
@@ -722,19 +744,32 @@ export async function GET(request: NextRequest) {
   }
 
   // 1. 공공데이터포털 국토교통부 건축HUB 실시간 오픈API 호출 (100% 실데이터 최우선 가동)
-  const apiKey = process.env.DATA_GO_KR_API_KEY;
+  const apiKey = process.env.DATA_GO_KR_API_KEY || DEFAULT_DATA_GO_KR_KEY;
 
   if (apiKey && apiKey !== 'your-data-go-kr-api-key') {
-    try {
-      const govParams = await parseAddressToGovParams(cleanAddr, detailAddress, dong);
-      if (govParams) {
-        const liveGovData = await fetchBuildingLedgerFromGov(apiKey, govParams, cleanAddr, propertyType);
-        if (liveGovData) {
-          return NextResponse.json(liveGovData);
+    // 지번주소가 있으면 국토교통부 건축물대장 지번 매칭 성공률이 가장 높으므로 지번주소도 함께 시도
+    const addressCandidates = Array.from(
+      new Set(
+        [
+          cleanAddr,
+          jibunAddress.trim(),
+          roadAddress.trim(),
+        ].filter(Boolean)
+      )
+    );
+
+    for (const candAddr of addressCandidates) {
+      try {
+        const govParams = await parseAddressToGovParams(candAddr, detailAddress, dong);
+        if (govParams) {
+          const liveGovData = await fetchBuildingLedgerFromGov(apiKey, govParams, cleanAddr, propertyType);
+          if (liveGovData) {
+            return NextResponse.json(liveGovData);
+          }
         }
+      } catch (err: any) {
+        console.warn(`공공데이터포털 실시간 호출 중 오류 (${candAddr}):`, err);
       }
-    } catch (err: any) {
-      console.warn('공공데이터포털 실시간 호출 중 오류 발생:', err);
     }
   }
 

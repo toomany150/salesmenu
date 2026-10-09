@@ -253,7 +253,9 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     try {
       const typeParam = propertyType ? `&propertyType=${encodeURIComponent(propertyType)}` : '';
       const detailParam = detailAddress ? `&detailAddress=${encodeURIComponent(detailAddress)}` : '';
-      const res = await fetch(`/api/public-data/building-ledger?address=${encodeURIComponent(targetAddress.trim())}${typeParam}${detailParam}`);
+      const roadParam = roadAddress ? `&roadAddress=${encodeURIComponent(roadAddress.trim())}` : '';
+      const jibunParam = jibunAddress ? `&jibunAddress=${encodeURIComponent(jibunAddress.trim())}` : '';
+      const res = await fetch(`/api/public-data/building-ledger?address=${encodeURIComponent(targetAddress.trim())}${typeParam}${detailParam}${roadParam}${jibunParam}`);
       const data: PublicBuildingLedgerResult = await res.json();
       if (!res.ok) {
         throw new Error((data as any).error || '대장 정보 조회 중 오류가 발생했습니다.');
@@ -291,10 +293,12 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setLoadingDongUnits(true);
     try {
       const typeParam = propertyType ? `&propertyType=${encodeURIComponent(propertyType)}` : '';
+      const roadParam = roadAddress ? `&roadAddress=${encodeURIComponent(roadAddress.trim())}` : '';
+      const jibunParam = jibunAddress ? `&jibunAddress=${encodeURIComponent(jibunAddress.trim())}` : '';
       const res = await fetch(
         `/api/public-data/building-ledger?address=${encodeURIComponent(targetAddress.trim())}&dong=${encodeURIComponent(
           dongName
-        )}${typeParam}`
+        )}${typeParam}${roadParam}${jibunParam}`
       );
       if (res.ok) {
         const data: PublicBuildingLedgerResult = await res.json();

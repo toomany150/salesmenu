@@ -33,14 +33,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [tab, setTab] = useState<'LOGIN' | 'CHANGE_PASSWORD'>('LOGIN');
 
   // Login form state
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState(''); // 비밀번호 자동 입력 방지
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Change password state
-  const [cpUsername, setCpUsername] = useState('admin');
+  const [cpUsername, setCpUsername] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -198,10 +198,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             type="button"
             onClick={() => {
               setTab('CHANGE_PASSWORD');
-              setCpUsername(username || 'admin');
-              if (password === '159753tma#') {
-                setCurrentPassword('159753tma#');
-              }
+              setCpUsername(username || '');
+              setCurrentPassword('');
               setErrorMsg(null);
             }}
             className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all ${
@@ -244,7 +242,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="지정된 아이디 입력 (예: admin, agent1 등)"
+                    placeholder="아이디를 입력하세요"
                     required
                     className="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-hidden transition-all"
                   />
@@ -261,7 +259,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                       onClick={() => {
                         setTab('CHANGE_PASSWORD');
                         setCpUsername(username);
-                        if (password === '159753tma#') setCurrentPassword('159753tma#');
+                        setCurrentPassword('');
                       }}
                       className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
                     >
@@ -272,40 +270,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={username === 'admin' ? '초기 비밀번호: 159753tma#' : '비밀번호를 입력하세요'}
+                    placeholder="비밀번호를 입력하세요"
                     required
                     className="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-hidden transition-all"
                   />
-                  {username === 'admin' && (
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      ※ 대표 관리자 초기 비밀번호는 <code className="bg-slate-100 text-blue-700 font-mono font-bold px-1.5 py-0.5 rounded border border-slate-200">159753tma#</code> 입니다.
-                    </p>
-                  )}
                 </div>
-
-                {/* Initial password notice & change prompt */}
-                {isAdminInitialPassword && (
-                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs space-y-1.5">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                      <span>🔑</span>
-                      <span>대표 관리자 초기 비밀번호가 입력되었습니다.</span>
-                    </div>
-                    <p className="text-amber-800 text-[11px]">
-                      보안을 위해 로그인 후 또는 지금 바로 상단의 <strong>[비밀번호 변경]</strong> 탭에서 원하시는 안전한 비밀번호로 변경하실 수 있습니다.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTab('CHANGE_PASSWORD');
-                        setCpUsername('admin');
-                        setCurrentPassword('159753tma#');
-                      }}
-                      className="text-xs font-extrabold text-blue-700 hover:text-blue-900 underline block"
-                    >
-                      지금 바로 비밀번호 변경하기 →
-                    </button>
-                  </div>
-                )}
 
                 <button
                   type="submit"
@@ -373,7 +342,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   비밀번호 변경 안내
                 </p>
                 <p className="text-[11px] text-indigo-800 leading-relaxed">
-                  대표 관리자 초기 비밀번호(<code className="font-mono font-bold text-blue-700 bg-white px-1 rounded">159753tma#</code>) 또는 소속공인중개사의 현재 비밀번호를 입력하여 새 비밀번호로 안전하게 변경합니다.
+                  현재 계정의 비밀번호를 입력하여 새 비밀번호로 안전하게 변경합니다.
                 </p>
               </div>
 
@@ -385,7 +354,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   type="text"
                   value={cpUsername}
                   onChange={(e) => setCpUsername(e.target.value)}
-                  placeholder="예: admin"
+                  placeholder="아이디를 입력하세요"
                   required
                   className="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500"
                 />
@@ -399,7 +368,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="현재 비밀번호 (초기: 159753tma#)"
+                  placeholder="현재 비밀번호를 입력하세요"
                   required
                   className="w-full text-sm font-medium px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-mono"
                 />

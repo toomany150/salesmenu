@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenAdminLogs}
-              title="관리자(Admin) 접속 및 계정·보안로그 관리 (초기비번: 1234)"
+              title="관리자(Admin) 접속 및 계정·보안로그 관리"
               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800 shrink-0"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
