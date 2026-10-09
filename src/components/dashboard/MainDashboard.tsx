@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Building2, Users } from 'lucide-react';
 import { CustomerItem, PropertyItem } from '@/lib/types';
-import { INITIAL_CUSTOMERS, INITIAL_PROPERTIES } from '@/lib/mockData';
 import { Header } from '../layout/Header';
 import { PropertyList } from '../properties/PropertyList';
 import { CustomerList } from '../crm/CustomerList';
@@ -14,8 +13,7 @@ import { CustomerDetailModal } from '../crm/CustomerDetailModal';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { LoginModal } from '../auth/LoginModal';
 import { AdminLogModal } from '../auth/AdminLogModal';
-import { CustomerPropertyBriefing } from '../properties/CustomerPropertyBriefing';
-import { initKakao, AddressShareMode } from '@/lib/kakao';
+import { initKakao } from '@/lib/kakao';
 import { 
   getCustomProperties, 
   saveCustomProperty, 
@@ -26,18 +24,6 @@ import {
   removeCustomCustomer, 
   getDeletedCustomerIds 
 } from '@/lib/storage';
-
-function fromUtf8Base64(b64: string): string {
-  try {
-    return decodeURIComponent(
-      Array.prototype.map
-        .call(atob(b64), (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-  } catch {
-    return '';
-  }
-}
 
 type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP' | 'ALL_CUSTOMERS' | 'CUSTOMER_SEARCH';
 
@@ -54,9 +40,9 @@ const DashboardContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<MainViewTab>('HOME');
   const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
 
-  // Data States
-  const [customers, setCustomers] = useState<CustomerItem[]>(INITIAL_CUSTOMERS);
-  const [properties, setProperties] = useState<PropertyItem[]>(INITIAL_PROPERTIES);
+  // Data States (비로그인 상태에서는 매물장 및 고객정보가 절대 조회되지 않도록 빈 배열로 시작)
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [properties, setProperties] = useState<PropertyItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Modal States
@@ -67,11 +53,6 @@ const DashboardContent: React.FC = () => {
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
 
-  // Customer Briefing View State (외부 공유 링크로 들어온 고객 전용 안내장 화면)
-  const [customerBriefingProp, setCustomerBriefingProp] = useState<PropertyItem | null>(null);
-  const [customerBriefingAddrMode, setCustomerBriefingAddrMode] = useState<AddressShareMode>('dong');
-  const [isCustomerMode, setIsCustomerMode] = useState(false);
-
   // Auth & Admin Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isAdminLogsOpen, setIsAdminLogsOpen] = useState(false);
@@ -81,12 +62,30 @@ const DashboardContent: React.FC = () => {
     initKakao();
   }, []);
 
+  // 비로그인 상태에서 조회/등록 시도 시 로그인 안내 및 차단
+  const checkAuthOrAlert = useCallback((message = '매물장 및 고객정보는 중개사 로그인 후 조회 및 등록이 가능합니다. 상단에서 로그인해주세요.'): boolean => {
+    if (!currentUser) {
+      alert(message);
+      setIsLoginOpen(true);
+      return false;
+    }
+    return true;
+  }, [currentUser]);
+
   const fetchData = useCallback(async () => {
+    // 1. 비로그인 상태인 경우 매물장 및 고객정보 조회를 엄격히 차단 (데이터 노출 방지)
+    if (!currentUser) {
+      setCustomers([]);
+      setProperties([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const deletedPropIds = getDeletedPropertyIds();
     const deletedCustIds = getDeletedCustomerIds();
 
-    // 1. 로컬에 안전하게 보관된 사용자 등록 매물 및 고객 불러오기
+    // 로컬에 보관된 사용자 등록 매물 및 고객 불러오기
     const localCustomProps = getCustomProperties().filter(
       (p) => !deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)
     );
@@ -95,12 +94,11 @@ const DashboardContent: React.FC = () => {
     );
 
     try {
-      const headers: HeadersInit = {};
-      if (currentUser) {
-        headers['x-user-role'] = currentUser.role;
-        headers['x-user-id'] = currentUser.id;
-        headers['x-user-name'] = encodeURIComponent(currentUser.name || '');
-      }
+      const headers: HeadersInit = {
+        'x-user-role': currentUser.role,
+        'x-user-id': currentUser.id,
+        'x-user-name': encodeURIComponent(currentUser.name || ''),
+      };
       const [custRes, propRes] = await Promise.all([
         fetch('/api/customers', { headers }),
         fetch('/api/properties', { headers }),
@@ -135,7 +133,7 @@ const DashboardContent: React.FC = () => {
             }
           });
 
-          // 2) 로컬스토리지 영구 보관 매물 오버레이 (Vercel 서버리스 재부팅 시에도 절대 매물이 사라지지 않음)
+          // 2) 로컬스토리지 보관 매물 오버레이
           localCustomProps.forEach((cp) => {
             const key = cp.propertyNumber || cp.id;
             if (!deletedPropIds.includes(cp.id) && !deletedPropIds.includes(cp.propertyNumber)) {
@@ -151,7 +149,7 @@ const DashboardContent: React.FC = () => {
           });
           setProperties(merged);
 
-          // 3) 백그라운드 서버 재동기화: 서버리스 DB 초기화로 서버에 없는 매물 조용히 복원
+          // 3) 백그라운드 서버 재동기화
           const serverPropKeys = new Set(pData.map((p: any) => p.propertyNumber || p.id));
           localCustomProps.forEach((cp) => {
             const key = cp.propertyNumber || cp.id;
@@ -177,92 +175,43 @@ const DashboardContent: React.FC = () => {
     }
   }, [currentUser]);
 
+  // 로그인 상태 변화 시: 로그인하면 데이터 로드, 로그아웃하면 즉시 모든 데이터 비움 및 HOME 복귀
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (currentUser) {
+      fetchData();
+    } else {
+      setCustomers([]);
+      setProperties([]);
+      setActiveTab('HOME');
+    }
+  }, [currentUser, fetchData]);
 
-  const hasAutoOpenedPropRef = useRef(false);
-
-  // 카카오톡 등 외부 공유 링크로 접근 시 (?propertyId=... 또는 ?pData=...) 
-  // 접속자가 누구든(대표님이 직접 확인하든, 고객이 열든) 100% 안전한 '고객 전용 매물 브리핑 안내장'을 기본 화면으로 표시합니다.
+  // 휴대폰(모바일) 접속 시 외부 공유 파라미터로 인해 2번째 이미지(고객 전용 안내장 단독화면)로 가로채지지 않도록 방지
+  // 항상 첨부한 첫번째 파일 화면(메인 대시보드)이 화면에 표시됩니다.
   useEffect(() => {
-    if (typeof window === 'undefined' || hasAutoOpenedPropRef.current) return;
+    if (typeof window === 'undefined') return;
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const propId = searchParams.get('propertyId');
       const pDataRaw = searchParams.get('pData');
-      const addrMode = (searchParams.get('addrMode') as AddressShareMode) || 'dong';
-      setCustomerBriefingAddrMode(addrMode);
-
-      if (!propId && !pDataRaw) return;
-
-      const applyOpenedProperty = (targetProp: PropertyItem) => {
-        hasAutoOpenedPropRef.current = true;
-        // 공유 링크로 접속한 경우: 무조건 안전한 고객 전용 매물 안내장(CustomerPropertyBriefing)으로 표시
-        setCustomerBriefingProp(targetProp);
-        setIsCustomerMode(true);
-      };
-
-      // 1) URL에 직렬화된 pData 매물 정보가 있는 경우: 즉시 모달 열람 (스마트폰 카톡 링크 클릭 시 100% 즉시 열림 보장)
-      if (pDataRaw) {
-        try {
-          const jsonStr = fromUtf8Base64(pDataRaw);
-          if (jsonStr) {
-            const parsedProp: PropertyItem = JSON.parse(jsonStr);
-            if (parsedProp && (parsedProp.id || parsedProp.propertyNumber)) {
-              applyOpenedProperty(parsedProp);
-              // 매물 목록에도 추가
-              setProperties((prev) => {
-                const exists = prev.some(
-                  (p) =>
-                    (parsedProp.id && p.id === parsedProp.id) ||
-                    (parsedProp.propertyNumber && p.propertyNumber === parsedProp.propertyNumber)
-                );
-                return exists ? prev : [parsedProp, ...prev];
-              });
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn('pData parse error:', err);
-        }
-      }
-
-      // 2) 현재 메모리/로컬스토리지에 있는 매물 목록에서 검색
-      if (propId && properties.length > 0) {
-        const found = properties.find((p) => p.id === propId || p.propertyNumber === propId);
-        if (found) {
-          applyOpenedProperty(found);
-          return;
-        }
-      }
-
-      // 3) 만약 현재 목록에 없는 매물번호/ID라면 서버 API에서 직접 단건 검색 시도
-      if (propId && !hasAutoOpenedPropRef.current) {
-        fetch(`/api/properties?search=${encodeURIComponent(propId)}`)
-          .then((res) => res.json())
-          .then((items) => {
-            if (Array.isArray(items) && items.length > 0 && !hasAutoOpenedPropRef.current) {
-              const matched = items.find((p: any) => p.id === propId || p.propertyNumber === propId) || items[0];
-              if (matched) {
-                applyOpenedProperty(matched);
-              }
-            }
-          })
-          .catch(() => {});
+      if (propId || pDataRaw) {
+        // 주소창을 정리하여 새로고침/뒤로가기 시에도 항상 깔끔한 첫번째 화면이 유지되도록 함
+        window.history.replaceState({}, '', window.location.pathname);
       }
     } catch (e) {}
-  }, [properties, currentUser]);
+  }, []);
 
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
 
   const handleOpenNewProperty = () => {
+    if (!checkAuthOrAlert('새 매물 등록은 중개사 로그인 후 이용 가능합니다.')) return;
     setEditingProperty(null);
     setIsPropertyRegOpen(true);
   };
 
   const handleOpenEditProperty = (prop: PropertyItem) => {
+    if (!checkAuthOrAlert()) return;
     setEditingProperty(prop);
     setIsPropertyRegOpen(true);
     setSelectedProperty(null);
@@ -295,11 +244,13 @@ const DashboardContent: React.FC = () => {
   };
 
   const handleOpenNewCustomer = () => {
+    if (!checkAuthOrAlert('새 고객 등록은 중개사 로그인 후 이용 가능합니다.')) return;
     setEditingCustomer(null);
     setIsCustomerRegOpen(true);
   };
 
   const handleOpenEditCustomer = (cust: CustomerItem) => {
+    if (!checkAuthOrAlert()) return;
     setEditingCustomer(cust);
     setIsCustomerRegOpen(true);
     setSelectedCustomer(null);
@@ -328,45 +279,25 @@ const DashboardContent: React.FC = () => {
   };
 
   const handleSelectTabWithScroll = (tab: MainViewTab) => {
+    if (!checkAuthOrAlert()) return;
     setActiveTab(tab);
     scrollToDetail();
   };
-
-  // 고객 전용 매물 브리핑 안내장 뷰
-  // (외부 공유 링크 접속 시 대표님이든 고객이든 안전한 고객 브리핑 화면 우선 표시)
-  if (isCustomerMode && customerBriefingProp) {
-    return (
-      <>
-        <CustomerPropertyBriefing
-          property={customerBriefingProp}
-          addressMode={customerBriefingAddrMode}
-          currentUser={currentUser}
-          onSwitchToAdmin={() => {
-            setIsCustomerMode(false);
-            setSelectedProperty(customerBriefingProp);
-          }}
-          onOpenLogin={() => setIsLoginOpen(true)}
-        />
-        <LoginModal
-          isOpen={isLoginOpen}
-          onClose={() => setIsLoginOpen(false)}
-          canClose={true}
-        />
-      </>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-16">
       
       {/* 1. Global Navigation Header */}
       <Header
-        propertyCount={properties.length}
-        receivedCustomerCount={receivedCustomers.length}
-        searchingCustomerCount={searchingCustomers.length}
+        propertyCount={currentUser ? properties.length : undefined}
+        receivedCustomerCount={currentUser ? receivedCustomers.length : undefined}
+        searchingCustomerCount={currentUser ? searchingCustomers.length : undefined}
         onOpenNewProperty={handleOpenNewProperty}
         onOpenNewCustomer={handleOpenNewCustomer}
-        onOpenAdminLogs={() => setIsAdminLogsOpen(true)}
+        onOpenAdminLogs={() => {
+          if (!checkAuthOrAlert()) return;
+          setIsAdminLogsOpen(true);
+        }}
         onOpenLogin={() => setIsLoginOpen(true)}
         onGoHome={() => setActiveTab('HOME')}
       />
@@ -383,6 +314,11 @@ const DashboardContent: React.FC = () => {
               <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">📊</span>
               <span>전체 현황</span>
             </h2>
+            {!currentUser && (
+              <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                🔒 로그인 후 상세 조회 가능
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
@@ -397,10 +333,20 @@ const DashboardContent: React.FC = () => {
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm font-bold text-emerald-950">전체 등록 매물</span>
-                <span className="text-[10px] sm:text-xs font-black text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full">실시간 가동</span>
+                <span className="text-[10px] sm:text-xs font-black text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full">
+                  {currentUser ? '실시간 가동' : '보안 잠금'}
+                </span>
               </div>
               <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl sm:text-3xl font-black text-emerald-900">{properties.length}<span className="text-sm font-normal text-emerald-700 ml-1">건</span></span>
+                {currentUser ? (
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-900">
+                    {properties.length}<span className="text-sm font-normal text-emerald-700 ml-1">건</span>
+                  </span>
+                ) : (
+                  <span className="text-base sm:text-lg font-bold text-slate-400 flex items-center gap-1">
+                    🔒 로그인 필요
+                  </span>
+                )}
                 <span className="text-xs font-semibold text-emerald-700">매물 보기 →</span>
               </div>
             </div>
@@ -418,10 +364,20 @@ const DashboardContent: React.FC = () => {
                 <span className="text-xs sm:text-sm font-bold text-blue-950 truncate">
                   [물건 접수] 매도,임대,임차인(권리금원함)
                 </span>
-                <span className="text-[10px] sm:text-xs font-black text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded-full shrink-0 ml-1">의뢰 고객</span>
+                <span className="text-[10px] sm:text-xs font-black text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded-full shrink-0 ml-1">
+                  {currentUser ? '의뢰 고객' : '보안 잠금'}
+                </span>
               </div>
               <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl sm:text-3xl font-black text-blue-900">{receivedCustomers.length}<span className="text-sm font-normal text-blue-700 ml-1">명</span></span>
+                {currentUser ? (
+                  <span className="text-2xl sm:text-3xl font-black text-blue-900">
+                    {receivedCustomers.length}<span className="text-sm font-normal text-blue-700 ml-1">명</span>
+                  </span>
+                ) : (
+                  <span className="text-base sm:text-lg font-bold text-slate-400 flex items-center gap-1">
+                    🔒 로그인 필요
+                  </span>
+                )}
                 <span className="text-xs font-semibold text-blue-700">접수장 보기 →</span>
               </div>
             </div>
@@ -439,20 +395,26 @@ const DashboardContent: React.FC = () => {
                 <span className="text-xs sm:text-sm font-bold text-indigo-950 truncate">
                   [물건 찾음] 매수,임차,임차인(권리금 가능)
                 </span>
-                <span className="text-[10px] sm:text-xs font-black text-indigo-700 bg-indigo-100/90 px-2 py-0.5 rounded-full shrink-0 ml-1">탐색 고객</span>
+                <span className="text-[10px] sm:text-xs font-black text-indigo-700 bg-indigo-100/90 px-2 py-0.5 rounded-full shrink-0 ml-1">
+                  {currentUser ? '탐색 고객' : '보안 잠금'}
+                </span>
               </div>
               <div className="flex items-baseline justify-between mt-2">
-                <span className="text-2xl sm:text-3xl font-black text-indigo-900">{searchingCustomers.length}<span className="text-sm font-normal text-indigo-700 ml-1">명</span></span>
+                {currentUser ? (
+                  <span className="text-2xl sm:text-3xl font-black text-indigo-900">
+                    {searchingCustomers.length}<span className="text-sm font-normal text-indigo-700 ml-1">명</span>
+                  </span>
+                ) : (
+                  <span className="text-base sm:text-lg font-bold text-slate-400 flex items-center gap-1">
+                    🔒 로그인 필요
+                  </span>
+                )}
                 <span className="text-xs font-semibold text-indigo-700">찾음장 보기 →</span>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ────────────────────────────────────────────────────────── */}
-        {/* 섹션 2. 🏢 새매물등록 / 매물장 검색(조건 필터) */}
-        {/* (2번째 첨부 이미지 바로 밑에 위치) */}
-        {/* ────────────────────────────────────────────────────────── */}
         {/* ────────────────────────────────────────────────────────── */}
         {/* 섹션 2. 🏢 새매물등록 / 매물장 검색(조건 필터) */}
         {/* ────────────────────────────────────────────────────────── */}
@@ -493,7 +455,7 @@ const DashboardContent: React.FC = () => {
                 <Building2 className="w-4 h-4 text-emerald-500" />
                 <span>매물장 검색 (조건 필터)</span>
                 <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200 text-slate-800">
-                  {properties.length}건
+                  {currentUser ? `${properties.length}건` : '로그인 필요'}
                 </span>
               </button>
             </div>
@@ -505,7 +467,7 @@ const DashboardContent: React.FC = () => {
         {/* ────────────────────────────────────────────────────────── */}
         <section className="bg-gradient-to-r from-blue-50 via-sky-50/70 to-blue-50/40 p-3.5 sm:p-4 rounded-2xl border-2 border-blue-300/90 shadow-2xs">
           
-          {/* 상단 통일 헤더 (2번째 매물 관리 이미지와 완벽히 동일한 구조/위치/높이/버튼 구성) */}
+          {/* 상단 통일 헤더 */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <span className="p-2 rounded-xl bg-blue-600 text-white shadow-2xs text-xs sm:text-sm font-bold shrink-0">👥</span>
@@ -520,7 +482,7 @@ const DashboardContent: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* 고객등록 버튼 (2번째 이미지와 나란히 배치) */}
+              {/* 고객등록 버튼 */}
               <button
                 type="button"
                 onClick={handleOpenNewCustomer}
@@ -529,10 +491,11 @@ const DashboardContent: React.FC = () => {
                 <span>＋ 새 고객 등록</span>
               </button>
 
-              {/* 고객검색(조건필터) 버튼 (2번째 이미지와 나란히 배치) */}
+              {/* 고객검색(조건필터) 버튼 */}
               <button
                 type="button"
                 onClick={() => {
+                  if (!checkAuthOrAlert()) return;
                   setCustomerFilterOpen(true);
                   handleSelectTabWithScroll('CUSTOMER_SEARCH');
                 }}
@@ -545,7 +508,7 @@ const DashboardContent: React.FC = () => {
                 <Users className="w-4 h-4 text-blue-500" />
                 <span>고객장 검색 (조건 필터)</span>
                 <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200 text-slate-800">
-                  {customers.length}명
+                  {currentUser ? `${customers.length}명` : '로그인 필요'}
                 </span>
               </button>
             </div>
@@ -554,7 +517,6 @@ const DashboardContent: React.FC = () => {
 
         {/* ────────────────────────────────────────────────────────── */}
         {/* 섹션 4. 📋 매물현황과 고객현황 */}
-        {/* (요청사항: '매물현황', '고객현황'으로 명칭 변경 및 클릭 시 자세한 현황으로 이동) */}
         {/* ────────────────────────────────────────────────────────── */}
         <section className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-slate-300 shadow-sm">
           <div className="flex items-center justify-between mb-3 px-1">
@@ -568,7 +530,7 @@ const DashboardContent: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {/* 1) 매물현황 버튼 (요청대로 '매물현황'으로 명칭 변경) */}
+            {/* 1) 매물현황 버튼 */}
             <button
               type="button"
               onClick={() => handleSelectTabWithScroll('ALL_PROPERTIES')}
@@ -586,16 +548,17 @@ const DashboardContent: React.FC = () => {
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
                   activeTab === 'ALL_PROPERTIES' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
                 }`}>
-                  {properties.length}건
+                  {currentUser ? `${properties.length}건` : '로그인 필요'}
                 </span>
                 <span className="text-xs font-semibold opacity-70">자세히 보기 →</span>
               </div>
             </button>
 
-            {/* 2) 고객현황 버튼 (요청대로 '고객현황'으로 명칭 변경) */}
+            {/* 2) 고객현황 버튼 */}
             <button
               type="button"
               onClick={() => {
+                if (!checkAuthOrAlert()) return;
                 setCustomerFilterOpen(false);
                 handleSelectTabWithScroll('ALL_CUSTOMERS');
               }}
@@ -615,7 +578,7 @@ const DashboardContent: React.FC = () => {
                     ? 'bg-white/20 text-white'
                     : 'bg-blue-200/80 text-blue-900'
                 }`}>
-                  {customers.length}명
+                  {currentUser ? `${customers.length}명` : '로그인 필요'}
                 </span>
                 <span className="text-xs font-semibold opacity-70">자세히 보기 →</span>
               </div>
@@ -627,10 +590,14 @@ const DashboardContent: React.FC = () => {
         {/* 섹션 5. 자세한 현황 콘텐츠 영역 (버튼 클릭 시에만 노출) */}
         {/* (첫번째 이미지인 중복 고객목록은 기본 홈화면에서 삭제됨!) */}
         {/* ────────────────────────────────────────────────────────── */}
+        {/* ────────────────────────────────────────────────────────── */}
+        {/* 섹션 5. 자세한 현황 콘텐츠 영역 (로그인 시 & 버튼 클릭 시에만 노출) */}
+        {/* (비로그인 상태에서는 매물장 및 고객정보 조회가 절대 불가하도록 원천 차단) */}
+        {/* ────────────────────────────────────────────────────────── */}
         <div ref={detailSectionRef} className="scroll-mt-20">
           
           {/* A. 자세한 고객현황 (전체 고객 / 조건 검색 / 물건 접수 / 물건 찾음) */}
-          {(activeTab === 'ALL_CUSTOMERS' || activeTab === 'CUSTOMER_SEARCH' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP') && (
+          {currentUser && (activeTab === 'ALL_CUSTOMERS' || activeTab === 'CUSTOMER_SEARCH' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP') && (
             <div className="space-y-4 animate-in fade-in duration-200 bg-white/70 p-3 sm:p-5 rounded-2xl border-2 border-blue-200 shadow-sm">
               <div className="flex items-center justify-between bg-blue-50 p-3 rounded-xl border border-blue-200">
                 <div className="flex items-center gap-2">
@@ -680,7 +647,7 @@ const DashboardContent: React.FC = () => {
           )}
 
           {/* B. 자세한 매물현황 (통합 매물장 + 실시간 지도) */}
-          {activeTab === 'ALL_PROPERTIES' && (
+          {currentUser && activeTab === 'ALL_PROPERTIES' && (
             <div className="space-y-4 animate-in fade-in duration-200 bg-white/70 p-3 sm:p-5 rounded-2xl border-2 border-emerald-300 shadow-sm">
               <div className="flex items-center justify-between bg-emerald-50 p-3 rounded-xl border border-emerald-200">
                 <div className="flex items-center gap-2">
@@ -713,10 +680,10 @@ const DashboardContent: React.FC = () => {
       </main>
 
       {/* 4. Modals */}
-      {/* 1) 새 매물 등록 및 수정 폼 */}
+      {/* 1) 새 매물 등록 및 수정 폼 (로그인 시에만 열림) */}
       <PropertyRegistrationForm
         customers={customers}
-        isOpen={isPropertyRegOpen}
+        isOpen={!!currentUser && isPropertyRegOpen}
         initialData={editingProperty}
         mode={editingProperty ? 'EDIT' : 'CREATE'}
         onClose={() => {
@@ -726,9 +693,9 @@ const DashboardContent: React.FC = () => {
         onSuccess={handlePropertySaved}
       />
 
-      {/* 2) 신규 고객 등록 및 수정 폼 */}
+      {/* 2) 신규 고객 등록 및 수정 폼 (로그인 시에만 열림) */}
       <CustomerFormModal
-        isOpen={isCustomerRegOpen}
+        isOpen={!!currentUser && isCustomerRegOpen}
         initialData={editingCustomer}
         mode={editingCustomer ? 'EDIT' : 'CREATE'}
         onClose={() => {
@@ -739,10 +706,10 @@ const DashboardContent: React.FC = () => {
         defaultGroup={activeTab === 'SEARCHING_GROUP' ? 'SEARCHING' : 'RECEIVED'}
       />
 
-      {/* 3) 매물 상세 모달 (문자 발송 링크 + 카톡 공유 API + 전화걸기 + 대장 정보 + 수정하기 + 삭제) */}
+      {/* 3) 매물 상세 모달 (로그인 시에만 열림) */}
       <PropertyDetailModal
-        property={selectedProperty}
-        isOpen={!!selectedProperty}
+        property={currentUser ? selectedProperty : null}
+        isOpen={!!currentUser && !!selectedProperty}
         onClose={() => setSelectedProperty(null)}
         onEditProperty={handleOpenEditProperty}
         onPropertyDeleted={(deletedId) => {
@@ -752,10 +719,10 @@ const DashboardContent: React.FC = () => {
         }}
       />
 
-      {/* 4) 고객 상세 모달 (전화걸기 href="tel:..." + 접수매물/탐색조건 + 수정하기 + 삭제) */}
+      {/* 4) 고객 상세 모달 (로그인 시에만 열림) */}
       <CustomerDetailModal
-        customer={selectedCustomer}
-        isOpen={!!selectedCustomer}
+        customer={currentUser ? selectedCustomer : null}
+        isOpen={!!currentUser && !!selectedCustomer}
         onClose={() => setSelectedCustomer(null)}
         onEditCustomer={handleOpenEditCustomer}
         onSelectProperty={(prop) => {
