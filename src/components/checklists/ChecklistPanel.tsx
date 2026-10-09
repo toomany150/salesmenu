@@ -24,12 +24,10 @@ interface ChecklistItem {
 }
 
 const STORE_CHECKLIST: ChecklistItem[] = [
-  { id: 'businessType', title: '1. 업종 인허가 승계', desc: '자유업/신고업/허가업 구분 및 구청 영업신고증 승계 가능 여부', importance: 'CRITICAL' },
-  { id: 'restoration', title: '2. 원상복구특약 명시', desc: '시설 권리양수도 시 기존 인테리어 원상복구 면제 특약 및 철거 범위 확인', importance: 'CRITICAL' },
-  { id: 'dailyRevenue', title: '3. 일매출 & 포스자료', desc: 'POS기/부가세과세표준증명 등 객관적 실매출 증빙 확인', importance: 'HIGH' },
-  { id: 'equipment', title: '4. 비품/렌탈 승계 확인', desc: '제빙기, 정수기, 포스기, 식기세척기 렌탈 승계 or 소유권 귀속 여부', importance: 'HIGH' },
-  { id: 'fireCert', title: '5. 소방필증 (완비증명)', desc: '지하 66㎡ 이상, 2층 이상 100㎡ 이상 다중이용업소 비상구/방염 필증 완비', importance: 'CRITICAL' },
-  { id: 'sanitation', title: '6. 정화조 용량 & 환경', desc: '업종 변경 시 정화조 용량 초과 여부 및 하수도 원인자부담금 사전 검토', importance: 'HIGH' },
+  { id: 'restoration', title: '1. 원상복구특약 명시', desc: '시설 권리양수도 시 기존 인테리어 원상복구 면제 특약 및 철거 범위 확인', importance: 'CRITICAL' },
+  { id: 'dailyRevenue', title: '2. 일매출 & 포스자료', desc: 'POS기/부가세과세표준증명 등 객관적 실매출 증빙 확인', importance: 'HIGH' },
+  { id: 'fireCert', title: '3. 소방필증 (완비증명)', desc: '지하 66㎡ 이상, 2층 이상 100㎡ 이상 다중이용업소 비상구/방염 필증 완비', importance: 'CRITICAL' },
+  { id: 'sanitation', title: '4. 정화조 용량 & 환경', desc: '업종 변경 시 정화조 용량 초과 여부 및 하수도 원인자부담금 사전 검토', importance: 'HIGH' },
 ];
 
 const OFFICE_CHECKLIST: ChecklistItem[] = [

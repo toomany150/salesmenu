@@ -863,7 +863,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                 섹터 4. 매장 운영 및 시설 현황
               </h4>
               <span className="text-xs text-violet-700">
-                테이블 갯수, 종업원 수, 영업기간, 주류대출여부 및 일매출
+                테이블 갯수, 종업원 수, 영업기간, 주류대출, 업종인허가 및 비품/렌탈 승계
               </span>
             </div>
           </div>
@@ -962,6 +962,166 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                   className="w-full text-sm px-3.5 py-2.5 bg-white border border-violet-300 rounded-xl focus:ring-2 focus:ring-violet-500 font-medium text-slate-900"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* 업종인허가승계 & 비품/렌탈승계 조건 (상가 임대/양도양수 핵심) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {/* 1) 업종인허가승계 */}
+            <div className="p-3.5 bg-violet-50/60 rounded-xl border border-violet-200">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-4 h-4 text-violet-700" />
+                <label className="text-sm font-bold text-violet-950">
+                  업종인허가승계
+                </label>
+              </div>
+              <div className="space-y-2">
+                <select
+                  value={
+                    data.businessLicenseTransfer?.includes('승계 가능')
+                      ? '승계가능'
+                      : data.businessLicenseTransfer?.includes('신규')
+                      ? '신규발급'
+                      : data.businessLicenseTransfer?.includes('불가')
+                      ? '승계불가'
+                      : data.businessLicenseTransfer?.includes('자유업종')
+                      ? '자유업종'
+                      : data.businessLicenseTransfer
+                      ? '직접입력'
+                      : ''
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '승계가능') {
+                      updateField('businessLicenseTransfer', '승계 가능: 기존 영업신고증 즉시 양도양수 승계 (행정처분 없음)');
+                    } else if (val === '신규발급') {
+                      updateField('businessLicenseTransfer', '신규 발급 필요: 기존 사업자 폐업 후 신규 영업신고/허가 진행');
+                    } else if (val === '승계불가') {
+                      updateField('businessLicenseTransfer', '승계 불가: 직종 변경 또는 지자체 조례 제한으로 승계 불가');
+                    } else if (val === '자유업종') {
+                      updateField('businessLicenseTransfer', '자유업종: 별도 관공서 인허가/영업신고증 불필요 (사업자등록만 진행)');
+                    }
+                  }}
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-violet-300 rounded-xl font-bold text-violet-950"
+                >
+                  <option value="">-- 업종인허가 승계 유형 선택 --</option>
+                  <option value="승계가능">🟢 승계 가능 (영업신고증 즉시 승계)</option>
+                  <option value="신규발급">🟡 신규 발급 필요 (기존 폐업 조건)</option>
+                  <option value="승계불가">🔴 승계 불가 (직종 변경/행정 제한)</option>
+                  <option value="자유업종">⚪ 자유업종 (인허가 불필요)</option>
+                  <option value="직접입력">✏️ 직접 입력</option>
+                </select>
+                <input
+                  type="text"
+                  value={data.businessLicenseTransfer || ''}
+                  onChange={(e) => updateField('businessLicenseTransfer', e.target.value)}
+                  placeholder="예: 일반음식점 영업신고증 즉시 승계 가능 (최근 행정처분 및 시정명령 이력 없음)"
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-violet-300 rounded-xl focus:ring-2 focus:ring-violet-500 font-medium text-slate-900"
+                />
+              </div>
+            </div>
+
+            {/* 2) 비품/렌탈승계 */}
+            <div className="p-3.5 bg-violet-50/60 rounded-xl border border-violet-200">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-violet-700" />
+                <label className="text-sm font-bold text-violet-950">
+                  비품/렌탈승계
+                </label>
+              </div>
+              <div className="space-y-2">
+                <select
+                  value={
+                    data.equipmentRentalTransfer?.includes('일체')
+                      ? '일체승계'
+                      : data.equipmentRentalTransfer?.includes('부분')
+                      ? '부분승계'
+                      : data.equipmentRentalTransfer?.includes('승계안함') || data.equipmentRentalTransfer?.includes('철거')
+                      ? '승계안함'
+                      : data.equipmentRentalTransfer?.includes('렌탈만')
+                      ? '렌탈만승계'
+                      : data.equipmentRentalTransfer
+                      ? '직접입력'
+                      : ''
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '일체승계') {
+                      updateField('equipmentRentalTransfer', '비품 일체 포함 & 렌탈 명의승계 (권리금에 포함)');
+                    } else if (val === '부분승계') {
+                      updateField('equipmentRentalTransfer', '부분 승계: 일부 비품 제외 및 렌탈 명의이전 협의');
+                    } else if (val === '승계안함') {
+                      updateField('equipmentRentalTransfer', '일체 승계안함: 기존 비품 전부 반출/철거 및 원상복구 조건');
+                    } else if (val === '렌탈만승계') {
+                      updateField('equipmentRentalTransfer', '렌탈만 명의승계 (기존 비품은 인수 제외)');
+                    }
+                  }}
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-violet-300 rounded-xl font-bold text-violet-950"
+                >
+                  <option value="">-- 비품/렌탈 승계 조건 선택 --</option>
+                  <option value="일체승계">🟢 비품 일체 포함 & 렌탈 명의승계</option>
+                  <option value="부분승계">🟡 부분 승계 (일부 비품 제외/협의)</option>
+                  <option value="렌탈만승계">🔵 렌탈만 승계 (비품은 인수 제외)</option>
+                  <option value="승계안함">🔴 일체 승계 안함 (전체 철거/원상복구)</option>
+                  <option value="직접입력">✏️ 직접 입력</option>
+                </select>
+                <input
+                  type="text"
+                  value={data.equipmentRentalTransfer || ''}
+                  onChange={(e) => updateField('equipmentRentalTransfer', e.target.value)}
+                  placeholder="예: 주방집기/테이블 일체 인수 포함, 제빙기·정수기는 명의변경 승계 조건"
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-violet-300 rounded-xl focus:ring-2 focus:ring-violet-500 font-medium text-slate-900"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 3) 비품 항목과 렌탈 항목을 기입할 수 있는 독립된 2개의 칸 (따로 따로) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+            {/* 칸 1: 비품 항목 */}
+            <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Store className="w-4 h-4 text-violet-600" />
+                  비품 항목
+                </label>
+                <span className="text-[11px] px-2 py-0.5 rounded bg-violet-100 text-violet-800 font-bold">
+                  양도/인수 비품 직접 기입
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mb-2">
+                권리금에 포함되어 신규 임차인에게 양도되는 비품/시설 목록
+              </p>
+              <VoiceTextarea
+                rows={3}
+                value={data.equipmentList || ''}
+                onChange={(val) => updateField('equipmentList', val)}
+                placeholder="예: 4구 업소용 냉장고 1대, 테이블 12개, 의자 48개, 간텍기 1개, 튀김기 1대, 천장형 시스템에어컨 2대, 닥트 시설 등"
+                className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 font-medium text-slate-900 resize-none"
+              />
+            </div>
+
+            {/* 칸 2: 렌탈 항목 */}
+            <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-violet-600" />
+                  렌탈 항목
+                </label>
+                <span className="text-[11px] px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
+                  명의승계 렌탈 직접 기입
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mb-2">
+                신규 임차인이 명의를 승계받아 월 렌탈료를 납부할 품목 목록
+              </p>
+              <VoiceTextarea
+                rows={3}
+                value={data.rentalList || ''}
+                onChange={(val) => updateField('rentalList', val)}
+                placeholder="예: 제빙기(카이저 월 4만원), 정수기(코웨이 월 3.5만원), 포스기/카드단말기(월 2만원), 식기세척기 등"
+                className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-violet-500 font-medium text-slate-900 resize-none"
+              />
             </div>
           </div>
         </div>

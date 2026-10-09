@@ -909,6 +909,34 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <span className="text-slate-800">{property.storeDetail.rentIncreaseCondition}</span>
                   </div>
                 )}
+                {property.storeDetail.businessLicenseTransfer && (
+                  <div className="p-2.5 bg-white rounded-lg border border-violet-200">
+                    <span className="font-bold text-violet-900 block">📄 업종인허가승계:</span>
+                    <span className="text-slate-800">{property.storeDetail.businessLicenseTransfer}</span>
+                  </div>
+                )}
+                {property.storeDetail.equipmentRentalTransfer && (
+                  <div className="p-2.5 bg-white rounded-lg border border-violet-200">
+                    <span className="font-bold text-violet-900 block">✨ 비품/렌탈승계:</span>
+                    <span className="text-slate-800">{property.storeDetail.equipmentRentalTransfer}</span>
+                  </div>
+                )}
+                {(property.storeDetail.equipmentList || property.storeDetail.rentalList) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {property.storeDetail.equipmentList && (
+                      <div className="p-2.5 bg-white rounded-lg border border-slate-200">
+                        <span className="font-bold text-slate-900 block">📦 비품 항목:</span>
+                        <span className="text-slate-700 whitespace-pre-line">{property.storeDetail.equipmentList}</span>
+                      </div>
+                    )}
+                    {property.storeDetail.rentalList && (
+                      <div className="p-2.5 bg-white rounded-lg border border-slate-200">
+                        <span className="font-bold text-slate-900 block">📑 렌탈 항목:</span>
+                        <span className="text-slate-700 whitespace-pre-line">{property.storeDetail.rentalList}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {property.storeDetail.restorationTerms && (
                   <div className="p-2.5 bg-amber-100/70 rounded-lg border border-amber-300">
                     <span className="font-bold text-amber-950 block">✨ 원상복구특약:</span>

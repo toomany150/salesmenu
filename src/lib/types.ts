@@ -373,6 +373,11 @@ export interface StoreData {
   dailyRevenue?: number;
   equipmentStatus?: string;
   fireInspectionCert?: string;
+  // 상가 임대 시 인허가 및 비품/렌탈 승계
+  businessLicenseTransfer?: string; // 업종인허가승계
+  equipmentRentalTransfer?: string; // 비품/렌탈승계
+  equipmentList?: string; // 비품 항목 (직접 기입)
+  rentalList?: string; // 렌탈 항목 (직접 기입)
 }
 
 export interface OfficeData {
