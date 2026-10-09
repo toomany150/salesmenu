@@ -686,7 +686,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: data.floorText || (data.floorCount ? `지상 ${data.floorCount}층 / 지하 ${data.underFloorCount || 0}층` : prev.currentFloor),
-        parkingCount: data.parkingCount || prev.parkingCount,
+        parkingCount: data.parkingCount !== undefined ? data.parkingCount : prev.parkingCount,
       }));
     } else if (propertyType === 'STORE') {
       const area = initialArea;
@@ -702,7 +702,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: initialFloorText || prev.currentFloor,
-        parkingCount: data.parkingCount || prev.parkingCount,
+        parkingCount: data.parkingCount !== undefined ? data.parkingCount : prev.parkingCount,
       }));
       if (!detailAddress && initialFloorText) {
         setDetailAddress(initialFloorText);
@@ -721,7 +721,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: initialFloorText || prev.currentFloor,
-        parkingCount: data.parkingCount || prev.parkingCount,
+        parkingCount: data.parkingCount !== undefined ? data.parkingCount : prev.parkingCount,
       }));
       if (!detailAddress && initialFloorText) {
         setDetailAddress(initialFloorText);
@@ -738,7 +738,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: data.floorText || prev.currentFloor,
-        parkingCount: data.parkingCount || prev.parkingCount,
+        parkingCount: data.parkingCount !== undefined ? data.parkingCount : prev.parkingCount,
       }));
     } else if (propertyType === 'LAND') {
       setLandData((prev: any) => ({

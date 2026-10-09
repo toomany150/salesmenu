@@ -728,36 +728,42 @@ async function fetchBuildingLedgerFromGov(
     }
   }
 
-  // 표제부 데이터 파싱
+  // 표제부 데이터 파싱 (공부상 주차대수: 총주차수 totPkngCnt 및 옥내/옥외/기계식/부속 합산 정확 파싱)
   const grnd = parseInt(chosenItem.grndFlrCnt, 10) || 1;
   const ugrnd = parseInt(chosenItem.ugrndFlrCnt, 10) || 0;
+  const rawTotPkng = parseInt(chosenItem.totPkngCnt, 10) || 0;
   const indrAuto = parseInt(chosenItem.indrAutoUtcnt, 10) || 0;
   const oudrAuto = parseInt(chosenItem.oudrAutoUtcnt, 10) || 0;
   const indrMech = parseInt(chosenItem.indrMechUtcnt, 10) || 0;
   const oudrMech = parseInt(chosenItem.oudrMechUtcnt, 10) || 0;
-  let totPkng = indrAuto + oudrAuto + indrMech + oudrMech;
+  const atchPkng = parseInt(chosenItem.atchBldPkngCnt, 10) || 0;
+  const sumDetailPkng = indrAuto + oudrAuto + indrMech + oudrMech + atchPkng;
+  let totPkng = Math.max(rawTotPkng, sumDetailPkng);
 
-  // [4번째 이미지 해결] 총괄표제부 주차대수 우선 보강 (대단지 아파트는 각 동 표제부에 0대이고 총괄표제부에 전체 주차대수 수천 대가 기록됨)
+  // 총괄표제부 주차대수 우선 보강 (대단지 아파트는 각 동 표제부에 0대이고 총괄표제부에 전체 주차대수가 기록됨)
   if (recapData) {
     const recapIndrAuto = parseInt(recapData.indrAutoUtcnt, 10) || 0;
     const recapOudrAuto = parseInt(recapData.oudrAutoUtcnt, 10) || 0;
     const recapIndrMech = parseInt(recapData.indrMechUtcnt, 10) || 0;
     const recapOudrMech = parseInt(recapData.oudrMechUtcnt, 10) || 0;
-    const recapTotPkng = parseInt(recapData.totPkngCnt, 10) || (recapIndrAuto + recapOudrAuto + recapIndrMech + recapOudrMech);
+    const recapAtch = parseInt(recapData.atchBldPkngCnt, 10) || 0;
+    const recapTotPkng = parseInt(recapData.totPkngCnt, 10) || (recapIndrAuto + recapOudrAuto + recapIndrMech + recapOudrMech + recapAtch);
     if (recapTotPkng > 0 && totPkng === 0) {
       totPkng = recapTotPkng;
     }
   }
 
-  // 만약 여전히 0대이면 titleList 전체 동의 주차대수 합산
+  // 만약 여전히 0대이고 여러 동이 존재하면 titleList 전체 동의 주차대수 합산
   if (totPkng === 0 && titleList.length > 1) {
     let sumTitlePkng = 0;
     for (const it of titleList) {
       const p =
+        parseInt(it.totPkngCnt, 10) ||
         (parseInt(it.indrAutoUtcnt, 10) || 0) +
         (parseInt(it.oudrAutoUtcnt, 10) || 0) +
         (parseInt(it.indrMechUtcnt, 10) || 0) +
-        (parseInt(it.oudrMechUtcnt, 10) || 0);
+        (parseInt(it.oudrMechUtcnt, 10) || 0) +
+        (parseInt(it.atchBldPkngCnt, 10) || 0);
       sumTitlePkng += p;
     }
     if (sumTitlePkng > 0) totPkng = sumTitlePkng;
@@ -770,7 +776,10 @@ async function fetchBuildingLedgerFromGov(
     if (oudrAuto > 0) parts.push(`자주식 옥외 ${oudrAuto}대`);
     if (indrMech > 0) parts.push(`기계식 옥내 ${indrMech}대`);
     if (oudrMech > 0) parts.push(`기계식 옥외 ${oudrMech}대`);
+    if (atchPkng > 0) parts.push(`부속 ${atchPkng}대`);
     pkngDetail = `총 ${totPkng}대${parts.length > 0 ? ` (${parts.join(', ')})` : ''}`;
+  } else {
+    pkngDetail = '총 0대 (공부상 주차장 없음)';
   }
 
   const bldArea = parseFloat(chosenItem.archArea) || 0;
@@ -846,7 +855,7 @@ async function fetchBuildingLedgerFromGov(
     ownershipChangeDate: approvalDate,
     ownershipChangeReason: '소유권이전',
     parkingCount: totPkng,
-    parkingDetail: pkngDetail || (totPkng > 0 ? `총 ${totPkng}대` : undefined),
+    parkingDetail: pkngDetail,
     parkingPerHousehold,
     complexName,
     supplyArea,

@@ -438,9 +438,9 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
           <label className="block text-xs font-medium text-slate-700 mb-1">가능주차대수</label>
           <input
             type="number"
-            value={data.parkingCount || ''}
-            onChange={(e) => updateField('parkingCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-            placeholder="예: 1대 / 불가"
+            value={data.parkingCount !== undefined && data.parkingCount !== null ? data.parkingCount : ''}
+            onChange={(e) => updateField('parkingCount', e.target.value !== '' ? parseInt(e.target.value, 10) : undefined)}
+            placeholder="예: 0 (불가) 또는 주차대수"
             className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
           />
         </div>

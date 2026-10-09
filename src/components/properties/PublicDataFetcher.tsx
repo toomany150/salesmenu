@@ -661,7 +661,9 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                 공부상 주차대수
               </span>
               <span className="font-black text-blue-950 text-xs break-keep leading-snug">
-                {fetchedData.parkingDetail || (fetchedData.parkingCount ? `총 ${fetchedData.parkingCount}대` : '총 3대 (자주식 옥외 3대)')}
+                {fetchedData.parkingDetail || (fetchedData.parkingCount !== undefined && fetchedData.parkingCount !== null
+                  ? (fetchedData.parkingCount > 0 ? `총 ${fetchedData.parkingCount}대` : '총 0대 (공부상 주차장 없음)')
+                  : '총 0대 (공부상 주차장 없음)')}
               </span>
             </div>
           </div>
@@ -1290,11 +1292,20 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-600 font-semibold mb-1">주차대수</label>
+                    <label className="block text-slate-600 font-semibold mb-1">공부상 주차대수</label>
                     <input
                       type="number"
-                      value={editForm.parkingCount ?? ''}
-                      onChange={(e) => setEditForm({ ...editForm, parkingCount: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                      min={0}
+                      value={editForm.parkingCount !== undefined && editForm.parkingCount !== null ? editForm.parkingCount : ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
+                        setEditForm({ 
+                          ...editForm, 
+                          parkingCount: val,
+                          parkingDetail: val !== undefined ? (val > 0 ? `총 ${val}대` : '총 0대 (공부상 주차장 없음)') : undefined
+                        });
+                      }}
+                      placeholder="예: 0 또는 주차대수"
                       className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded font-semibold text-slate-900"
                     />
                   </div>
