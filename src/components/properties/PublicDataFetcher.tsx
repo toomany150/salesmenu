@@ -842,26 +842,19 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                             </div>
 
                             <div className="space-y-1 mt-1">
-                              {/* 1. 공급면적 */}
+                              {/* 1. 공급면적 (분양평수) */}
                               <div className={`text-[11px] font-black flex items-center justify-between ${
                                 isSelected ? 'text-indigo-100' : 'text-indigo-700'
                               }`}>
                                 <span className="text-[10px] font-bold">공급</span>
                                 <span>{unit.supplyArea || unit.exclusiveArea}㎡ ({unit.supplyAreaPyeong || +((unit.supplyArea || unit.exclusiveArea) * 0.3025).toFixed(1)}평)</span>
                               </div>
-                              {/* 2. 전용면적 */}
+                              {/* 2. 전용면적 (등기·실평수) */}
                               <div className={`text-[11px] font-extrabold flex items-center justify-between ${
                                 isSelected ? 'text-blue-100' : 'text-blue-800'
                               }`}>
                                 <span className="text-[10px] font-bold">전용</span>
-                                <span>{unit.exclusiveArea}㎡</span>
-                              </div>
-                              {/* 3. 실평수 */}
-                              <div className={`text-[10px] font-semibold flex items-center justify-between ${
-                                isSelected ? 'text-blue-200' : 'text-slate-500'
-                              }`}>
-                                <span>실평수</span>
-                                <span>{unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평</span>
+                                <span>{unit.exclusiveArea}㎡ ({unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평)</span>
                               </div>
                               {unit.ownerName && (
                                 <div className={`text-[10px] truncate pt-0.5 border-t ${
