@@ -276,6 +276,18 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
   useEffect(() => {
     if (mapEngine !== 'KAKAO' || !kakaoLoaded || !mapContainerRef.current || !window.kakao?.maps) return;
 
+    // 만약 이미 지도가 생성되어 있다면 위치 및 레이아웃만 갱신
+    if (kakaoMapRef.current) {
+      try {
+        const centerPos = new window.kakao.maps.LatLng(currentCoords.lat, currentCoords.lng);
+        kakaoMapRef.current.relayout();
+        kakaoMapRef.current.setCenter(centerPos);
+      } catch (e) {
+        console.warn('Kakao map relayout notice:', e);
+      }
+      return;
+    }
+
     let isMounted = true;
 
     try {
@@ -378,7 +390,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
       console.warn('Kakao map native init failed, switching to interactive fallback:', e);
       setMapEngine('LEAFLET');
     }
-  }, [mapEngine, kakaoLoaded]);
+  }, [mapEngine, kakaoLoaded, address, currentCoords.lat, currentCoords.lng]);
 
   // 5. Update Kakao Map Center when Coords or Title Change (유지 축척: level 4)
   useEffect(() => {
@@ -502,8 +514,9 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         if (!isMounted || !mapContainerRef.current) return;
 
         if (leafletMapRef.current) {
-          leafletMapRef.current.remove();
-          leafletMapRef.current = null;
+          leafletMapRef.current.setView([currentCoords.lat, currentCoords.lng], 17);
+          leafletMapRef.current.invalidateSize();
+          return;
         }
 
         const map = L.map(mapContainerRef.current, {
@@ -561,7 +574,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         leafletMapRef.current = null;
       }
     };
-  }, [mapEngine]);
+  }, [mapEngine, address, currentCoords.lat, currentCoords.lng]);
 
   // 10. Update Leaflet Map and Marker when Coords or Title Change
   useEffect(() => {
@@ -639,22 +652,8 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
   const kakaoRoadviewUrl = `https://map.kakao.com/link/roadview/${currentCoords.lat},${currentCoords.lng}`;
   const kakaoFullScreenUrl = `https://map.kakao.com/link/map/${encodeURIComponent(address)},${currentCoords.lat},${currentCoords.lng}`;
 
-  if (!address || !address.trim()) {
-    return (
-      <div className={`w-full ${height} bg-gradient-to-br from-slate-50 via-blue-50/20 to-slate-100 rounded-xl border border-slate-200 flex flex-col items-center justify-center p-6 text-center shadow-xs ${className}`}>
-        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3 shadow-xs">
-          <MapPin className="w-6 h-6 animate-pulse" />
-        </div>
-        <p className="text-sm font-bold text-slate-800">카카오 지도 실시간 위치 연동</p>
-        <p className="text-xs text-slate-500 mt-1 max-w-sm">
-          위 소재지 주소를 입력하시면 정부 건축물대장 및 카카오 정밀 위치 지도가 자동으로 표시됩니다.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className={`relative w-full rounded-2xl overflow-hidden border border-slate-300/90 shadow-xl bg-white select-none flex flex-col ${className}`}>
+    <div className={`relative w-full rounded-2xl overflow-hidden border border-slate-300/90 shadow-xl bg-white select-none flex flex-col ${height ? height : 'h-[460px]'} ${className}`}>
       
       {/* ─────────────────────────────────────────────────────────────
           TOP SHORTCUT BAR: 카카오지도 & 네이버지도 공식 포털 바로가기
@@ -1071,6 +1070,19 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
           className="w-full h-full relative z-0 bg-[#eef1f4]"
           style={{ minHeight: '460px', width: '100%', height: '100%' }}
         />
+
+        {/* 주소 미입력 시 실시간 대기 안내 오버레이 (DOM 컨테이너는 상시 유지되어 SDK 사전 로드 완료) */}
+        {(!address || !address.trim()) && (
+          <div className="absolute inset-0 z-30 bg-gradient-to-br from-slate-50/95 via-blue-50/80 to-slate-100/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center shadow-inner select-none pointer-events-auto">
+            <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3 shadow-xs">
+              <MapPin className="w-6 h-6 animate-pulse" />
+            </div>
+            <p className="text-sm font-bold text-slate-800">카카오 지도 실시간 위치 연동</p>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm">
+              위 소재지 주소를 입력하거나 대장정보를 불러오시면 실시간 카카오 지도와 정밀 위치가 자동으로 즉시 표시됩니다.
+            </p>
+          </div>
+        )}
 
         {/* Optional Speech Bubble (마커 클릭 시에만 팝업) */}
         {showSpeechBubble && (

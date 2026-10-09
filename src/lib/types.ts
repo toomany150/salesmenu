@@ -301,6 +301,16 @@ export interface HouseData {
   airconRooms?: string[];
 }
 
+export interface StoreLeaseUnitItem {
+  id: string;
+  floorHo: string; // 층별 호수 (예: 1층 101호, 2층 등)
+  contractStartDate?: string; // 계약기간 시작일 (YYYY-MM-DD 등)
+  evictionPossible?: string; // 명도여부 가능 ('명도 가능', '명도 협의', '만기 퇴거 예정', '재계약 유지')
+  deposit?: number; // 임차보증금 (만원)
+  monthlyRent?: number; // 월세 (만원)
+  isVacant?: boolean; // 공실 여부
+}
+
 export interface StoreData {
   storeName?: string;
   businessType?: string;
@@ -328,10 +338,15 @@ export interface StoreData {
   gasType?: string; // 가스구분 (도시가스, LPG, 없음)
   monthlyRentVat?: boolean;
   premium?: number;
+  negotiablePremium?: number; // 조정가능한 권리금 (만원)
   isNoPremium?: boolean; // 권리금 없음 여부
   maintenanceFee?: number;
   isNoMaintenanceFee?: boolean; // 관리비 없음 여부
   maintenanceFeeVat?: boolean;
+  managementFeeDetails?: string; // 관리비 내역 (직접 입력)
+  restrictedBusinessTypes?: string; // 입점 안되는 업종 / 제한 업종 (직접 입력)
+  // 매매 시 층별 호수별 임대차 현황 (보증금/월세/명도/공실)
+  leaseStatusList?: StoreLeaseUnitItem[];
   // 운영 및 계약 조건
   tableCount?: number; // 총 테이블수
   tableCountHall?: number;
@@ -492,7 +507,11 @@ export interface PropertyItem {
   monthlyRent?: number;
   negotiableMonthlyRent?: number; // 조정 가능한 월 임대료 (만원)
   monthlyRentVat?: boolean; // 월 임대료 부가세 별도 여부
+  maintenanceFee?: number; // 관리비 (만원)
   isNoMaintenanceFee?: boolean; // 관리비 없음
+  maintenanceFeeVat?: boolean; // 관리비 부가세 별도 여부
+  maintenanceFeeDetails?: string; // 관리비 내역 (직접 입력)
+  restrictedBusinessTypes?: string; // 입점 안되는 업종 / 제한 업종 (직접 입력)
   consultationNotes?: string;
   landArea?: number;
   totalFloorArea?: number;

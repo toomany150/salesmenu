@@ -102,7 +102,11 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [monthlyRent, setMonthlyRent] = useState<string>('');
   const [negotiableMonthlyRent, setNegotiableMonthlyRent] = useState<string>(''); // 조정 가능한 월 임대료 (만원)
   const [isMonthlyRentVat, setIsMonthlyRentVat] = useState<boolean>(false); // 월 임대료 부가세 별도 여부
+  const [maintenanceFee, setMaintenanceFee] = useState<string>(''); // 관리비 (만원)
   const [isNoMaintenanceFee, setIsNoMaintenanceFee] = useState<boolean>(false); // 관리비 없음
+  const [isMaintenanceFeeVat, setIsMaintenanceFeeVat] = useState<boolean>(false); // 관리비 부가세 별도 여부
+  const [maintenanceFeeDetails, setMaintenanceFeeDetails] = useState<string>(''); // 관리비 내역 직접 입력
+  const [restrictedBusinessTypes, setRestrictedBusinessTypes] = useState<string>(''); // 입점 불가 업종 직접 입력
   const [consultationNotes, setConsultationNotes] = useState('');
 
   // 기타 특이 옵션 직접 추가 상태 (사진등록 상단 위치)
@@ -200,6 +204,13 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setMonthlyRent(initialData.monthlyRent !== undefined && initialData.monthlyRent !== null ? String(initialData.monthlyRent) : '');
         setNegotiableMonthlyRent(initialData.negotiableMonthlyRent !== undefined && initialData.negotiableMonthlyRent !== null ? String(initialData.negotiableMonthlyRent) : '');
         setIsMonthlyRentVat(!!(initialData.monthlyRentVat || initialData.storeDetail?.monthlyRentVat || initialData.officeDetail?.monthlyRentVat));
+        const feeVal = initialData.maintenanceFee !== undefined && initialData.maintenanceFee !== null 
+          ? String(initialData.maintenanceFee) 
+          : (initialData.storeDetail?.maintenanceFee !== undefined ? String(initialData.storeDetail.maintenanceFee) : '');
+        setMaintenanceFee(feeVal);
+        setIsMaintenanceFeeVat(!!(initialData.maintenanceFeeVat || initialData.storeDetail?.maintenanceFeeVat));
+        setMaintenanceFeeDetails(initialData.maintenanceFeeDetails || initialData.storeDetail?.managementFeeDetails || '');
+        setRestrictedBusinessTypes(initialData.restrictedBusinessTypes || initialData.storeDetail?.restrictedBusinessTypes || '');
         setIsNoMaintenanceFee(!!initialData.isNoMaintenanceFee);
         setConsultationNotes(initialData.consultationNotes || '');
         setManagerName(initialData.managerName || '개업공인중개사 (대표)');
@@ -292,6 +303,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setMonthlyRent('');
         setNegotiableMonthlyRent('');
         setIsMonthlyRentVat(false);
+        setMaintenanceFee('');
+        setIsMaintenanceFeeVat(false);
+        setMaintenanceFeeDetails('');
+        setRestrictedBusinessTypes('');
         setExtraCustomOption('');
         setIsNoMaintenanceFee(false);
         setConsultationNotes('');
@@ -936,6 +951,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       monthlyRent: monthlyRent ? parseFloat(monthlyRent) : undefined,
       negotiableMonthlyRent: negotiableMonthlyRent ? parseFloat(negotiableMonthlyRent) : undefined,
       monthlyRentVat: isMonthlyRentVat,
+      maintenanceFee: isNoMaintenanceFee ? 0 : (maintenanceFee ? parseFloat(maintenanceFee) : undefined),
+      maintenanceFeeVat: isMaintenanceFeeVat,
+      maintenanceFeeDetails: maintenanceFeeDetails.trim() || undefined,
+      restrictedBusinessTypes: restrictedBusinessTypes.trim() || undefined,
       isNoMaintenanceFee,
       consultationNotes: consultationNotes.trim() || undefined,
       landArea,
@@ -958,7 +977,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       // 7가지 서브 데이터
       apartmentDetail: propertyType === 'APARTMENT' ? apartmentData : undefined,
       houseDetail: propertyType === 'HOUSE' ? houseData : undefined,
-      storeDetail: propertyType === 'STORE' ? { ...storeData, monthlyRentVat: isMonthlyRentVat } : undefined,
+      storeDetail: propertyType === 'STORE' ? {
+        ...storeData,
+        monthlyRentVat: isMonthlyRentVat,
+        maintenanceFee: isNoMaintenanceFee ? 0 : (maintenanceFee ? parseFloat(maintenanceFee) : storeData?.maintenanceFee),
+        maintenanceFeeVat: isMaintenanceFeeVat,
+        managementFeeDetails: maintenanceFeeDetails.trim() || storeData?.managementFeeDetails,
+        restrictedBusinessTypes: restrictedBusinessTypes.trim() || storeData?.restrictedBusinessTypes,
+      } : undefined,
       officeDetail: propertyType === 'OFFICE' ? { ...officeData, monthlyRentVat: isMonthlyRentVat } : undefined,
       factoryWarehouseDetail: propertyType === 'FACTORY_WAREHOUSE' ? factoryWarehouseData : undefined,
       landDetail: propertyType === 'LAND' ? landData : undefined,
@@ -990,6 +1016,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       monthlyRent: payload.monthlyRent,
       negotiableMonthlyRent: payload.negotiableMonthlyRent,
       monthlyRentVat: payload.monthlyRentVat,
+      maintenanceFee: payload.maintenanceFee,
+      maintenanceFeeVat: payload.maintenanceFeeVat,
+      maintenanceFeeDetails: payload.maintenanceFeeDetails,
+      restrictedBusinessTypes: payload.restrictedBusinessTypes,
       isNoMaintenanceFee: payload.isNoMaintenanceFee,
       consultationNotes: payload.consultationNotes,
       landArea: payload.landArea,
@@ -1903,6 +1933,96 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         </div>
                       </>
                     )}
+
+                    {/* 임대차 시: 보증금란 밑 관리비/부가세/관리비 내역 및 입점제한업종 추가 */}
+                    {transactionType !== '매매' && (
+                      <div className="sm:col-span-2 pt-3 border-t border-slate-200 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* 관리비란 */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="block text-sm font-bold text-slate-800">
+                                관리비 (만원)
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextNoFee = !isNoMaintenanceFee;
+                                    setIsNoMaintenanceFee(nextNoFee);
+                                    if (nextNoFee) {
+                                      setMaintenanceFee('0');
+                                    }
+                                  }}
+                                  className={`px-2 py-0.5 text-xs font-bold rounded border transition-all cursor-pointer ${
+                                    isNoMaintenanceFee
+                                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                      : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  ✓ [관리비 없음] 설정
+                                </button>
+                                <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer select-none font-semibold hover:text-blue-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={isMaintenanceFeeVat}
+                                    onChange={(e) => setIsMaintenanceFeeVat(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span>부가세 별도</span>
+                                </label>
+                              </div>
+                            </div>
+                            <input
+                              type="number"
+                              disabled={isNoMaintenanceFee}
+                              value={isNoMaintenanceFee ? '0' : maintenanceFee}
+                              onChange={(e) => setMaintenanceFee(e.target.value)}
+                              placeholder={isNoMaintenanceFee ? '0 (관리비 없음)' : '예: 25'}
+                              className={`w-full text-base px-3.5 py-2.5 rounded-xl border font-bold transition-all ${
+                                isNoMaintenanceFee
+                                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                  : 'bg-white border-slate-300 text-slate-900 focus:ring-2 focus:ring-blue-500 font-extrabold'
+                              }`}
+                            />
+                          </div>
+
+                          {/* 관리금 내역 직접 입력 */}
+                          <div>
+                            <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                              관리금 내역 (직접 입력)
+                            </label>
+                            <input
+                              type="text"
+                              value={maintenanceFeeDetails}
+                              onChange={(e) => setMaintenanceFeeDetails(e.target.value)}
+                              placeholder="예: 청소비, 승강기 유지비, 공용전기, 수도료 포함 등"
+                              className="w-full text-base px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 입점 안되는 업종 직접 입력 */}
+                        <div>
+                          <label className="block text-sm font-bold text-rose-800 mb-1.5 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded text-xs font-black">제한</span>
+                              <span>입점 안되는 업종 (직접 입력 가능)</span>
+                            </span>
+                            <span className="text-xs font-normal text-slate-500">
+                              (건물주 금지 업종 또는 동종업종 제한 등 직접 입력)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            value={restrictedBusinessTypes}
+                            onChange={(e) => setRestrictedBusinessTypes(e.target.value)}
+                            placeholder="예: 냄새 심한 고기집/생선구이 불가, 유흥주점 불가, 커피전문점 동종제한 등"
+                            className="w-full text-base px-3.5 py-2.5 bg-rose-50/40 border border-rose-200 rounded-xl focus:ring-2 focus:ring-rose-500 font-medium text-slate-900"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* ======================================================== */}
@@ -2011,7 +2131,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     <HouseForm data={houseData} onChange={setHouseData} />
                   )}
                   {propertyType === 'STORE' && (
-                    <StoreForm data={storeData} onChange={setStoreData} transactionType={transactionType} />
+                    <StoreForm data={storeData} onChange={setStoreData} transactionType={transactionType} ledgerData={ledgerData} />
                   )}
                   {propertyType === 'OFFICE' && (
                     <OfficeForm data={officeData} onChange={setOfficeData} />

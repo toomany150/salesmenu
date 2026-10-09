@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { StoreData } from '@/lib/types';
+import React, { useMemo } from 'react';
+import { StoreData, StoreLeaseUnitItem } from '@/lib/types';
 import { VoiceTextarea } from '@/components/common/VoiceInput';
 import { 
   Store, 
@@ -17,19 +17,107 @@ import {
   Megaphone, 
   Wine, 
   Sparkles,
-  Ban
+  Ban,
+  Plus,
+  Trash2,
+  Building2,
+  Calendar,
+  CheckCircle2
 } from 'lucide-react';
 
 interface StoreFormProps {
   data: Partial<StoreData>;
   onChange: (updated: Partial<StoreData>) => void;
   transactionType?: string;
+  ledgerData?: any;
 }
 
-export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactionType }) => {
+export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactionType, ledgerData }) => {
   const updateField = (field: keyof StoreData, value: any) => {
     onChange({ ...data, [field]: value });
   };
+
+  // 매매 시 층별/호수별 임대차 현황 리스트 핸들러
+  const leaseList: StoreLeaseUnitItem[] = data.leaseStatusList || [];
+
+  const updateLeaseItem = (index: number, updatedItem: Partial<StoreLeaseUnitItem>) => {
+    const nextList = [...leaseList];
+    nextList[index] = { ...nextList[index], ...updatedItem };
+    onChange({ ...data, leaseStatusList: nextList });
+  };
+
+  const addLeaseItem = (floorHoDefault = '') => {
+    const newItem: StoreLeaseUnitItem = {
+      id: `lease-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      floorHo: floorHoDefault || `${leaseList.length + 1}층`,
+      contractStartDate: '',
+      evictionPossible: '명도 가능',
+      deposit: undefined,
+      monthlyRent: undefined,
+      isVacant: false,
+    };
+    onChange({ ...data, leaseStatusList: [...leaseList, newItem] });
+  };
+
+  const removeLeaseItem = (index: number) => {
+    const nextList = leaseList.filter((_, i) => i !== index);
+    onChange({ ...data, leaseStatusList: nextList });
+  };
+
+  const handleToggleVacant = (index: number) => {
+    const cur = leaseList[index];
+    const nextVacant = !cur.isVacant;
+    updateLeaseItem(index, {
+      isVacant: nextVacant,
+      deposit: nextVacant ? 0 : (cur.deposit === 0 ? undefined : cur.deposit),
+      monthlyRent: nextVacant ? 0 : (cur.monthlyRent === 0 ? undefined : cur.monthlyRent),
+    });
+  };
+
+  // 건축물대장 층별/호수 정보로부터 자동 생성
+  const handleLoadFromLedger = () => {
+    if (!ledgerData) return;
+    const generated: StoreLeaseUnitItem[] = [];
+
+    if (ledgerData.unitList && ledgerData.unitList.length > 0) {
+      ledgerData.unitList.forEach((u: any, idx: number) => {
+        generated.push({
+          id: `ledger-unit-${idx}-${Date.now()}`,
+          floorHo: `${u.dong ? u.dong + ' ' : ''}${u.ho || u.floor || (idx + 1) + '호'}`,
+          contractStartDate: '',
+          evictionPossible: '명도 가능',
+          deposit: undefined,
+          monthlyRent: undefined,
+          isVacant: false,
+        });
+      });
+    } else if (ledgerData.floorList && ledgerData.floorList.length > 0) {
+      ledgerData.floorList.forEach((f: any, idx: number) => {
+        generated.push({
+          id: `ledger-floor-${idx}-${Date.now()}`,
+          floorHo: `${f.floor} (${f.mainUse || '점포'})`,
+          contractStartDate: '',
+          evictionPossible: '명도 가능',
+          deposit: undefined,
+          monthlyRent: undefined,
+          isVacant: false,
+        });
+      });
+    }
+
+    if (generated.length > 0) {
+      onChange({ ...data, leaseStatusList: generated });
+    }
+  };
+
+  // 총 보증금 및 총 월세 계산
+  const totalDeposit = useMemo(() => {
+    return leaseList.reduce((acc, cur) => acc + (cur.isVacant ? 0 : (Number(cur.deposit) || 0)), 0);
+  }, [leaseList]);
+
+  const totalMonthlyRent = useMemo(() => {
+    return leaseList.reduce((acc, cur) => acc + (cur.isVacant ? 0 : (Number(cur.monthlyRent) || 0)), 0);
+  }, [leaseList]);
 
   // 대장상 면적 ㎡ 입력 시 평 자동 계산
   const handleBuildingAreaSqm = (valStr: string) => {
@@ -514,6 +602,254 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
       </div>
 
       {/* ────────────────────────────────────────────────────────── */}
+      {/* 매매(SALE) 전용: 섹터 4. 층별·호수별 임대차 및 명도 현황 (보증금·월세·공실 관리) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {transactionType === '매매' ? (
+        <div className="bg-white rounded-2xl border-2 border-indigo-200/90 shadow-xs overflow-hidden">
+          <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 px-4 py-3.5 border-b border-indigo-200 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-2xs">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-indigo-950">
+                  섹터 4. 층별·호수별 임대차 및 명도 현황 (보증금·월세·명도·공실 관리)
+                </h4>
+                <span className="text-xs text-indigo-700">
+                  건축물대장 층별 호수 연동, 계약시작일, 명도여부, 임차보증금 및 월세, 공실 원클릭 설정
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {ledgerData && (
+                <button
+                  type="button"
+                  onClick={handleLoadFromLedger}
+                  title="건축물대장의 층별개요 또는 호실 목록을 불러와 자동으로 채웁니다"
+                  className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>대장 층/호수 불러오기</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => addLeaseItem()}
+                className="px-2.5 py-1.5 rounded-lg bg-white border border-indigo-300 hover:bg-indigo-50 text-indigo-800 text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>호실 추가</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 space-y-4">
+            {leaseList.length === 0 ? (
+              <div className="p-6 rounded-xl border-2 border-dashed border-indigo-200 bg-indigo-50/30 text-center space-y-2">
+                <p className="text-sm font-bold text-slate-700">등록된 층별·호수별 임대차 내역이 없습니다.</p>
+                <p className="text-xs text-slate-500">
+                  상단의 [대장 층/호수 불러오기]를 누르시거나 [+ 호실 추가] 버튼을 눌러 각 호실의 보증금 및 월세를 입력해주세요.
+                </p>
+                <div className="pt-2 flex justify-center gap-2">
+                  {ledgerData && (
+                    <button
+                      type="button"
+                      onClick={handleLoadFromLedger}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-xs hover:bg-indigo-700 cursor-pointer"
+                    >
+                      🏛️ 건축물대장 층별 목록 일괄 불러오기
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => addLeaseItem('1층')}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-indigo-300 text-indigo-800 text-xs font-bold hover:bg-indigo-50 cursor-pointer"
+                  >
+                    + 첫 호실 직접 입력하기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* 층별 호수 리스트 (데스크톱/모바일 반응형) */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
+                        <th className="py-2.5 px-3 min-w-[120px]">층 · 호수 *</th>
+                        <th className="py-2.5 px-3 min-w-[130px]">계약 시작일</th>
+                        <th className="py-2.5 px-3 min-w-[120px]">명도 가능 여부</th>
+                        <th className="py-2.5 px-3 min-w-[110px]">임차보증금 (만원)</th>
+                        <th className="py-2.5 px-3 min-w-[110px]">월세 (만원)</th>
+                        <th className="py-2.5 px-3 text-center min-w-[90px]">공실 상태</th>
+                        <th className="py-2.5 px-2 text-center w-10">삭제</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {leaseList.map((item, idx) => (
+                        <tr 
+                          key={item.id || idx}
+                          className={`transition-colors ${item.isVacant ? 'bg-amber-50/40' : 'hover:bg-slate-50'}`}
+                        >
+                          {/* 1. 층별 호수 */}
+                          <td className="py-2 px-2.5">
+                            <input
+                              type="text"
+                              value={item.floorHo}
+                              onChange={(e) => updateLeaseItem(idx, { floorHo: e.target.value })}
+                              placeholder="예: 1층 101호"
+                              className="w-full text-xs font-bold px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-slate-900"
+                            />
+                          </td>
+
+                          {/* 2. 계약기간 시작일 */}
+                          <td className="py-2 px-2.5">
+                            <input
+                              type="date"
+                              value={item.contractStartDate || ''}
+                              onChange={(e) => updateLeaseItem(idx, { contractStartDate: e.target.value })}
+                              className="w-full text-xs px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                            />
+                          </td>
+
+                          {/* 3. 명도여부 가능 */}
+                          <td className="py-2 px-2.5">
+                            <select
+                              value={item.evictionPossible || '명도 가능'}
+                              onChange={(e) => updateLeaseItem(idx, { evictionPossible: e.target.value })}
+                              className="w-full text-xs font-bold px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                            >
+                              <option value="명도 가능">🟢 명도 가능</option>
+                              <option value="명도 협의">🟡 명도 협의</option>
+                              <option value="만기 퇴거 예정">🔵 만기 퇴거 예정</option>
+                              <option value="재계약 승계">⚪ 재계약 승계</option>
+                            </select>
+                          </td>
+
+                          {/* 4. 임차보증금 (만원) */}
+                          <td className="py-2 px-2.5">
+                            <input
+                              type="number"
+                              disabled={item.isVacant}
+                              value={item.isVacant ? 0 : (item.deposit !== undefined && item.deposit !== null ? item.deposit : '')}
+                              onChange={(e) => updateLeaseItem(idx, { deposit: e.target.value ? parseFloat(e.target.value) : undefined })}
+                              placeholder="보증금 (만원)"
+                              className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${
+                                item.isVacant
+                                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                  : 'bg-white border-blue-300 text-blue-950 focus:ring-1 focus:ring-blue-500'
+                              }`}
+                            />
+                          </td>
+
+                          {/* 5. 월세 (만원) */}
+                          <td className="py-2 px-2.5">
+                            <input
+                              type="number"
+                              disabled={item.isVacant}
+                              value={item.isVacant ? 0 : (item.monthlyRent !== undefined && item.monthlyRent !== null ? item.monthlyRent : '')}
+                              onChange={(e) => updateLeaseItem(idx, { monthlyRent: e.target.value ? parseFloat(e.target.value) : undefined })}
+                              placeholder="월세 (만원)"
+                              className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${
+                                item.isVacant
+                                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                  : 'bg-white border-emerald-300 text-emerald-950 focus:ring-1 focus:ring-emerald-500'
+                              }`}
+                            />
+                          </td>
+
+                          {/* 6. 공실 버튼 (원클릭 토글) */}
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleVacant(idx)}
+                              title={item.isVacant ? '클릭 시 입주 상태로 전환' : '클릭 시 공실(보증금/월세 0)로 전환'}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer shadow-2xs ${
+                                item.isVacant
+                                  ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                              }`}
+                            >
+                              {item.isVacant ? '✓ 공실' : '입주중'}
+                            </button>
+                          </td>
+
+                          {/* 7. 삭제 */}
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeLeaseItem(idx)}
+                              title="해당 층/호수 삭제"
+                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 행 추가 버튼 */}
+                <div className="pt-1 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => addLeaseItem()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer border border-indigo-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>호실 추가</span>
+                  </button>
+                  <span className="text-xs text-slate-500">
+                    * 공실인 경우 우측 [공실] 버튼을 누르면 보증금과 월세가 0으로 즉시 반영됩니다.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 맨 마지막: 총 보증금 합 및 월세 합계 요약 대시보드 카드 */}
+            <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white shadow-md">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      전체 호실 임대차 집계 요약
+                    </h5>
+                    <p className="text-[11px] text-slate-400">
+                      총 {leaseList.length}개 호실 (입주 {leaseList.filter((l) => !l.isVacant).length}곳 / 공실 {leaseList.filter((l) => l.isVacant).length}곳)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-5 sm:gap-8">
+                  {/* 총 보증금 합계 */}
+                  <div className="text-right">
+                    <span className="block text-[11px] font-bold text-slate-400">총 보증금 합계</span>
+                    <span className="text-lg sm:text-xl font-black text-amber-300 tracking-tight font-mono">
+                      {totalDeposit.toLocaleString()} <span className="text-xs font-bold text-white">만원</span>
+                    </span>
+                  </div>
+
+                  <div className="w-[1px] h-8 bg-slate-700"></div>
+
+                  {/* 총 월세 합계 */}
+                  <div className="text-right">
+                    <span className="block text-[11px] font-bold text-slate-400">총 월세 합계</span>
+                    <span className="text-lg sm:text-xl font-black text-emerald-300 tracking-tight font-mono">
+                      {totalMonthlyRent.toLocaleString()} <span className="text-xs font-bold text-white">만원</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      ) : (
+        <>
+      {/* ────────────────────────────────────────────────────────── */}
       {/* 섹터 4. 점포 운영 스펙 (테이블수, 종업원수, 영업기간, 주류대출) */}
       {/* ────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border-2 border-violet-200/90 shadow-xs overflow-hidden">
@@ -790,9 +1126,11 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 섹터 6. 금액·인상조건·광고여부·원상복구특약 (매매 시 불필요하므로 숨김) */}
+      {/* 임대차 전용: 섹터 5. 권리금·인상조건·광고·원상복구특약 (매매 시 숨김) */}
       {/* ────────────────────────────────────────────────────────── */}
       {transactionType !== '매매' && (
       <div className="bg-white rounded-2xl border-2 border-blue-200/90 shadow-xs overflow-hidden">
@@ -803,10 +1141,10 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
             </div>
             <div>
               <h4 className="text-sm font-bold text-blue-950">
-                섹터 6. 권리금·관리비·인상조건·광고·원상복구특약
+                섹터 5. 권리금·인상조건·광고·원상복구특약
               </h4>
               <span className="text-xs text-blue-700">
-                권리금, 관리비(없음 옵션), 임대료 인상액, 광고 동의, 원상복구특약
+                권리금 및 조정가능 권리금, 임대료 인상액, 광고 동의, 원상복구특약
               </span>
             </div>
           </div>
@@ -817,7 +1155,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
 
         <div className="p-4 sm:p-5 space-y-4">
           
-          {/* 권리금 & 관리비 */}
+          {/* 권리금 & 조정가능한 권리금 (사용자 요청: 관리비 항목 삭제 및 조정가능 권리금 배치) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -825,7 +1163,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                   권리금 (만원)
                 </label>
                 
-                {/* [권리금 없음] 토글 버튼 (4번째 이미지 스타일) */}
+                {/* [권리금 없음] 토글 버튼 */}
                 <button
                   type="button"
                   onClick={() => {
@@ -835,6 +1173,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                       ...data,
                       isNoPremium: nextNoPremium,
                       premium: nextNoPremium ? 0 : undefined,
+                      negotiablePremium: nextNoPremium ? 0 : data.negotiablePremium,
                     });
                   }}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold border transition-all cursor-pointer ${
@@ -850,7 +1189,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               <input
                 type="number"
                 disabled={data.isNoPremium || data.premium === 0}
-                value={data.isNoPremium || data.premium === 0 ? 0 : (data.premium || '')}
+                value={data.isNoPremium || data.premium === 0 ? 0 : (data.premium !== undefined && data.premium !== null ? data.premium : '')}
                 onChange={(e) => updateField('premium', e.target.value ? parseFloat(e.target.value) : undefined)}
                 placeholder={data.isNoPremium || data.premium === 0 ? '0 (무권리)' : '예: 3000 (무권리 시 0 입력)'}
                 className={`w-full text-sm px-3.5 py-2.5 border rounded-xl font-bold ${
@@ -861,58 +1200,24 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               />
             </div>
 
-            {/* 관리비 & 관리비 없음 체크 */}
+            {/* 조정가능한 권리금 (만원) */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-bold text-slate-800">
-                  관리비 (만원)
+                <label className="text-sm font-bold text-indigo-950">
+                  조정가능한 권리금 (만원)
                 </label>
-                
-                {/* [관리비 없음] 토글 버튼 */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextNoFee = !data.isNoMaintenanceFee;
-                    onChange({
-                      ...data,
-                      isNoMaintenanceFee: nextNoFee,
-                      maintenanceFee: nextNoFee ? 0 : (data.maintenanceFee || 10),
-                    });
-                  }}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold border transition-all ${
-                    data.isNoMaintenanceFee
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>✓</span>
-                  <span>[관리비 없음] 설정</span>
-                </button>
+                <span className="text-[11px] font-medium text-slate-400">
+                  협의 가능 하한선
+                </span>
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  disabled={data.isNoMaintenanceFee}
-                  value={data.isNoMaintenanceFee ? 0 : (data.maintenanceFee || '')}
-                  onChange={(e) => updateField('maintenanceFee', e.target.value ? parseFloat(e.target.value) : undefined)}
-                  placeholder={data.isNoMaintenanceFee ? '관리비 없음' : '예: 25'}
-                  className={`w-full text-sm px-3.5 py-2.5 border rounded-xl font-bold ${
-                    data.isNoMaintenanceFee
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800 cursor-not-allowed'
-                      : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900'
-                  }`}
-                />
-                <label className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap text-xs font-semibold text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={!!data.maintenanceFeeVat}
-                    onChange={(e) => updateField('maintenanceFeeVat', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded-sm"
-                  />
-                  <span>부가세 별도</span>
-                </label>
-              </div>
+              <input
+                type="number"
+                disabled={data.isNoPremium || data.premium === 0}
+                value={data.isNoPremium || data.premium === 0 ? 0 : (data.negotiablePremium !== undefined && data.negotiablePremium !== null ? data.negotiablePremium : '')}
+                onChange={(e) => updateField('negotiablePremium', e.target.value ? parseFloat(e.target.value) : undefined)}
+                placeholder="예: 2500 (조정 가능한 권리금)"
+                className="w-full text-sm px-3.5 py-2.5 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
+              />
             </div>
           </div>
 
