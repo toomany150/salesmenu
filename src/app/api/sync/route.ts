@@ -2,8 +2,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, ensureDatabaseSchema } from '@/lib/prisma';
 import { PropertyItem, CustomerItem } from '@/lib/types';
+import fs from 'fs';
+import path from 'path';
 
-// Vercel Serverless 인스턴스 간 공유를 보완하기 위한 전역 인메모리 캐시
+// Vercel Serverless /tmp 캐시 파일 경로
+const TMP_SYNC_FILE = '/tmp/broker_sync_bundle.json';
+
+// Vercel Serverless 인스턴스 간 메모리 캐시
 let inMemorySyncStore: {
   properties: PropertyItem[];
   customers: CustomerItem[];
@@ -14,11 +19,37 @@ let inMemorySyncStore: {
   updatedAt: new Date().toISOString(),
 };
 
+// /tmp 파일에서 데이터 로드 시도
+function readTmpSyncFile(): { properties: PropertyItem[]; customers: CustomerItem[] } {
+  try {
+    if (fs.existsSync(TMP_SYNC_FILE)) {
+      const raw = fs.readFileSync(TMP_SYNC_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return {
+        properties: Array.isArray(parsed.properties) ? parsed.properties : [],
+        customers: Array.isArray(parsed.customers) ? parsed.customers : [],
+      };
+    }
+  } catch (e) {
+    console.warn('Failed to read /tmp sync file:', e);
+  }
+  return { properties: [], customers: [] };
+}
+
+// /tmp 파일에 데이터 저장
+function writeTmpSyncFile(data: { properties: PropertyItem[]; customers: CustomerItem[] }) {
+  try {
+    fs.writeFileSync(TMP_SYNC_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('Failed to write /tmp sync file:', e);
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     await ensureDatabaseSchema().catch(() => {});
 
-    // 1. DB에서 조회 시도
+    // 1. DB에서 매물 및 고객 조회
     let dbProperties: any[] = [];
     let dbCustomers: any[] = [];
     try {
@@ -41,11 +72,20 @@ export async function GET(request: NextRequest) {
       console.warn('Sync GET DB fetch notice:', e);
     }
 
-    // 2. DB 데이터와 인메모리 캐시 데이터 병합
+    // 2. /tmp 파일 데이터 불러오기
+    const tmpData = readTmpSyncFile();
+
+    // 3. 매물 3중 병합 (DB + /tmp 파일 + 인메모리)
     const propMap = new Map<string, any>();
     dbProperties.forEach((p) => {
       const key = p.propertyNumber || p.id;
-      propMap.set(key, p);
+      if (key) propMap.set(key, p);
+    });
+    tmpData.properties.forEach((p) => {
+      const key = p.propertyNumber || p.id;
+      if (key && !propMap.has(key)) {
+        propMap.set(key, p);
+      }
     });
     inMemorySyncStore.properties.forEach((p) => {
       const key = p.propertyNumber || p.id;
@@ -54,9 +94,15 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // 4. 고객 3중 병합
     const custMap = new Map<string, any>();
     dbCustomers.forEach((c) => {
       if (c.id) custMap.set(c.id, c);
+    });
+    tmpData.customers.forEach((c) => {
+      if (c.id && !custMap.has(c.id)) {
+        custMap.set(c.id, c);
+      }
     });
     inMemorySyncStore.customers.forEach((c) => {
       if (c.id && !custMap.has(c.id)) {
@@ -84,19 +130,35 @@ export async function POST(request: NextRequest) {
     const incomingProps: PropertyItem[] = Array.isArray(body.properties) ? body.properties : [];
     const incomingCusts: CustomerItem[] = Array.isArray(body.customers) ? body.customers : [];
 
-    // 인메모리 스토어 업데이트
+    // 1. 인메모리 스토어 업데이트
     const propMap = new Map<string, PropertyItem>();
-    inMemorySyncStore.properties.forEach((p) => propMap.set(p.propertyNumber || p.id, p));
-    incomingProps.forEach((p) => propMap.set(p.propertyNumber || p.id, p));
+    inMemorySyncStore.properties.forEach((p) => {
+      const key = p.propertyNumber || p.id;
+      if (key) propMap.set(key, p);
+    });
+    incomingProps.forEach((p) => {
+      const key = p.propertyNumber || p.id;
+      if (key) propMap.set(key, { ...propMap.get(key), ...p });
+    });
     inMemorySyncStore.properties = Array.from(propMap.values());
 
     const custMap = new Map<string, CustomerItem>();
-    inMemorySyncStore.customers.forEach((c) => custMap.set(c.id, c));
-    incomingCusts.forEach((c) => custMap.set(c.id, c));
+    inMemorySyncStore.customers.forEach((c) => {
+      if (c.id) custMap.set(c.id, c);
+    });
+    incomingCusts.forEach((c) => {
+      if (c.id) custMap.set(c.id, { ...custMap.get(c.id), ...c });
+    });
     inMemorySyncStore.customers = Array.from(custMap.values());
     inMemorySyncStore.updatedAt = new Date().toISOString();
 
-    // DB에 일괄 저장 시도 (백그라운드 비동기 처리로 클라이언트 응답 지연 방지)
+    // 2. /tmp 캐시 파일에 즉시 영구 기록 (서버리스 컨테이너 간 공유용)
+    writeTmpSyncFile({
+      properties: inMemorySyncStore.properties,
+      customers: inMemorySyncStore.customers,
+    });
+
+    // 3. DB에 고객 일괄 Upsert
     try {
       await ensureDatabaseSchema().catch(() => {});
       for (const cust of incomingCusts) {
@@ -111,9 +173,9 @@ export async function POST(request: NextRequest) {
             subType: cust.subType,
             group: cust.group || 'SEARCHING',
             memo: cust.memo,
-            price: cust.price,
-            deposit: cust.deposit,
-            monthlyRent: cust.monthlyRent,
+            price: cust.price !== undefined ? cust.price : null,
+            deposit: cust.deposit !== undefined ? cust.deposit : null,
+            monthlyRent: cust.monthlyRent !== undefined ? cust.monthlyRent : null,
           },
           create: {
             id: cust.id,
@@ -124,14 +186,70 @@ export async function POST(request: NextRequest) {
             subType: cust.subType,
             group: cust.group || 'SEARCHING',
             memo: cust.memo,
-            price: cust.price,
-            deposit: cust.deposit,
-            monthlyRent: cust.monthlyRent,
+            price: cust.price !== undefined ? cust.price : null,
+            deposit: cust.deposit !== undefined ? cust.deposit : null,
+            monthlyRent: cust.monthlyRent !== undefined ? cust.monthlyRent : null,
           },
-        }).catch(() => {});
+        }).catch((err) => console.warn('Sync customer upsert error:', err));
       }
-    } catch (dbErr) {
-      console.warn('Sync DB upsert notice:', dbErr);
+    } catch (dbCustErr) {
+      console.warn('Sync DB customers upsert notice:', dbCustErr);
+    }
+
+    // 4. DB에 매물 일괄 Upsert (★ 핵심: 매물 저장 누락 완전 해결!)
+    try {
+      await ensureDatabaseSchema().catch(() => {});
+      for (const prop of incomingProps) {
+        const propNum = prop.propertyNumber || prop.id;
+        if (!propNum || !prop.address) continue;
+
+        const propDataToSave: any = {
+          propertyNumber: propNum,
+          receiptDate: prop.receiptDate ? new Date(prop.receiptDate) : new Date(),
+          propertyType: prop.propertyType || 'STORE',
+          status: prop.status || 'AVAILABLE',
+          transactionType: prop.transactionType || '월세',
+          address: prop.address,
+          roadAddress: prop.roadAddress || null,
+          jibunAddress: prop.jibunAddress || null,
+          detailAddress: prop.detailAddress || null,
+          images: prop.images ? (Array.isArray(prop.images) ? JSON.stringify(prop.images) : String(prop.images)) : null,
+          latitude: prop.latitude ? parseFloat(String(prop.latitude)) : null,
+          longitude: prop.longitude ? parseFloat(String(prop.longitude)) : null,
+          direction: prop.direction || null,
+          directionCriteria: prop.directionCriteria || null,
+          availableDate: prop.availableDate ? new Date(prop.availableDate) : null,
+          isImmediateAvailable: !!prop.isImmediateAvailable,
+          price: prop.price !== undefined && prop.price !== null ? parseFloat(String(prop.price)) : null,
+          negotiablePrice: prop.negotiablePrice !== undefined && prop.negotiablePrice !== null ? parseFloat(String(prop.negotiablePrice)) : null,
+          deposit: prop.deposit !== undefined && prop.deposit !== null ? parseFloat(String(prop.deposit)) : null,
+          negotiableDeposit: prop.negotiableDeposit !== undefined && prop.negotiableDeposit !== null ? parseFloat(String(prop.negotiableDeposit)) : null,
+          monthlyRent: prop.monthlyRent !== undefined && prop.monthlyRent !== null ? parseFloat(String(prop.monthlyRent)) : null,
+          negotiableMonthlyRent: prop.negotiableMonthlyRent !== undefined && prop.negotiableMonthlyRent !== null ? parseFloat(String(prop.negotiableMonthlyRent)) : null,
+          isNoMaintenanceFee: !!prop.isNoMaintenanceFee,
+          consultationNotes: prop.consultationNotes || null,
+          landArea: prop.landArea !== undefined && prop.landArea !== null ? parseFloat(String(prop.landArea)) : null,
+          totalFloorArea: prop.totalFloorArea !== undefined && prop.totalFloorArea !== null ? parseFloat(String(prop.totalFloorArea)) : null,
+          approvalDate: prop.approvalDate ? new Date(prop.approvalDate) : null,
+          buildingRegisterUse: prop.buildingRegisterUse || null,
+          customerId: prop.customerId || null,
+          managerName: prop.managerName || '사무실',
+          assignedAgents: prop.assignedAgents ? (Array.isArray(prop.assignedAgents) ? JSON.stringify(prop.assignedAgents) : String(prop.assignedAgents)) : null,
+          createdById: prop.createdById || null,
+          creatorName: prop.creatorName || null,
+        };
+
+        await prisma.property.upsert({
+          where: { propertyNumber: propNum },
+          update: propDataToSave,
+          create: {
+            id: prop.id || `prop-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            ...propDataToSave,
+          },
+        }).catch((err) => console.warn('Sync property upsert error:', err));
+      }
+    } catch (dbPropErr) {
+      console.warn('Sync DB properties upsert notice:', dbPropErr);
     }
 
     return NextResponse.json({

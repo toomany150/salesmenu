@@ -158,15 +158,37 @@ export interface SyncDataBundle {
   customers: CustomerItem[];
 }
 
-export function exportDataBundle(): SyncDataBundle {
-  const properties = getCustomProperties();
-  const customers = getCustomCustomers();
+export function exportDataBundle(liveProperties?: PropertyItem[], liveCustomers?: CustomerItem[]): SyncDataBundle {
+  const localProps = getCustomProperties();
+  const propMap = new Map<string, PropertyItem>();
+  localProps.forEach((p) => {
+    const key = p.propertyNumber || p.id;
+    if (key) propMap.set(key, p);
+  });
+  if (Array.isArray(liveProperties)) {
+    liveProperties.forEach((p) => {
+      const key = p.propertyNumber || p.id;
+      if (key) propMap.set(key, { ...propMap.get(key), ...p });
+    });
+  }
+
+  const localCusts = getCustomCustomers();
+  const custMap = new Map<string, CustomerItem>();
+  localCusts.forEach((c) => {
+    if (c.id) custMap.set(c.id, c);
+  });
+  if (Array.isArray(liveCustomers)) {
+    liveCustomers.forEach((c) => {
+      if (c.id) custMap.set(c.id, { ...custMap.get(c.id), ...c });
+    });
+  }
+
   return {
     version: '1.0',
     exportedAt: new Date().toISOString(),
     deviceInfo: typeof navigator !== 'undefined' ? (navigator.userAgent.includes('Mobile') ? '스마트폰' : 'PC') : '기기',
-    properties,
-    customers,
+    properties: Array.from(propMap.values()),
+    customers: Array.from(custMap.values()),
   };
 }
 
@@ -251,10 +273,10 @@ export function importDataBundle(bundle: Partial<SyncDataBundle>): {
 /**
  * 7. 백업 파일(.json) 즉시 다운로드 (스마트폰/PC에서 소실 방지용 영구 보존)
  */
-export function downloadBackupFile(): boolean {
+export function downloadBackupFile(liveProperties?: PropertyItem[], liveCustomers?: CustomerItem[]): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    const bundle = exportDataBundle();
+    const bundle = exportDataBundle(liveProperties, liveCustomers);
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

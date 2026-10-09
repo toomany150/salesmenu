@@ -755,6 +755,8 @@ const DashboardContent: React.FC = () => {
       <DataSyncModal
         isOpen={isDataSyncOpen}
         onClose={() => setIsDataSyncOpen(false)}
+        currentProperties={properties}
+        currentCustomers={customers}
         onSyncSuccess={() => {
           fetchData(); // 동기화 성공 시 화면 데이터 즉시 갱신
         }}

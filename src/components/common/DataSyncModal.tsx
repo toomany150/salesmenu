@@ -26,17 +26,22 @@ import {
   getCustomCustomers,
   SyncDataBundle
 } from '@/lib/storage';
+import { PropertyItem, CustomerItem } from '@/lib/types';
 
 interface DataSyncModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSyncSuccess?: () => void;
+  currentProperties?: PropertyItem[];
+  currentCustomers?: CustomerItem[];
 }
 
 export const DataSyncModal: React.FC<DataSyncModalProps> = ({
   isOpen,
   onClose,
   onSyncSuccess,
+  currentProperties,
+  currentCustomers,
 }) => {
   const [activeTab, setActiveTab] = useState<'EXPORT' | 'IMPORT' | 'GUIDE'>('EXPORT');
   const [propCount, setPropCount] = useState(0);
@@ -54,16 +59,15 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const p = getCustomProperties();
-      const c = getCustomCustomers();
-      setPropCount(p.length);
-      setCustCount(c.length);
+      const bundle = exportDataBundle(currentProperties, currentCustomers);
+      setPropCount(bundle.properties.length);
+      setCustCount(bundle.customers.length);
       setCopied(false);
       setServerSyncMsg(null);
       setImportStatus(null);
       setSyncCodeInput('');
     }
-  }, [isOpen]);
+  }, [isOpen, currentProperties, currentCustomers]);
 
   if (!isOpen) return null;
 
@@ -72,7 +76,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
     setIsServerSyncing(true);
     setServerSyncMsg(null);
     try {
-      const bundle = exportDataBundle();
+      const bundle = exportDataBundle(currentProperties, currentCustomers);
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -80,7 +84,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setServerSyncMsg(`✅ 서버 전송 완료! PC에서 [서버에서 즉시 불러오기]를 눌러주세요.`);
+        setServerSyncMsg(`✅ 서버 전송 완료! (매물 ${bundle.properties.length}건, 고객 ${bundle.customers.length}명)\nPC에서 [서버에서 즉시 불러오기]를 눌러주세요.`);
       } else {
         setServerSyncMsg(`⚠️ 전송 실패: ${data.error || '알 수 없는 오류'}`);
       }
@@ -94,7 +98,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
   // 2. 동기화 코드 클립보드 복사
   const handleCopySyncCode = () => {
     try {
-      const bundle = exportDataBundle();
+      const bundle = exportDataBundle(currentProperties, currentCustomers);
       const jsonStr = JSON.stringify(bundle);
       navigator.clipboard.writeText(jsonStr);
       setCopied(true);
@@ -106,7 +110,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
 
   // 3. 파일 다운로드
   const handleDownloadBackup = () => {
-    const ok = downloadBackupFile();
+    const ok = downloadBackupFile(currentProperties, currentCustomers);
     if (ok) {
       alert('백업 파일이 기기에 안전하게 저장되었습니다.\n카카오톡 나에게 보내기나 이메일로 PC에 전송할 수 있습니다.');
     } else {
