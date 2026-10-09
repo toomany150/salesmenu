@@ -146,3 +146,129 @@ export function getDeletedCustomerIds(): string[] {
     return [];
   }
 }
+
+/**
+ * 5. 스마트폰/PC 간 데이터 동기화 번들 생성 (내보내기)
+ */
+export interface SyncDataBundle {
+  version: string;
+  exportedAt: string;
+  deviceInfo?: string;
+  properties: PropertyItem[];
+  customers: CustomerItem[];
+}
+
+export function exportDataBundle(): SyncDataBundle {
+  const properties = getCustomProperties();
+  const customers = getCustomCustomers();
+  return {
+    version: '1.0',
+    exportedAt: new Date().toISOString(),
+    deviceInfo: typeof navigator !== 'undefined' ? (navigator.userAgent.includes('Mobile') ? '스마트폰' : 'PC') : '기기',
+    properties,
+    customers,
+  };
+}
+
+/**
+ * 6. 스마트폰/PC 간 데이터 동기화 번들 병합 복원 (가져오기)
+ */
+export function importDataBundle(bundle: Partial<SyncDataBundle>): {
+  success: boolean;
+  importedPropertiesCount: number;
+  importedCustomersCount: number;
+  error?: string;
+} {
+  if (typeof window === 'undefined') {
+    return { success: false, importedPropertiesCount: 0, importedCustomersCount: 0, error: '브라우저 환경이 아닙니다.' };
+  }
+
+  try {
+    const incomingProps = Array.isArray(bundle.properties) ? bundle.properties : [];
+    const incomingCusts = Array.isArray(bundle.customers) ? bundle.customers : [];
+
+    // 1) 매물 병합
+    const currentProps = getCustomProperties();
+    const propMap = new Map<string, PropertyItem>();
+    currentProps.forEach((p) => {
+      const key = p.propertyNumber || p.id;
+      propMap.set(key, p);
+    });
+    incomingProps.forEach((p) => {
+      const key = p.propertyNumber || p.id;
+      if (key) {
+        propMap.set(key, { ...propMap.get(key), ...p });
+      }
+    });
+    const mergedProps = Array.from(propMap.values());
+    localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(mergedProps));
+
+    // 2) 고객 병합
+    const currentCusts = getCustomCustomers();
+    const custMap = new Map<string, CustomerItem>();
+    currentCusts.forEach((c) => {
+      if (c.id) custMap.set(c.id, c);
+    });
+    incomingCusts.forEach((c) => {
+      if (c.id) {
+        custMap.set(c.id, { ...custMap.get(c.id), ...c });
+      } else if (c.phone) {
+        custMap.set(c.phone, { ...custMap.get(c.phone), ...c });
+      }
+    });
+    const mergedCusts = Array.from(custMap.values());
+    localStorage.setItem(STORAGE_CUSTOM_CUSTOMERS, JSON.stringify(mergedCusts));
+
+    // 3) 삭제 목록 정리 (불러온 데이터가 삭제 목록에 들어있으면 삭제 해제)
+    const deletedProps = getDeletedPropertyIds();
+    const cleanProps = deletedProps.filter(
+      (id) => !incomingProps.some((p) => p.id === id || p.propertyNumber === id)
+    );
+    localStorage.setItem(STORAGE_DELETED_PROPERTIES, JSON.stringify(cleanProps));
+
+    const deletedCusts = getDeletedCustomerIds();
+    const cleanCusts = deletedCusts.filter(
+      (id) => !incomingCusts.some((c) => c.id === id)
+    );
+    localStorage.setItem(STORAGE_DELETED_CUSTOMERS, JSON.stringify(cleanCusts));
+
+    return {
+      success: true,
+      importedPropertiesCount: incomingProps.length,
+      importedCustomersCount: incomingCusts.length,
+    };
+  } catch (err: any) {
+    console.error('Failed to import data bundle:', err);
+    return {
+      success: false,
+      importedPropertiesCount: 0,
+      importedCustomersCount: 0,
+      error: err.message || '데이터 병합 중 오류가 발생했습니다.',
+    };
+  }
+}
+
+/**
+ * 7. 백업 파일(.json) 즉시 다운로드 (스마트폰/PC에서 소실 방지용 영구 보존)
+ */
+export function downloadBackupFile(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const bundle = exportDataBundle();
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    a.href = url;
+    a.download = `참좋은부동산_매물고객데이터백업_${nowStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return true;
+  } catch (err) {
+    console.error('Failed to download backup file:', err);
+    return false;
+  }
+}
+

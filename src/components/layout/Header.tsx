@@ -11,7 +11,8 @@ import {
   UserCircle2,
   Lock,
   User,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 
@@ -22,6 +23,7 @@ interface HeaderProps {
   onOpenNewProperty?: () => void;
   onOpenNewCustomer?: () => void;
   onOpenAdminLogs?: () => void;
+  onOpenDataSync?: () => void;
   onOpenLogin?: () => void;
   onGoHome?: () => void;
 }
@@ -30,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewProperty,
   onOpenNewCustomer,
   onOpenAdminLogs,
+  onOpenDataSync,
   onGoHome,
 }) => {
   const { currentUser, login, logout, loginAsDefaultAdmin } = useAuth();
@@ -103,6 +106,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
               <span>admin</span>
+            </button>
+
+            {/* 🔄 기기 동기화 & 백업 버튼 (스마트폰 <-> PC 데이터 연동) */}
+            <button
+              type="button"
+              onClick={onOpenDataSync}
+              title="스마트폰과 PC 간 데이터 동기화 및 백업"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg border border-blue-200 transition-all active:scale-95 cursor-pointer shrink-0 shadow-2xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>기기 동기화</span>
             </button>
           </div>
 

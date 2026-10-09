@@ -13,6 +13,7 @@ import { CustomerDetailModal } from '../crm/CustomerDetailModal';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { LoginModal } from '../auth/LoginModal';
 import { AdminLogModal } from '../auth/AdminLogModal';
+import { DataSyncModal } from '../common/DataSyncModal';
 import { initKakao } from '@/lib/kakao';
 import { 
   getCustomProperties, 
@@ -53,9 +54,10 @@ const DashboardContent: React.FC = () => {
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
 
-  // Auth & Admin Modals
+  // Auth, Admin & Sync Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isAdminLogsOpen, setIsAdminLogsOpen] = useState(false);
+  const [isDataSyncOpen, setIsDataSyncOpen] = useState(false);
 
   // Init Kakao SDK on mount
   useEffect(() => {
@@ -298,6 +300,7 @@ const DashboardContent: React.FC = () => {
           if (!checkAuthOrAlert()) return;
           setIsAdminLogsOpen(true);
         }}
+        onOpenDataSync={() => setIsDataSyncOpen(true)}
         onOpenLogin={() => setIsLoginOpen(true)}
         onGoHome={() => setActiveTab('HOME')}
       />
@@ -746,6 +749,15 @@ const DashboardContent: React.FC = () => {
       <AdminLogModal
         isOpen={isAdminLogsOpen}
         onClose={() => setIsAdminLogsOpen(false)}
+      />
+
+      {/* 7) 스마트폰-PC 기기 간 데이터 동기화 & 소실 방지 백업 모달 */}
+      <DataSyncModal
+        isOpen={isDataSyncOpen}
+        onClose={() => setIsDataSyncOpen(false)}
+        onSyncSuccess={() => {
+          fetchData(); // 동기화 성공 시 화면 데이터 즉시 갱신
+        }}
       />
 
     </div>
