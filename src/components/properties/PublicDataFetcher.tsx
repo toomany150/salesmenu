@@ -49,6 +49,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   const [fetchedData, setFetchedData] = useState<PublicBuildingLedgerResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedFloorName, setSelectedFloorName] = useState<string | null>(null);
+  const [selectedFloorKey, setSelectedFloorKey] = useState<string | null>(null);
   // 집합건물 전유부(동/호수) 선택 상태
   const [selectedDong, setSelectedDong] = useState<string>('');
   const [selectedUnitKey, setSelectedUnitKey] = useState<string | null>(null);
@@ -178,11 +179,13 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       setFetchedData(null);
       setErrorMsg(null);
       setSelectedFloorName(null);
+      setSelectedFloorKey(null);
     } else if (fetchedData && fetchedData.address) {
       const current = (roadAddress || jibunAddress).trim();
       if (!current.includes(fetchedData.address) && !fetchedData.address.includes(current)) {
         setFetchedData(null);
         setSelectedFloorName(null);
+        setSelectedFloorKey(null);
       }
     }
   }, [roadAddress, jibunAddress, fetchedData]);
@@ -194,6 +197,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       setFetchedData(null);
       setErrorMsg(null);
       setSelectedFloorName(null);
+      setSelectedFloorKey(null);
       onAddressChange(result.roadAddress, result.jibunAddress);
     });
   };
@@ -204,6 +208,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setFetchedData(null);
     setErrorMsg(null);
     setSelectedFloorName(null);
+    setSelectedFloorKey(null);
     onAddressChange(val, jibunAddress);
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -225,6 +230,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setFetchedData(null);
     setErrorMsg(null);
     setSelectedFloorName(null);
+    setSelectedFloorKey(null);
     onAddressChange(roadAddress, val);
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -318,6 +324,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setFetchedData(null);
     setErrorMsg(null);
     setSelectedFloorName(null);
+    setSelectedFloorKey(null);
     setSelectedUnitKey(null);
     setSelectedDong('');
     setDongSearchQuery('');
@@ -325,8 +332,9 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     onAddressChange(road, jibun);
   };
 
-  const handleFloorClick = (floorInfo: PublicBuildingFloorInfo) => {
+  const handleFloorClick = (floorInfo: PublicBuildingFloorInfo, uniqueKey: string) => {
     setSelectedFloorName(floorInfo.floor);
+    setSelectedFloorKey(uniqueKey);
     if (onSelectFloor) {
       onSelectFloor(floorInfo);
     }
@@ -1100,11 +1108,12 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                     return a.floor.localeCompare(b.floor, 'ko');
                   })
                   .map((item, idx) => {
-                  const isSelected = selectedFloorName === item.floor;
+                  const itemKey = `${item.floor}_${item.mainUse || ''}_${item.area}_${idx}`;
+                  const isSelected = selectedFloorKey === itemKey;
                   return (
                     <div
-                      key={idx}
-                      onClick={() => handleFloorClick(item)}
+                      key={itemKey}
+                      onClick={() => handleFloorClick(item, itemKey)}
                       className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
                         isSelected
                           ? 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-300 shadow-xs'

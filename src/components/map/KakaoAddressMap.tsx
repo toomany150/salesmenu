@@ -632,6 +632,9 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
     setTimeout(() => setCopiedNotice(null), 2200);
   };
 
+  const cleanTargetAddress = (geocodedRoadAddress || geocodedAddress || address || '').trim();
+  const kakaoSearchUrl = `https://map.kakao.com/link/search/${encodeURIComponent(cleanTargetAddress)}`;
+  const naverSearchUrl = `https://map.naver.com/v5/search/${encodeURIComponent(cleanTargetAddress)}`;
   const kakaoDirectionsUrl = `https://map.kakao.com/link/to/${encodeURIComponent(address)},${currentCoords.lat},${currentCoords.lng}`;
   const kakaoRoadviewUrl = `https://map.kakao.com/link/roadview/${currentCoords.lat},${currentCoords.lng}`;
   const kakaoFullScreenUrl = `https://map.kakao.com/link/map/${encodeURIComponent(address)},${currentCoords.lat},${currentCoords.lng}`;
@@ -651,7 +654,47 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
   }
 
   return (
-    <div className={`relative w-full rounded-2xl overflow-hidden border border-slate-300/90 shadow-xl bg-white select-none flex flex-col md:flex-row ${className} ${height}`} style={{ minHeight: '460px' }}>
+    <div className={`relative w-full rounded-2xl overflow-hidden border border-slate-300/90 shadow-xl bg-white select-none flex flex-col ${className}`}>
+      
+      {/* ─────────────────────────────────────────────────────────────
+          TOP SHORTCUT BAR: 카카오지도 & 네이버지도 공식 포털 바로가기
+         ───────────────────────────────────────────────────────────── */}
+      <div className="w-full bg-slate-900 text-white px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 z-30 shadow-xs">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="text-xs font-bold text-slate-100">지도 바로가기</span>
+          <span className="text-[11px] text-slate-400 hidden sm:inline">| 새 창에서 카카오맵·네이버지도 검색 결과가 즉시 열립니다</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* 카카오지도 바로가기 버튼 */}
+          <a
+            href={kakaoSearchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="카카오 지도에서 해당 주소 바로보기"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FEE500] hover:bg-[#ebd400] text-[#191919] font-black text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#191919]"></span>
+            <span>카카오지도 바로가기</span>
+            <ExternalLink className="w-3.5 h-3.5 text-[#191919]" />
+          </a>
+
+          {/* 네이버지도 바로가기 버튼 */}
+          <a
+            href={naverSearchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="네이버 지도에서 해당 주소 바로보기"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#03C75A] hover:bg-[#02b351] text-white font-black text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <span className="font-extrabold text-[10px] bg-white text-[#03C75A] px-1 rounded-xs">N</span>
+            <span>네이버지도 바로가기</span>
+            <ExternalLink className="w-3.5 h-3.5 text-white" />
+          </a>
+        </div>
+      </div>
+
+      <div className={`relative w-full flex-1 flex flex-col md:flex-row ${height}`} style={{ minHeight: '460px' }}>
       
       {/* ─────────────────────────────────────────────────────────────
           1. LEFT SIDEBAR: Authentic Kakao Map Search & Address Panel (Image 2)
@@ -936,6 +979,19 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
 
           <div className="w-[1px] h-3.5 bg-slate-200"></div>
 
+          <button
+            type="button"
+            onClick={() => setMapEngine((prev) => (prev === 'KAKAO' ? 'LEAFLET' : 'KAKAO'))}
+            title="카카오맵 또는 일반 상세지도 엔진 전환"
+            className={`px-2 py-1 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+              mapEngine === 'LEAFLET' ? 'bg-indigo-600 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-indigo-600'
+            }`}
+          >
+            {mapEngine === 'KAKAO' ? '카카오맵' : '일반지도'}
+          </button>
+
+          <div className="w-[1px] h-3.5 bg-slate-200"></div>
+
           <a
             href={kakaoFullScreenUrl}
             target="_blank"
@@ -1147,6 +1203,7 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         </div>
 
       </div>
+    </div>
     </div>
   );
 };

@@ -23,9 +23,10 @@ import {
 interface StoreFormProps {
   data: Partial<StoreData>;
   onChange: (updated: Partial<StoreData>) => void;
+  transactionType?: string;
 }
 
-export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
+export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactionType }) => {
   const updateField = (field: keyof StoreData, value: any) => {
     onChange({ ...data, [field]: value });
   };
@@ -215,9 +216,8 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
 
             {/* 3. 실평수 (전용 ㎡) * */}
             <div>
-              <label className="block text-xs font-bold text-amber-900 mb-1 flex items-center justify-between">
-                <span>실평수 (전용 ㎡) *</span>
-                <span className="text-[10px] text-amber-600 font-normal">수정가능</span>
+              <label className="block text-xs font-bold text-amber-900 mb-1">
+                실평수 (전용 ㎡) *
               </label>
               <input
                 type="number"
@@ -792,8 +792,9 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
       </div>
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 섹터 6. 금액·인상조건·광고여부·원상복구특약 */}
+      {/* 섹터 6. 금액·인상조건·광고여부·원상복구특약 (매매 시 불필요하므로 숨김) */}
       {/* ────────────────────────────────────────────────────────── */}
+      {transactionType !== '매매' && (
       <div className="bg-white rounded-2xl border-2 border-blue-200/90 shadow-xs overflow-hidden">
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1010,6 +1011,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange }) => {
 
         </div>
       </div>
+      )}
 
     </div>
   );

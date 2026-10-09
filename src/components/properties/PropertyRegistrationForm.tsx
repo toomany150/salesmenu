@@ -789,10 +789,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let finalPropNumber = propertyNumber.trim();
+    const finalPropNumber = propertyNumber.trim();
     if (!finalPropNumber) {
-      // 사용자가 매물고유번호를 직접 적지 않고 비워둔 경우 자동 고유번호 부여
-      finalPropNumber = `PROP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      setErrorMsg('매물번호(고유번호)를 직접 입력해주세요.');
+      return;
     }
     const finalAddress = roadAddress.trim() || jibunAddress.trim() || address.trim();
     if (!finalAddress) {
@@ -1490,18 +1490,18 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-sm font-bold text-slate-800">
-                          매물번호 (고유번호)
+                          매물번호 (고유번호) *
                         </label>
-                        <span className="text-[11px] font-medium text-slate-400">
-                          미입력 시 자동 채번
+                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                          직접 입력
                         </span>
                       </div>
                       <input
                         type="text"
                         value={propertyNumber}
                         onChange={(e) => setPropertyNumber(e.target.value)}
-                        placeholder="직접 입력 (비워두면 자동 생성)"
-                        className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-mono font-extrabold text-blue-900"
+                        placeholder="매물번호 직접 입력 (예: 101, 2026-01)"
+                        className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-mono font-extrabold text-blue-900 shadow-2xs"
                       />
                     </div>
                     <div>
@@ -2011,7 +2011,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     <HouseForm data={houseData} onChange={setHouseData} />
                   )}
                   {propertyType === 'STORE' && (
-                    <StoreForm data={storeData} onChange={setStoreData} />
+                    <StoreForm data={storeData} onChange={setStoreData} transactionType={transactionType} />
                   )}
                   {propertyType === 'OFFICE' && (
                     <OfficeForm data={officeData} onChange={setOfficeData} />
