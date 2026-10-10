@@ -27,6 +27,7 @@ import {
   SyncDataBundle
 } from '@/lib/storage';
 import { PropertyItem, CustomerItem } from '@/lib/types';
+import { useAuth } from '../auth/AuthContext';
 
 interface DataSyncModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
   currentProperties,
   currentCustomers,
 }) => {
+  const { currentUser, loginAsDefaultAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<'EXPORT' | 'IMPORT' | 'GUIDE'>('EXPORT');
   const [propCount, setPropCount] = useState(0);
   const [custCount, setCustCount] = useState(0);
@@ -84,6 +86,14 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
     setServerSyncMsg(null);
     try {
       const bundle = exportDataBundle(currentProperties, currentCustomers);
+      if (bundle.properties.length === 0 && bundle.customers.length === 0) {
+        setServerSyncMsg(
+          '⚠️ 현재 기기에 저장된 매물과 고객 데이터가 0건입니다.\n전송할 데이터가 없어 서버로 보내지 않았습니다. 먼저 매물이나 고객을 등록해주세요.'
+        );
+        setIsServerSyncing(false);
+        return;
+      }
+
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,7 +103,9 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       if (res.ok && data.success) {
         const targetDevice = isMobile ? 'PC' : '스마트폰';
         setServerSyncMsg(
-          `✅ 서버 전송 성공! (매물 ${bundle.properties.length}건, 고객 ${bundle.customers.length}명)\n👉 이제 ${targetDevice}에서 [데이터 불러오기]를 누르시면 즉시 나타납니다.`
+          `✅ 서버 전송 성공! (매물 ${bundle.properties.length}건, 고객 ${bundle.customers.length}명)\n` +
+          `👉 이제 ${targetDevice}에서 [2. 데이터 불러오기] ➔ [서버에서 가져오기]를 누르시면 됩니다.\n` +
+          `💡 팁: Vercel 서버리스 특성상 만약 스마트폰에서 0건으로 나오는 경우, [방법 2: 동기화 코드 복사]로 카카오톡 전송하시면 1초 만에 100% 확실하게 복원됩니다.`
         );
       } else {
         setServerSyncMsg(`⚠️ 전송 실패: ${data.error || '알 수 없는 오류'}`);
@@ -136,16 +148,41 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       const res = await fetch('/api/sync');
       const data = await res.json();
       if (res.ok && data.success) {
+        const incomingProps = Array.isArray(data.properties) ? data.properties : [];
+        const incomingCusts = Array.isArray(data.customers) ? data.customers : [];
+
+        // 0건인 경우 명확한 안내 제공
+        if (incomingProps.length === 0 && incomingCusts.length === 0) {
+          setImportStatus(
+            '⚠️ 서버에 보관된 매물 및 고객 데이터가 없습니다 (0건).\n' +
+            '1) PC에서 [1. 데이터 보내기] ➔ [서버로 전송하기]가 완료되었는지 확인해주세요.\n' +
+            '2) Vercel 무료 서버리스 환경 특성상 인스턴스 분리로 서버 임시 메모리가 비어있을 수 있습니다.\n' +
+            '👉 [방법 2: 동기화 코드 복사]로 카카오톡 나에게 보내기를 이용하시면 1초 만에 100% 확실하게 넘어옵니다!'
+          );
+          return;
+        }
+
         const result = importDataBundle(data);
         if (result.success) {
           const thisDevice = isMobile ? '스마트폰' : 'PC';
-          setImportStatus(`🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽하게 반영되었습니다.`);
+          // 비로그인 상태인 경우 자동 로그인 활성화하여 화면에 즉시 렌더링되도록 보장
+          if (!currentUser) {
+            loginAsDefaultAdmin();
+            setImportStatus(
+              `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽하게 반영되었습니다.\n` +
+              `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
+            );
+          } else {
+            setImportStatus(
+              `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽하게 반영되었습니다.`
+            );
+          }
           if (onSyncSuccess) onSyncSuccess();
         } else {
           setImportStatus(`⚠️ 동기화 실패: ${result.error}`);
         }
       } else {
-        setImportStatus(`⚠️ 서버에서 데이터를 찾을 수 없습니다. [동기화 코드 붙여넣기]를 이용해주세요.`);
+        setImportStatus(`⚠️ 서버에서 데이터를 찾을 수 없습니다. [방법 2: 동기화 코드 붙여넣기]를 이용해주세요.`);
       }
     } catch (e: any) {
       setImportStatus(`⚠️ 서버 연결 실패: ${e.message}`);
@@ -165,7 +202,15 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       const result = importDataBundle(bundle);
       if (result.success) {
         const thisDevice = isMobile ? '스마트폰' : 'PC';
-        setImportStatus(`🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.`);
+        if (!currentUser) {
+          loginAsDefaultAdmin();
+          setImportStatus(
+            `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.\n` +
+            `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
+          );
+        } else {
+          setImportStatus(`🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.`);
+        }
         setSyncCodeInput('');
         if (onSyncSuccess) onSyncSuccess();
       } else {
@@ -188,7 +233,15 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
         const result = importDataBundle(bundle);
         if (result.success) {
           const thisDevice = isMobile ? '스마트폰' : 'PC';
-          setImportStatus(`🎉 백업 파일 복원 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 반영되었습니다.`);
+          if (!currentUser) {
+            loginAsDefaultAdmin();
+            setImportStatus(
+              `🎉 백업 파일 복원 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 반영되었습니다.\n` +
+              `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
+            );
+          } else {
+            setImportStatus(`🎉 백업 파일 복원 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 반영되었습니다.`);
+          }
           if (onSyncSuccess) onSyncSuccess();
         } else {
           setImportStatus(`⚠️ 복원 실패: ${result.error}`);
@@ -218,6 +271,15 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
                 <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30">
                   {isMobile ? '📱 스마트폰 접속 중' : '💻 PC 접속 중'}
                 </span>
+                {currentUser ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40">
+                    👤 {currentUser.name}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/30 text-amber-200 border border-amber-300/40">
+                    🔒 비로그인 (불러올 때 자동 로그인)
+                  </span>
+                )}
               </div>
               <p className="text-xs text-blue-100 mt-0.5">
                 PC에서 입력한 정보는 스마트폰으로, 스마트폰에서 입력한 정보는 PC로 자유롭게 주고받습니다.
@@ -309,7 +371,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div>
                       <span className="font-bold text-sm text-slate-900 block">
-                        🚀 방법 1: 원클릭 서버로 바로 전송 (가장 추천)
+                        🚀 방법 1: 원클릭 서버로 바로 전송
                       </span>
                       <p className="text-xs text-slate-500">
                         {isMobile 
@@ -338,10 +400,10 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div>
                       <span className="font-bold text-sm text-slate-900 block">
-                        📋 방법 2: 동기화 코드 복사 (카카오톡 나에게 보내기)
+                        📋 방법 2: 동기화 코드 복사 (카카오톡 나에게 보내기 - 100% 확실)
                       </span>
                       <p className="text-xs text-slate-500">
-                        동기화 코드를 복사하여 카카오톡이나 메모장으로 {isMobile ? 'PC' : '스마트폰'}에 전달합니다.
+                        동기화 코드를 복사하여 카카오톡이나 메모장으로 {isMobile ? 'PC' : '스마트폰'}에 전달합니다. (서버 상태와 무관하게 즉시 100% 연동)
                       </p>
                     </div>
                     <button
@@ -363,7 +425,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
                         💾 방법 3: 영구 백업 파일 다운로드 (.json)
                       </span>
                       <p className="text-xs text-slate-500">
-                        현재 기기에 백업 파일로 보관합니다. 이 파일은 다른 기기에서 바로 불러올 수 있습니다.
+                        현재 기기에 백업 파일로 보관합니다. 이 파일은 카카오톡/이메일로 다른 기기에 전달하여 바로 복원할 수 있습니다.
                       </p>
                     </div>
                     <button
@@ -393,7 +455,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
               </div>
 
               {importStatus && (
-                <div className={`p-3 rounded-xl text-xs font-bold leading-relaxed ${
+                <div className={`p-3 rounded-xl text-xs font-bold leading-relaxed whitespace-pre-line ${
                   importStatus.includes('성공') 
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' 
                     : 'bg-rose-50 text-rose-800 border border-rose-300'
@@ -423,6 +485,9 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
                     ? '👉 PC에서 [서버로 전송하기]를 눌렀다면, 여기서 클릭 1번으로 스마트폰에 즉시 나타납니다.' 
                     : '👉 스마트폰에서 [서버로 전송하기]를 눌렀다면, 여기서 클릭 1번으로 PC에 즉시 나타납니다.'}
                 </p>
+                <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-800 font-medium leading-relaxed">
+                  ⚠️ <strong>참고사항:</strong> Vercel 무료 서버리스 환경은 컨테이너가 분리되어 있어 서버 임시 메모리가 비어있을 수 있습니다. 만약 0건으로 나오면 아래 <strong>[방법 2: 동기화 코드 붙여넣기]</strong>를 이용하시면 카카오톡을 통해 100% 확실하게 복원됩니다!
+                </div>
               </div>
 
               {/* 방법 2: 동기화 코드 붙여넣기 */}

@@ -4,9 +4,10 @@ import { prisma, ensureDatabaseSchema } from '@/lib/prisma';
 import { PropertyItem, CustomerItem } from '@/lib/types';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
-// Vercel Serverless /tmp 캐시 파일 경로
-const TMP_SYNC_FILE = '/tmp/broker_sync_bundle.json';
+// Vercel Serverless 및 로컬 OS 독립적인 임시 캐시 파일 경로
+const TMP_SYNC_FILE = path.join(os.tmpdir(), 'broker_sync_bundle.json');
 
 // Vercel Serverless 인스턴스 간 메모리 캐시
 let inMemorySyncStore: {
@@ -18,6 +19,42 @@ let inMemorySyncStore: {
   customers: [],
   updatedAt: new Date().toISOString(),
 };
+
+// 매물 데이터 출력 안전 포맷팅 (JSON 문자열 파싱)
+function formatPropertyOutput(p: any): PropertyItem {
+  if (!p) return p;
+  let parsedImages: string[] = [];
+  if (p.images) {
+    if (Array.isArray(p.images)) {
+      parsedImages = p.images;
+    } else {
+      try {
+        const parsed = JSON.parse(p.images);
+        parsedImages = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        parsedImages = [];
+      }
+    }
+  }
+  let parsedAssignedAgents: string[] = [];
+  if (p.assignedAgents) {
+    if (Array.isArray(p.assignedAgents)) {
+      parsedAssignedAgents = p.assignedAgents;
+    } else {
+      try {
+        const parsed = JSON.parse(p.assignedAgents);
+        parsedAssignedAgents = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        parsedAssignedAgents = p.assignedAgents ? String(p.assignedAgents).split(',').map((s: string) => s.trim()) : [];
+      }
+    }
+  }
+  return {
+    ...p,
+    images: parsedImages,
+    assignedAgents: parsedAssignedAgents,
+  };
+}
 
 // /tmp 파일에서 데이터 로드 시도
 function readTmpSyncFile(): { properties: PropertyItem[]; customers: CustomerItem[] } {
@@ -39,6 +76,10 @@ function readTmpSyncFile(): { properties: PropertyItem[]; customers: CustomerIte
 // /tmp 파일에 데이터 저장
 function writeTmpSyncFile(data: { properties: PropertyItem[]; customers: CustomerItem[] }) {
   try {
+    const dir = path.dirname(TMP_SYNC_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(TMP_SYNC_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (e) {
     console.warn('Failed to write /tmp sync file:', e);
@@ -110,11 +151,19 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    const formattedProperties = Array.from(propMap.values()).map(formatPropertyOutput);
+    const resultCustomers = Array.from(custMap.values());
+
     return NextResponse.json({
       success: true,
       updatedAt: inMemorySyncStore.updatedAt,
-      properties: Array.from(propMap.values()),
-      customers: Array.from(custMap.values()),
+      properties: formattedProperties,
+      customers: resultCustomers,
+      count: {
+        properties: formattedProperties.length,
+        customers: resultCustomers.length,
+      },
+      hasData: formattedProperties.length > 0 || resultCustomers.length > 0,
     });
   } catch (error: any) {
     return NextResponse.json(
