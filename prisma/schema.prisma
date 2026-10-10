@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite" // PostgreSQL 배포시 "postgresql"로 변경 가능
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
