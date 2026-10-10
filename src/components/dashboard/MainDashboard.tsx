@@ -18,10 +18,12 @@ import { initKakao } from '@/lib/kakao';
 import { 
   getCustomProperties, 
   saveCustomProperty, 
+  setCustomProperties,
   removeCustomProperty, 
   getDeletedPropertyIds,
   getCustomCustomers, 
   saveCustomCustomer, 
+  setCustomCustomers,
   removeCustomCustomer, 
   getDeletedCustomerIds 
 } from '@/lib/storage';
@@ -120,14 +122,8 @@ const DashboardContent: React.FC = () => {
       if (custRes.ok) {
         const cData = await custRes.json();
         if (Array.isArray(cData)) {
-          const custMap = new Map<string, CustomerItem>();
-          cData.forEach((c: any) => {
-            if (!deletedCustIds.includes(c.id)) custMap.set(c.id, c);
-          });
-          localCustomCusts.forEach((c) => {
-            if (!deletedCustIds.includes(c.id)) custMap.set(c.id, c);
-          });
-          setCustomers(Array.from(custMap.values()));
+          setCustomers(cData);
+          setCustomCustomers(cData);
         }
       } else if (localCustomCusts.length > 0) {
         setCustomers(localCustomCusts);
@@ -136,44 +132,13 @@ const DashboardContent: React.FC = () => {
       if (propRes.ok) {
         const pData = await propRes.json();
         if (Array.isArray(pData)) {
-          const propMap = new Map<string, PropertyItem>();
-          
-          // 1) 서버 매물 추가
-          pData.forEach((p: any) => {
-            const key = p.propertyNumber || p.id;
-            if (!deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)) {
-              propMap.set(key, p);
-            }
-          });
-
-          // 2) 로컬스토리지 보관 매물 오버레이
-          localCustomProps.forEach((cp) => {
-            const key = cp.propertyNumber || cp.id;
-            if (!deletedPropIds.includes(cp.id) && !deletedPropIds.includes(cp.propertyNumber)) {
-              propMap.set(key, cp);
-            }
-          });
-
-          const merged = Array.from(propMap.values());
-          merged.sort((a, b) => {
+          pData.sort((a: any, b: any) => {
             const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
             const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
             return tB - tA;
           });
-          setProperties(merged);
-
-          // 3) 백그라운드 서버 재동기화
-          const serverPropKeys = new Set(pData.map((p: any) => p.propertyNumber || p.id));
-          localCustomProps.forEach((cp) => {
-            const key = cp.propertyNumber || cp.id;
-            if (!serverPropKeys.has(key)) {
-              fetch('/api/properties', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...headers },
-                body: JSON.stringify(cp),
-              }).catch(() => {});
-            }
-          });
+          setProperties(pData);
+          setCustomProperties(pData);
         }
       } else if (localCustomProps.length > 0) {
         setProperties(localCustomProps);
@@ -182,6 +147,9 @@ const DashboardContent: React.FC = () => {
       console.warn('DB fetch error, using local storage cache:', err);
       if (localCustomProps.length > 0) {
         setProperties(localCustomProps);
+      }
+      if (localCustomCusts.length > 0) {
+        setCustomers(localCustomCusts);
       }
     } finally {
       setLoading(false);

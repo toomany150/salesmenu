@@ -85,6 +85,18 @@ export function getDeletedPropertyIds(): string[] {
 }
 
 /**
+ * 서버 최신 매물 목록으로 로컬 캐시 동기화
+ */
+export function setCustomProperties(list: PropertyItem[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(list));
+  } catch (err) {
+    console.error('Failed to set custom properties to localStorage:', err);
+  }
+}
+
+/**
  * 4. 고객 데이터 영구 보존
  */
 export function getCustomCustomers(): CustomerItem[] {
@@ -144,6 +156,18 @@ export function getDeletedCustomerIds(): string[] {
     return JSON.parse(localStorage.getItem(STORAGE_DELETED_CUSTOMERS) || '[]');
   } catch {
     return [];
+  }
+}
+
+/**
+ * 서버 최신 고객 목록으로 로컬 캐시 동기화
+ */
+export function setCustomCustomers(list: CustomerItem[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_CUSTOM_CUSTOMERS, JSON.stringify(list));
+  } catch (err) {
+    console.error('Failed to set custom customers to localStorage:', err);
   }
 }
 
