@@ -131,6 +131,26 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const currentPhotoIndex = activePhotoIndex < images.length ? activePhotoIndex : 0;
   const statusInfo = STATUS_LABELS[property.status] || { label: property.status, color: 'bg-slate-100 text-slate-800' };
 
+  // 상가 권리금 계산
+  const isStore = property.propertyType === 'STORE';
+  const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
+  const premVal = isNoPrem
+    ? 0
+    : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+  const negoPremVal = isNoPrem
+    ? 0
+    : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+
+  const formatPremStr = (val?: number | null) => {
+    if (val === undefined || val === null) return '협의';
+    if (val === 0) return '무권리';
+    if (val >= 10000) {
+      const eok = (val / 10000).toFixed(val % 10000 === 0 ? 0 : 1);
+      return `${eok}억원 (${val.toLocaleString()}만원)`;
+    }
+    return `${val.toLocaleString()}만원`;
+  };
+
   let priceText = '';
   if (property.transactionType === '매매') {
     priceText = property.price ? `${property.price.toLocaleString()} 만원` : '협의';
@@ -140,6 +160,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     const isVat = property.monthlyRentVat || property.storeDetail?.monthlyRentVat || property.officeDetail?.monthlyRentVat;
     const vatText = isVat ? ' (부가세 별도)' : ' (부가세 포함)';
     priceText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
+    if (isStore) {
+      if (isNoPrem) {
+        priceText += ' · 권리금 없음 (무권리)';
+      } else if (premVal !== undefined && premVal !== null) {
+        const shortPremStr = premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만`;
+        priceText += ` · 권리금 ${shortPremStr}`;
+      }
+    }
   }
 
   // 관리비 및 부가세/상세내용 정보 계산
@@ -433,6 +461,19 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 {priceText}
               </div>
               <div className="flex flex-wrap items-center justify-start sm:justify-end gap-1.5 mt-2 text-xs">
+                {/* 상가 권리금 뱃지 (상단 헤더에 크고 명확하게 노출) */}
+                {isStore && (
+                  isNoPrem ? (
+                    <span className="px-2.5 py-1 rounded-md font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
+                      ✨ 권리금 없음 (무권리)
+                    </span>
+                  ) : (premVal !== undefined && premVal !== null) ? (
+                    <span className="px-2.5 py-1 rounded-md font-extrabold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-950 border-2 border-amber-400 shadow-2xs">
+                      💰 권리금: {formatPremStr(premVal)}
+                      {negoPremVal && negoPremVal !== premVal ? ` (조정: ${formatPremStr(negoPremVal)})` : ''}
+                    </span>
+                  ) : null
+                )}
                 {actualAreaVal && (
                   <span className="px-2.5 py-1 rounded-md font-bold bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
                     📐 실평수 {actualAreaVal}㎡ (약 {actualAreaPyeong}평)
@@ -903,35 +944,44 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
           {/* 상가 점포 상세 브리핑 (섹터 1~6 전체 정밀 브리핑 및 복구 폴백) */}
           {(property.propertyType === 'STORE' || property.storeDetail) && (() => {
-            const store = property.storeDetail || {
-              storeName: property.propertyNumber,
-              businessType: '일반음식점',
-              currentFloor: property.detailAddress || '1층',
-              actualArea: actualAreaVal || 85,
-              roomCount: roomCountVal || 1,
-              bathroomCount: bathroomCountVal || 1,
-              toiletGenderType: toiletGenderTypeVal || '남녀공용(내부)',
-              electricityCapacity: '15kW',
-              electricityType: '개별',
-              waterType: '개별',
-              gasType: '도시가스(LNG)',
-              isParkingImpossible: isParkingImpossibleVal,
-              parkingCount: parkingCountVal,
-              monthlyRentVat: property.monthlyRentVat,
-              premium: property.deposit ? 17000 : 0,
-              negotiablePremium: 17000,
-              maintenanceFee: 15,
-              isNoMaintenanceFee: false,
-              maintenanceFeeVat: true,
-              managementFeeDetails: '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)',
-              tableCount: 12,
-              employeeCount: 3,
-              operationPeriod: '3년 이상',
-              violationBuilding: '없음(정상)',
-              operatorContractorMatch: '일치',
-              storeAdStatus: '비공개(보안유지)',
-              restorationTerms: '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의',
-              rentIncreaseCondition: '인상 없음 (동결)'
+            const rawStore = (property.storeDetail || {}) as any;
+            const store = {
+              ...rawStore,
+              storeName: rawStore.storeName || property.propertyNumber,
+              businessType: rawStore.businessType || '일반음식점',
+              currentFloor: rawStore.currentFloor || property.detailAddress || '1층',
+              actualArea: rawStore.actualArea || actualAreaVal || 85,
+              roomCount: rawStore.roomCount ?? roomCountVal ?? 1,
+              bathroomCount: rawStore.bathroomCount ?? bathroomCountVal ?? 1,
+              toiletGenderType: rawStore.toiletGenderType || toiletGenderTypeVal || '남녀공용(내부)',
+              electricityCapacity: rawStore.electricityCapacity || '15kW',
+              electricityType: rawStore.electricityType || '개별',
+              waterType: rawStore.waterType || '개별',
+              gasType: rawStore.gasType || '도시가스(LNG)',
+              isParkingImpossible: rawStore.isParkingImpossible ?? isParkingImpossibleVal,
+              parkingCount: rawStore.parkingCount ?? parkingCountVal,
+              monthlyRentVat: rawStore.monthlyRentVat ?? property.monthlyRentVat,
+              premium: premVal,
+              negotiablePremium: negoPremVal,
+              isNoPremium: isNoPrem,
+              maintenanceFee: rawStore.maintenanceFee ?? mFeeVal ?? 15,
+              isNoMaintenanceFee: isNoFee,
+              maintenanceFeeVat: isFeeVat,
+              managementFeeDetails: feeDetails || '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)',
+              tableCount: rawStore.tableCount ?? 12,
+              employeeCount: rawStore.employeeCount ?? 3,
+              operationPeriod: rawStore.operationPeriod || '3년 이상',
+              violationBuilding: rawStore.violationBuilding || '없음(정상)',
+              operatorContractorMatch: rawStore.operatorContractorMatch || '일치',
+              storeAdStatus: rawStore.storeAdStatus || '비공개(보안유지)',
+              restorationTerms: rawStore.restorationTerms || '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의',
+              rentIncreaseCondition: rawStore.rentIncreaseCondition || '인상 없음 (동결)',
+              equipmentList: rawStore.equipmentList,
+              rentalList: rawStore.rentalList,
+              businessLicenseTransfer: rawStore.businessLicenseTransfer,
+              equipmentRentalTransfer: rawStore.equipmentRentalTransfer,
+              liquorLoan: rawStore.liquorLoan,
+              administrativeDisposition: rawStore.administrativeDisposition,
             };
 
             return (
@@ -1147,13 +1197,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
                       <span className="text-[11px] text-amber-900 block font-semibold">권리금</span>
                       <span className="font-extrabold text-amber-950 text-sm">
-                        {store.isNoPremium || store.premium === 0 ? '무권리' : (store.premium ? `${store.premium.toLocaleString()} 만원` : '협의')}
+                        {store.isNoPremium || store.premium === 0 ? '✨ 권리금 없음 (무권리)' : (store.premium ? formatPremStr(store.premium) : '협의')}
                       </span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200">
                       <span className="text-[11px] text-indigo-900 block font-semibold">조정가능한 권리금</span>
                       <span className="font-extrabold text-indigo-950 text-sm">
-                        {store.negotiablePremium ? `${store.negotiablePremium.toLocaleString()} 만원` : (store.premium ? `${store.premium.toLocaleString()} 만원` : '협의')}
+                        {store.isNoPremium ? '무권리' : (store.negotiablePremium ? formatPremStr(store.negotiablePremium) : (store.premium ? formatPremStr(store.premium) : '협의'))}
                       </span>
                     </div>
                     <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200">

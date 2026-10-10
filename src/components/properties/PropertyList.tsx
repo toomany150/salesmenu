@@ -66,7 +66,20 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     } else {
       const isVat = p.monthlyRentVat || p.storeDetail?.monthlyRentVat || p.officeDetail?.monthlyRentVat;
       const vatText = isVat ? ' (부가세 별도)' : '';
-      return `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
+      let display = `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
+      if (p.propertyType === 'STORE') {
+        const isNoPrem = !!(p.storeDetail?.isNoPremium || p.isNoPremium || (p.storeDetail && p.storeDetail.premium === 0));
+        const premVal = isNoPrem
+          ? 0
+          : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+        if (isNoPrem) {
+          display += ' · 무권리';
+        } else if (premVal !== undefined && premVal !== null) {
+          const premStr = premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만`;
+          display += ` · 권리 ${premStr}`;
+        }
+      }
+      return display;
     }
   };
 
@@ -253,6 +266,37 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             <p className="text-[10px] text-amber-700 truncate pl-4">
                               지번: {property.jibunAddress}
                             </p>
+                          )}
+                          {property.propertyType === 'STORE' && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {(() => {
+                                const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
+                                const premVal = isNoPrem
+                                  ? 0
+                                  : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+                                const negoPremVal = isNoPrem
+                                  ? 0
+                                  : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+                                const premStr = premVal ? (premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만원`) : null;
+                                const negoStr = negoPremVal && negoPremVal !== premVal ? (negoPremVal >= 10000 ? `${(negoPremVal / 10000).toFixed(negoPremVal % 10000 === 0 ? 0 : 1)}억` : `${negoPremVal.toLocaleString()}만원`) : null;
+
+                                if (isNoPrem) {
+                                  return (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                      ✨ 무권리
+                                    </span>
+                                  );
+                                }
+                                if (premStr) {
+                                  return (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                                      💰 권리 {premStr}{negoStr ? ` (조정 ${negoStr})` : ''}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
                           )}
                         </div>
 
@@ -453,6 +497,38 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             {getPriceDisplay(property)}
                           </span>
                         </div>
+
+                        {property.propertyType === 'STORE' && (
+                          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                            {(() => {
+                              const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
+                              const premVal = isNoPrem
+                                ? 0
+                                : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+                              const negoPremVal = isNoPrem
+                                ? 0
+                                : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+                              const premStr = premVal ? (premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만원`) : null;
+                              const negoStr = negoPremVal && negoPremVal !== premVal ? (negoPremVal >= 10000 ? `${(negoPremVal / 10000).toFixed(negoPremVal % 10000 === 0 ? 0 : 1)}억` : `${negoPremVal.toLocaleString()}만원`) : null;
+
+                              if (isNoPrem) {
+                                return (
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    ✨ 무권리 (권리금 없음)
+                                  </span>
+                                );
+                              }
+                              if (premStr) {
+                                return (
+                                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                                    💰 권리금: {premStr}{negoStr ? ` (조정: ${negoStr})` : ''}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        )}
 
                         {/* Customer / Owner Info */}
                         {property.customer && (

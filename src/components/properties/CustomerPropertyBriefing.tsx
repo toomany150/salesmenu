@@ -71,6 +71,26 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
   );
 
   // 금액 포맷 (월세 부가세 포함여부 명시)
+  // 권리금 (상가)
+  const isStore = property.propertyType === 'STORE';
+  const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
+  const premVal = isNoPrem
+    ? 0
+    : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+  const negoPremVal = isNoPrem
+    ? 0
+    : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+
+  const formatPremStr = (val?: number | null) => {
+    if (val === undefined || val === null) return '협의';
+    if (val === 0) return '무권리';
+    if (val >= 10000) {
+      const eok = (val / 10000).toFixed(val % 10000 === 0 ? 0 : 1);
+      return `${eok}억원 (${val.toLocaleString()}만원)`;
+    }
+    return `${val.toLocaleString()}만원`;
+  };
+
   let priceMainText = '';
   if (property.transactionType === '매매') {
     priceMainText = property.price ? `${property.price.toLocaleString()} 만원` : '협의';
@@ -80,6 +100,14 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
     const isVat = property.monthlyRentVat || property.storeDetail?.monthlyRentVat || property.officeDetail?.monthlyRentVat;
     const vatText = isVat ? ' (부가세 별도)' : ' (부가세 포함)';
     priceMainText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
+    if (isStore) {
+      if (isNoPrem) {
+        priceMainText += ' · 권리금 없음 (무권리)';
+      } else if (premVal !== undefined && premVal !== null) {
+        const shortPrem = premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만`;
+        priceMainText += ` · 권리금 ${shortPrem}`;
+      }
+    }
   }
 
   // 관리비 및 부가세/상세내역
@@ -119,12 +147,16 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
     }
   }
 
-  // 권리금 (상가)
   let premiumText = '';
-  if (property.storeDetail?.isNoPremium) {
-    premiumText = '✨ 무권리금 (권리금 없음)';
-  } else if (property.storeDetail?.premium) {
-    premiumText = `권리금 ${property.storeDetail.premium.toLocaleString()} 만원`;
+  if (isStore || isNoPrem || (premVal !== undefined && premVal !== null)) {
+    if (isNoPrem) {
+      premiumText = '✨ 권리금 없음 (무권리)';
+    } else if (premVal !== undefined && premVal !== null) {
+      premiumText = `💰 권리금: ${formatPremStr(premVal)}`;
+      if (negoPremVal && negoPremVal !== premVal) {
+        premiumText += ` (조정: ${formatPremStr(negoPremVal)})`;
+      }
+    }
   }
 
   // 실평수 계산

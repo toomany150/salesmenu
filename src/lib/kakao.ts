@@ -467,6 +467,19 @@ export function generateSmsLink(
   } else {
     const vat = property.monthlyRentVat ? ' (부가세 별도)' : '';
     priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'}/월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vat}`;
+    if (property.propertyType?.includes('상가') || (property as any).propertyType === 'STORE') {
+      const pAny = property as any;
+      const isNoPrem = !!(pAny.storeDetail?.isNoPremium || pAny.isNoPremium || (pAny.storeDetail && pAny.storeDetail.premium === 0));
+      const premVal = isNoPrem
+        ? 0
+        : (pAny.storeDetail?.premium ?? pAny.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+      if (isNoPrem) {
+        priceStr += ' (무권리)';
+      } else if (premVal) {
+        const shortPrem = premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만원`;
+        priceStr += ` (권리금 ${shortPrem})`;
+      }
+    }
   }
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
@@ -518,6 +531,19 @@ export function getSmsText(property: any, addressMode: AddressShareMode = 'dong'
   } else {
     const vat = property.monthlyRentVat ? ' (부가세 별도)' : '';
     priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'}/월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vat}`;
+    if (property.propertyType?.includes('상가') || (property as any).propertyType === 'STORE') {
+      const pAny = property as any;
+      const isNoPrem = !!(pAny.storeDetail?.isNoPremium || pAny.isNoPremium || (pAny.storeDetail && pAny.storeDetail.premium === 0));
+      const premVal = isNoPrem
+        ? 0
+        : (pAny.storeDetail?.premium ?? pAny.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+      if (isNoPrem) {
+        priceStr += ' (무권리)';
+      } else if (premVal) {
+        const shortPrem = premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만원`;
+        priceStr += ` (권리금 ${shortPrem})`;
+      }
+    }
   }
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);

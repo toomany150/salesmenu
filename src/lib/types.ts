@@ -512,6 +512,9 @@ export interface PropertyItem {
   monthlyRent?: number;
   negotiableMonthlyRent?: number; // 조정 가능한 월 임대료 (만원)
   monthlyRentVat?: boolean; // 월 임대료 부가세 별도 여부
+  premium?: number; // 권리금 (만원)
+  negotiablePremium?: number; // 조정 가능한 권리금 (만원)
+  isNoPremium?: boolean; // 권리금 없음 (무권리)
   maintenanceFee?: number; // 관리비 (만원)
   isNoMaintenanceFee?: boolean; // 관리비 없음
   maintenanceFeeVat?: boolean; // 관리비 부가세 별도 여부

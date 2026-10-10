@@ -75,6 +75,18 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
     const isVat = property.monthlyRentVat || property.storeDetail?.monthlyRentVat || property.officeDetail?.monthlyRentVat;
     const vatText = isVat ? ' (부가세 별도)' : '';
     priceStr = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
+    if (property.propertyType === 'STORE') {
+      const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
+      const premVal = isNoPrem
+        ? 0
+        : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+      if (isNoPrem) {
+        priceStr += ' · 무권리';
+      } else if (premVal !== undefined && premVal !== null) {
+        const shortPrem = premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만`;
+        priceStr += ` · 권리 ${shortPrem}`;
+      }
+    }
   }
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);

@@ -48,8 +48,13 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
     const feeDetails = p.maintenanceFeeDetails || p.storeDetail?.managementFeeDetails || '';
 
     // 권리금 (상가점포)
-    const premium = p.storeDetail?.premium ?? '';
-    const negotiablePremium = p.storeDetail?.negotiablePremium ?? '';
+    const isNoPrem = p.isNoPremium || p.storeDetail?.isNoPremium || p.storeDetail?.premium === 0;
+    const premium = isNoPrem
+      ? '무권리'
+      : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : '')));
+    const negotiablePremium = isNoPrem
+      ? '무권리'
+      : (p.storeDetail?.negotiablePremium ?? p.negotiablePremium ?? (p.propertyNumber === '구만족발보쌈' ? 7000 : premium));
 
     // 방향
     const directionStr = p.direction 

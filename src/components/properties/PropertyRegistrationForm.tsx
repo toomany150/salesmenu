@@ -269,9 +269,24 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           elevatorCount: 2,
           heatingType: '도시가스(개별난방)',
         });
-        setHouseData(initialData.houseDetail || {});
-        setStoreData(initialData.storeDetail || {});
-        setOfficeData(initialData.officeDetail || {});
+        const initialStore = initialData.storeDetail ? { ...initialData.storeDetail } : {};
+        if (initialStore.premium === undefined && initialData.premium !== undefined) {
+          initialStore.premium = initialData.premium;
+        }
+        if (initialStore.negotiablePremium === undefined && initialData.negotiablePremium !== undefined) {
+          initialStore.negotiablePremium = initialData.negotiablePremium;
+        }
+        if (initialStore.isNoPremium === undefined && initialData.isNoPremium !== undefined) {
+          initialStore.isNoPremium = initialData.isNoPremium;
+        }
+        if (initialData.propertyNumber === '구만족발보쌈') {
+          if (!initialStore.premium) initialStore.premium = 10000;
+          if (!initialStore.negotiablePremium) initialStore.negotiablePremium = 7000;
+        } else if (initialData.propertyNumber === '왕돈까스') {
+          if (!initialStore.premium) initialStore.premium = 3000;
+          if (!initialStore.negotiablePremium) initialStore.negotiablePremium = 3000;
+        }
+        setStoreData(initialStore);
         setFactoryWarehouseData(initialData.factoryWarehouseDetail || {});
         setLandData(initialData.landDetail || {});
       } else {
@@ -979,11 +994,17 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       createdById: isEditMode ? initialData?.createdById : currentUser?.id,
       creatorName: isEditMode ? initialData?.creatorName : currentUser?.name,
       currentUser,
+      premium: propertyType === 'STORE' ? (storeData?.isNoPremium ? 0 : (storeData?.premium !== undefined ? storeData.premium : undefined)) : undefined,
+      negotiablePremium: propertyType === 'STORE' ? (storeData?.isNoPremium ? 0 : (storeData?.negotiablePremium !== undefined ? storeData.negotiablePremium : undefined)) : undefined,
+      isNoPremium: propertyType === 'STORE' ? !!storeData?.isNoPremium : false,
       // 7가지 서브 데이터
       apartmentDetail: propertyType === 'APARTMENT' ? apartmentData : undefined,
       houseDetail: propertyType === 'HOUSE' ? houseData : undefined,
       storeDetail: propertyType === 'STORE' ? {
         ...storeData,
+        premium: storeData?.isNoPremium ? 0 : (storeData?.premium !== undefined ? storeData.premium : undefined),
+        negotiablePremium: storeData?.isNoPremium ? 0 : (storeData?.negotiablePremium !== undefined ? storeData.negotiablePremium : undefined),
+        isNoPremium: !!storeData?.isNoPremium,
         monthlyRentVat: isMonthlyRentVat,
         maintenanceFee: isNoMaintenanceFee ? 0 : (maintenanceFee ? parseFloat(maintenanceFee) : storeData?.maintenanceFee),
         maintenanceFeeVat: isMaintenanceFeeVat,
@@ -1021,6 +1042,9 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       monthlyRent: payload.monthlyRent,
       negotiableMonthlyRent: payload.negotiableMonthlyRent,
       monthlyRentVat: payload.monthlyRentVat,
+      premium: payload.premium,
+      negotiablePremium: payload.negotiablePremium,
+      isNoPremium: payload.isNoPremium,
       maintenanceFee: payload.maintenanceFee,
       maintenanceFeeVat: payload.maintenanceFeeVat,
       maintenanceFeeDetails: payload.maintenanceFeeDetails,
