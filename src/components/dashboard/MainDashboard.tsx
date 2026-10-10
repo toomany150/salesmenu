@@ -76,7 +76,18 @@ const DashboardContent: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     // 1. 비로그인 상태인 경우 매물장 및 고객정보 조회를 엄격히 차단 (데이터 노출 방지)
-    if (!currentUser) {
+    let user = currentUser;
+    if (!user && typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('cham_real_estate_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.id) user = parsed;
+        }
+      } catch (e) {}
+    }
+
+    if (!user) {
       setCustomers([]);
       setProperties([]);
       setLoading(false);
@@ -97,9 +108,9 @@ const DashboardContent: React.FC = () => {
 
     try {
       const headers: HeadersInit = {
-        'x-user-role': currentUser.role,
-        'x-user-id': currentUser.id,
-        'x-user-name': encodeURIComponent(currentUser.name || ''),
+        'x-user-role': user.role,
+        'x-user-id': user.id,
+        'x-user-name': encodeURIComponent(user.name || ''),
       };
       const [custRes, propRes] = await Promise.all([
         fetch('/api/customers', { headers }),

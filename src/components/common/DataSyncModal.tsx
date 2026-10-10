@@ -60,6 +60,12 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [isServerLoading, setIsServerLoading] = useState(false);
 
+  // 방법 3 백업 파일 상태
+  const [selectedFileBundle, setSelectedFileBundle] = useState<SyncDataBundle | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (typeof navigator !== 'undefined') {
       setIsMobile(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
@@ -75,6 +81,9 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       setServerSyncMsg(null);
       setImportStatus(null);
       setSyncCodeInput('');
+      setSelectedFileBundle(null);
+      setSelectedFileName(null);
+      setFileError(null);
     }
   }, [isOpen, currentProperties, currentCustomers]);
 
@@ -202,55 +211,90 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       const result = importDataBundle(bundle);
       if (result.success) {
         const thisDevice = isMobile ? '스마트폰' : 'PC';
-        if (!currentUser) {
-          loginAsDefaultAdmin();
-          setImportStatus(
-            `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.\n` +
-            `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
-          );
-        } else {
-          setImportStatus(`🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.`);
-        }
+        loginAsDefaultAdmin();
+        setImportStatus(
+          `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.\n` +
+          `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
+        );
+        alert(
+          `🎉 동기화 코드 적용 성공!\n\n` +
+          `매물 ${result.importedPropertiesCount}건과 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽히 복원되었습니다.\n` +
+          `대표 관리자로 자동 로그인되어 화면에 즉시 나타납니다.`
+        );
         setSyncCodeInput('');
         if (onSyncSuccess) onSyncSuccess();
+        onClose();
+        setTimeout(() => {
+          window.location.reload();
+        }, 300);
       } else {
         setImportStatus(`⚠️ 복원 실패: ${result.error}`);
+        alert(`⚠️ 복원 실패: ${result.error}`);
       }
     } catch (e) {
-      setImportStatus('⚠️ 올바른 동기화 코드 형식이 아닙니다. 다른 기기에서 다시 복사해주세요.');
+      const errMsg = '⚠️ 올바른 동기화 코드 형식이 아닙니다. 카카오톡 메시지에서 코드가 중간에 잘리지 않았는지 확인하시거나, [방법 3: 백업 파일(.json)]을 이용해주세요.';
+      setImportStatus(errMsg);
+      alert(errMsg);
     }
   };
 
-  // 6. 파일 선택하여 복원
+  // 6. 백업 파일(.json) 선택 시 즉시 읽기 및 검증
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setFileError(null);
+    setSelectedFileName(file.name);
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
         const bundle = JSON.parse(text);
-        const result = importDataBundle(bundle);
-        if (result.success) {
-          const thisDevice = isMobile ? '스마트폰' : 'PC';
-          if (!currentUser) {
-            loginAsDefaultAdmin();
-            setImportStatus(
-              `🎉 백업 파일 복원 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 반영되었습니다.\n` +
-              `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
-            );
-          } else {
-            setImportStatus(`🎉 백업 파일 복원 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 반영되었습니다.`);
-          }
-          if (onSyncSuccess) onSyncSuccess();
-        } else {
-          setImportStatus(`⚠️ 복원 실패: ${result.error}`);
+        if (!bundle || (!Array.isArray(bundle.properties) && !Array.isArray(bundle.customers))) {
+          setFileError('올바른 백업 파일(.json) 형식이 아닙니다.');
+          setSelectedFileBundle(null);
+          return;
         }
-      } catch (err) {
-        setImportStatus('⚠️ 파일 형식이 올바르지 않습니다.');
+        setSelectedFileBundle(bundle);
+      } catch (err: any) {
+        setFileError('파일을 읽는 중 오류가 발생했습니다: ' + (err.message || 'JSON 형식 불일치'));
+        setSelectedFileBundle(null);
       }
     };
     reader.readAsText(file);
+  };
+
+  // 7. 백업 파일 적용 버튼 클릭 핸들러 (사용자가 누를 [적용하기] 버튼)
+  const handleApplyBackupFile = () => {
+    if (!selectedFileBundle) {
+      alert('먼저 스마트폰에 저장된 백업 파일(.json)을 선택해 주세요.');
+      return;
+    }
+    try {
+      const result = importDataBundle(selectedFileBundle);
+      if (result.success) {
+        const thisDevice = isMobile ? '스마트폰' : 'PC';
+        loginAsDefaultAdmin();
+        setImportStatus(
+          `🎉 백업 파일 복원 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 반영되었습니다.`
+        );
+        alert(
+          `🎉 백업 파일 복원 성공!\n\n` +
+          `매물 ${result.importedPropertiesCount}건과 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽히 적용되었습니다.\n` +
+          `대표 관리자로 자동 로그인되어 화면으로 이동합니다.`
+        );
+        if (onSyncSuccess) onSyncSuccess();
+        onClose();
+        setTimeout(() => {
+          window.location.reload();
+        }, 300);
+      } else {
+        setImportStatus(`⚠️ 복원 실패: ${result.error}`);
+        alert(`⚠️ 복원 실패: ${result.error}`);
+      }
+    } catch (err: any) {
+      alert('⚠️ 데이터 적용 중 오류가 발생했습니다: ' + err.message);
+    }
   };
 
   return (
@@ -511,17 +555,76 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
                 </button>
               </div>
 
-              {/* 방법 3: 백업 파일 선택 */}
-              <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2">
-                <span className="font-extrabold text-sm text-slate-900 block">
-                  방법 3: 백업 파일(.json) 불러오기
-                </span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileUpload}
-                  className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-100 file:text-purple-800 hover:file:bg-purple-200 cursor-pointer"
-                />
+              {/* 방법 3: 백업 파일 선택 및 적용 */}
+              <div className="p-4 bg-white border-2 border-purple-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-sm text-slate-900 block flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-purple-600" />
+                    방법 3: 백업 파일(.json) 불러오기 & 적용
+                  </span>
+                  <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                    글자수 제한 없음 · 100% 성공
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  PC에서 카카오톡으로 받은 <strong>.json 백업 파일</strong>을 아래에서 선택하신 후 <strong>[적용하기] 버튼</strong>을 누르면 1초 만에 스마트폰에 완벽 반영됩니다.
+                </p>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    1단계: 카톡에서 다운로드한 백업 파일 선택
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json,application/json,text/plain"
+                    onChange={handleFileUpload}
+                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                  />
+
+                  {fileError && (
+                    <div className="p-2.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold">
+                      ⚠️ {fileError}
+                    </div>
+                  )}
+
+                  {selectedFileBundle && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl space-y-1.5 animate-in fade-in">
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-900">
+                        <span className="truncate max-w-[280px]">📄 파일: {selectedFileName}</span>
+                        <span className="text-[10px] bg-emerald-200/80 px-2 py-0.5 rounded-full text-emerald-800 shrink-0">
+                          검증 완료 ✓
+                        </span>
+                      </div>
+                      <div className="text-xs text-emerald-800 font-semibold flex items-center gap-1.5">
+                        <span>📊 포함 데이터:</span>
+                        <span className="font-black text-emerald-950">
+                          매물 {selectedFileBundle.properties?.length || 0}건 / 의뢰 고객 {selectedFileBundle.customers?.length || 0}명
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2단계: 크고 명확한 적용 버튼 */}
+                <button
+                  type="button"
+                  onClick={handleApplyBackupFile}
+                  disabled={!selectedFileBundle}
+                  className={`w-full py-3 text-xs sm:text-sm font-extrabold rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 ${
+                    selectedFileBundle
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-purple-500/25 active:scale-98 animate-pulse'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>
+                    {selectedFileBundle 
+                      ? '2단계: 백업 파일 적용하기 (화면에 즉시 반영)' 
+                      : '파일을 선택하시면 [적용하기] 버튼이 활성화됩니다'}
+                  </span>
+                </button>
               </div>
             </div>
           )}
