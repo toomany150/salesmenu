@@ -42,6 +42,7 @@ interface CustomerPropertyBriefingProps {
   currentUser?: any;
   onSwitchToAdmin?: () => void;
   onOpenLogin?: () => void;
+  onClose?: () => void;
 }
 
 export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> = ({
@@ -50,6 +51,7 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
   currentUser,
   onSwitchToAdmin,
   onOpenLogin,
+  onClose,
 }) => {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isPhotoLightboxOpen, setIsPhotoLightboxOpen] = useState(false);
@@ -68,27 +70,34 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
     effectiveMode
   );
 
-  // 금액 포맷
+  // 금액 포맷 (월세 부가세 포함여부 명시)
   let priceMainText = '';
-  let priceSubText = '';
   if (property.transactionType === '매매') {
     priceMainText = property.price ? `${property.price.toLocaleString()} 만원` : '협의';
   } else if (property.transactionType === '전세') {
     priceMainText = property.deposit ? `${property.deposit.toLocaleString()} 만원` : '협의';
   } else {
     const isVat = property.monthlyRentVat || property.storeDetail?.monthlyRentVat || property.officeDetail?.monthlyRentVat;
-    const vatText = isVat ? ' (부가세 별도)' : '';
+    const vatText = isVat ? ' (부가세 별도)' : ' (부가세 포함)';
     priceMainText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
   }
 
-  // 관리비
+  // 관리비 및 부가세/상세내역
   let maintenanceText = '관리비 정보 없음';
   if (property.isNoMaintenanceFee || property.storeDetail?.isNoMaintenanceFee || property.officeDetail?.isNoMaintenanceFee) {
     maintenanceText = '관리비 없음';
   } else {
-    const mFee = property.storeDetail?.maintenanceFee ?? property.officeDetail?.maintenanceFee;
-    if (mFee !== undefined && mFee !== null && mFee > 0) {
-      maintenanceText = `월 ${mFee.toLocaleString()} 만원`;
+    const mFee = property.maintenanceFee ?? property.storeDetail?.maintenanceFee ?? property.officeDetail?.maintenanceFee ?? property.apartmentDetail?.maintenanceFee;
+    const isFeeVat = !!(property.maintenanceFeeVat || property.storeDetail?.maintenanceFeeVat);
+    const feeVatText = isFeeVat ? ' (부가세 별도)' : ' (부가세 포함)';
+    const feeDetails = property.maintenanceFeeDetails || property.storeDetail?.managementFeeDetails;
+    if (mFee !== undefined && mFee !== null && Number(mFee) > 0) {
+      maintenanceText = `월 ${Number(mFee).toLocaleString()}만원${feeVatText}`;
+      if (feeDetails) {
+        maintenanceText += ` [상세: ${feeDetails}]`;
+      }
+    } else {
+      maintenanceText = '관리비: 별도 협의';
     }
   }
 
@@ -99,6 +108,31 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
   } else if (property.storeDetail?.premium) {
     premiumText = `권리금 ${property.storeDetail.premium.toLocaleString()} 만원`;
   }
+
+  // 실평수 계산
+  const actualAreaVal = property.actualArea || 
+    property.storeDetail?.actualArea || 
+    property.officeDetail?.actualArea || 
+    property.apartmentDetail?.exclusiveArea || 
+    property.totalFloorArea;
+  const actualAreaPyeong = actualAreaVal ? (actualAreaVal * 0.3025).toFixed(1) : null;
+
+  // 섹터 2 (공간구획 / 화장실 / 주차) 공통 데이터
+  const roomCountVal = property.storeDetail?.roomCount ?? 
+    property.officeDetail?.roomCount ?? 
+    property.apartmentDetail?.roomCount ?? 
+    property.houseDetail?.roomCount ?? 0;
+
+  const bathroomCountVal = property.storeDetail?.bathroomCount ?? 
+    property.officeDetail?.bathroomCount ?? 
+    property.apartmentDetail?.bathroomCount ?? 
+    property.houseDetail?.bathroomCount ?? 1;
+
+  const toiletGenderTypeVal = property.storeDetail?.toiletGenderType || 
+    property.officeDetail?.toiletGenderType || '남녀공용';
+
+  const isParkingImpossibleVal = !!(property.storeDetail?.isParkingImpossible || property.officeDetail?.isParkingImpossible);
+  const parkingCountVal = property.storeDetail?.parkingCount ?? property.officeDetail?.parkingCount;
 
   const handleCopyLink = async () => {
     const success = await copyPropertyShareLink(property, effectiveMode);
@@ -162,6 +196,17 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">중개사 로그인</span>
+              </button>
+            )}
+
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                title="안내장 닫기"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors ml-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
               </button>
             )}
           </div>
@@ -240,6 +285,11 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {actualAreaVal && (
+                <div className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-950 font-bold text-xs shadow-2xs">
+                  📐 실평수 {actualAreaVal}㎡ (약 {actualAreaPyeong}평)
+                </div>
+              )}
               {premiumText && (
                 <div className="px-3 py-1.5 rounded-lg bg-amber-100/90 border border-amber-300 text-amber-950 font-bold text-xs shadow-2xs">
                   {premiumText}
@@ -247,7 +297,7 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
               )}
               {maintenanceText && (
                 <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-xs shadow-2xs">
-                  관리비: {maintenanceText}
+                  {maintenanceText}
                 </div>
               )}
             </div>
@@ -324,26 +374,22 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
           </div>
         )}
 
-        {/* 4. 매물 핵심 제원 (스펙 그리드) */}
+        {/* 4. 매물 핵심 제원 (섹터 2 공간구획/화장실/주차 반영) */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200">
           <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
             <span className="w-2 h-4 rounded-full bg-blue-600"></span>
-            매물 주요 제원 및 건축물 정보
+            기본 스펙 및 방향/일정/공간구획·화장실·주차
           </h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            {/* 면적 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
+            {/* 실평수 */}
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 block">전용 / 공급 면적</span>
+              <span className="text-[11px] text-slate-500 block">실평수 (전용)</span>
               <span className="font-bold text-slate-900 text-sm">
-                {property.storeDetail?.actualArea || property.officeDetail?.actualArea || property.totalFloorArea || '-'} ㎡
+                {actualAreaVal ? `${actualAreaVal} ㎡` : '-'}
               </span>
               <span className="text-[10px] text-slate-400 block mt-0.5">
-                {property.storeDetail?.actualArea 
-                  ? `(약 ${(property.storeDetail.actualArea * 0.3025).toFixed(1)}평)`
-                  : property.officeDetail?.actualArea 
-                  ? `(약 ${(property.officeDetail.actualArea * 0.3025).toFixed(1)}평)`
-                  : ''}
+                {actualAreaPyeong ? `(약 ${actualAreaPyeong}평)` : ''}
               </span>
             </div>
 
@@ -367,31 +413,49 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
               </span>
             </div>
 
+            {/* 공간구획 (방/룸) */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-[11px] text-slate-500 block">공간구획 (방/룸)</span>
+              <span className="font-bold text-slate-900 text-sm">
+                {roomCountVal > 0 ? `방/룸 ${roomCountVal}개` : '단일공간 (통구조)'}
+              </span>
+            </div>
+
+            {/* 화장실 */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-[11px] text-slate-500 block">화장실</span>
+              <span className="font-bold text-slate-900 text-sm">
+                {bathroomCountVal}개 ({toiletGenderTypeVal})
+              </span>
+            </div>
+
             {/* 주차 */}
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 block">주차 여부</span>
               <span className="font-bold text-slate-900 text-sm">
-                {property.officeDetail?.isParkingImpossible ? (
+                {isParkingImpossibleVal ? (
                   <span className="text-rose-600">주차 불가</span>
+                ) : parkingCountVal !== undefined && parkingCountVal !== null ? (
+                  `${parkingCountVal}대 가능`
                 ) : (
-                  `${property.officeDetail?.parkingCount || property.storeDetail?.parkingCount || 1}대 가능`
+                  '주차 협의'
                 )}
               </span>
             </div>
 
-            {/* 입주가능일 (토지 제외 및 값 있을 때만 표시) */}
+            {/* 입주가능일 */}
             {property.propertyType !== 'LAND' && (property.isImmediateAvailable || property.isNegotiableDate || property.availableDate) && (
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[11px] text-slate-500 block">입주 가능일</span>
                 <span className="font-bold text-slate-900">
-                  {property.isImmediateAvailable ? '✨ 즉시 입주 가능' : property.isNegotiableDate ? '🤝 입주일 협의' : property.availableDate || '협의 입주'}
+                  {property.isImmediateAvailable ? '⚡ 즉시 입주' : property.isNegotiableDate ? '🤝 입주일 협의' : property.availableDate || '협의 입주'}
                 </span>
               </div>
             )}
 
             {/* 건축물용도 */}
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 block">건축물 용도</span>
+              <span className="text-[11px] text-slate-500 block">건축물 주용도</span>
               <span className="font-bold text-slate-900">
                 {property.buildingRegisterUse || '근린생활시설'}
               </span>

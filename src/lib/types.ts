@@ -521,6 +521,8 @@ export interface PropertyItem {
   landArea?: number;
   totalFloorArea?: number;
   buildingArea?: number;
+  actualArea?: number;
+  actualAreaPyeong?: number;
   approvalDate?: string;
   buildingRegisterUse?: string;
   zoningArea?: string;

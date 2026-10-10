@@ -14,7 +14,9 @@ import {
   Building,
   Sparkles,
   Search,
-  UserCheck
+  UserCheck,
+  Lock,
+  DollarSign
 } from 'lucide-react';
 import { 
   PropertyType, 
@@ -1987,10 +1989,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             />
                           </div>
 
-                          {/* 관리금 내역 직접 입력 */}
+                          {/* 관리비 내역 직접 입력 */}
                           <div>
                             <label className="block text-sm font-bold text-slate-800 mb-1.5">
-                              관리금 내역 (직접 입력)
+                              관리비 내역 (직접 입력)
                             </label>
                             <input
                               type="text"
@@ -2021,6 +2023,182 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             className="w-full text-base px-3.5 py-2.5 bg-rose-50/40 border border-rose-200 rounded-xl focus:ring-2 focus:ring-rose-500 font-medium text-slate-900"
                           />
                         </div>
+
+                        {/* 상가 임대차 전용: 섹터 6. 권리금·인상조건·광고·원상복구특약 (관리비 내역 밑으로 배치) */}
+                        {propertyType === 'STORE' && (
+                          <div className="mt-4 bg-white rounded-2xl border-2 border-blue-200/90 shadow-xs overflow-hidden">
+                            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-2xs">
+                                  <DollarSign className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold text-blue-950">
+                                    섹터 6. 권리금·인상조건·광고·원상복구특약
+                                  </h4>
+                                  <span className="text-xs text-blue-700">
+                                    권리금 및 조정가능 권리금, 임대료 인상액, 광고 동의, 원상복구특약
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-200/80 text-blue-900">
+                                상가임대조건
+                              </span>
+                            </div>
+
+                            <div className="p-4 sm:p-5 space-y-4">
+                              {/* 권리금 & 조정가능한 권리금 (직접 입력 지원) */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <label className="text-sm font-bold text-slate-800">
+                                      권리금 (만원)
+                                    </label>
+                                    
+                                    {/* [권리금 없음] 토글 버튼 */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const isCurrentlyNoPremium = !!storeData.isNoPremium;
+                                        const nextNoPremium = !isCurrentlyNoPremium;
+                                        setStoreData({
+                                          ...storeData,
+                                          isNoPremium: nextNoPremium,
+                                          premium: nextNoPremium ? 0 : undefined,
+                                          negotiablePremium: nextNoPremium ? 0 : storeData.negotiablePremium,
+                                        });
+                                      }}
+                                      className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold border transition-all cursor-pointer ${
+                                        storeData.isNoPremium
+                                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                                          : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                                      }`}
+                                    >
+                                      <span>✓</span>
+                                      <span>[권리금 없음] 설정</span>
+                                    </button>
+                                  </div>
+                                  <input
+                                    type="number"
+                                    disabled={!!storeData.isNoPremium}
+                                    value={storeData.isNoPremium ? 0 : (storeData.premium !== undefined && storeData.premium !== null ? storeData.premium : '')}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      const parsed = val !== '' ? parseFloat(val) : undefined;
+                                      setStoreData({
+                                        ...storeData,
+                                        isNoPremium: false,
+                                        premium: parsed,
+                                      });
+                                    }}
+                                    placeholder={storeData.isNoPremium ? '0 (무권리)' : '예: 3000 (직접 입력, 무권리 시 0)'}
+                                    className={`w-full text-sm px-3.5 py-2.5 border rounded-xl font-bold ${
+                                      storeData.isNoPremium
+                                        ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-extrabold cursor-not-allowed'
+                                        : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 font-extrabold text-slate-900'
+                                    }`}
+                                  />
+                                </div>
+
+                                {/* 조정가능한 권리금 (만원) */}
+                                <div>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <label className="text-sm font-bold text-indigo-950">
+                                      조정가능한 권리금 (만원)
+                                    </label>
+                                    <span className="text-[11px] font-medium text-slate-400">
+                                      협의 가능 하한선
+                                    </span>
+                                  </div>
+                                  <input
+                                    type="number"
+                                    disabled={!!storeData.isNoPremium}
+                                    value={storeData.isNoPremium ? 0 : (storeData.negotiablePremium !== undefined && storeData.negotiablePremium !== null ? storeData.negotiablePremium : '')}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      const parsed = val !== '' ? parseFloat(val) : undefined;
+                                      setStoreData({
+                                        ...storeData,
+                                        negotiablePremium: parsed,
+                                      });
+                                    }}
+                                    placeholder="예: 2500 (직접 입력, 협의 하한선)"
+                                    className={`w-full text-sm px-3.5 py-2.5 rounded-xl font-bold border ${
+                                      storeData.isNoPremium
+                                        ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                        : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900'
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* 임대료 인상조건 여부 및 인상폭 */}
+                              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                                <label className="block text-sm font-bold text-slate-800">
+                                  임대료 인상조건 여부 및 인상폭 (새 임대차 승계 시) *
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                  <div className="sm:col-span-1">
+                                    <select
+                                      value={storeData.rentIncreaseCondition?.includes('인상조건있음') ? '인상있음' : '인상없음'}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === '인상없음') {
+                                          setStoreData({ ...storeData, rentIncreaseCondition: '인상 없음 (동결)' });
+                                        } else {
+                                          setStoreData({ ...storeData, rentIncreaseCondition: '인상조건있음: 신규 계약 시 월세 OO만원 인상 요구' });
+                                        }
+                                      }}
+                                      className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
+                                    >
+                                      <option value="인상없음">🟢 인상 없음 (동결)</option>
+                                      <option value="인상있음">🔴 인상 조건 있음</option>
+                                    </select>
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <input
+                                      type="text"
+                                      value={storeData.rentIncreaseCondition || ''}
+                                      onChange={(e) => setStoreData({ ...storeData, rentIncreaseCondition: e.target.value })}
+                                      placeholder="예: 인상조건있음: 보증금 5,000만원 동일, 월세 20만원 인상(300만원 -> 320만원 요구)"
+                                      className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 점포 자체 광고 진행 여부 & 원상복구특약 */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                                    점포 자체 광고 진행 여부
+                                  </label>
+                                  <select
+                                    value={storeData.storeAdStatus || '비공개(보안유지)'}
+                                    onChange={(e) => setStoreData({ ...storeData, storeAdStatus: e.target.value })}
+                                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-slate-900"
+                                  >
+                                    <option value="비공개(보안유지)">🔒 비공개 (보안 유지 및 조용한 양도 희망)</option>
+                                    <option value="공개광고가능">📢 공개 광고 가능 (포털/온라인 홍보 허용)</option>
+                                    <option value="제한적공개">⚠️ 제한적 공개 (상호명 제외 조건부)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                                    원상복구특약 합의 사항
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={storeData.restorationTerms || ''}
+                                    onChange={(e) => setStoreData({ ...storeData, restorationTerms: e.target.value })}
+                                    placeholder="예: 현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의"
+                                    className="w-xs sm:w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl font-medium text-slate-900"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2100,17 +2278,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
                   </div>
 
-                  {/* 상담 내용 및 특이사항 메모 (직접 타자 및 스마트폰 마이크 음성 입력 지원) */}
-                  <div>
-                    <VoiceTextarea
-                      label="상담내용 및 매물 메모 (타자 & 마이크 음성 입력)"
-                      rows={2}
-                      value={consultationNotes}
-                      onChange={setConsultationNotes}
-                      placeholder="고객 요청사항, 가격 협의 가능 여부, 방문 예약 주의사항 등 직접 입력하거나 마이크 버튼을 눌러 음성으로 입력하세요."
-                    />
-                  </div>
-
                 {/* 6. 7가지 매물 세부 폼 (동적 렌더링 - 주택 폼에 에어컨/풀옵션 보강됨) */}
                 <div>
                   {propertyType === 'APARTMENT' && (
@@ -2131,7 +2298,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     <HouseForm data={houseData} onChange={setHouseData} />
                   )}
                   {propertyType === 'STORE' && (
-                    <StoreForm data={storeData} onChange={setStoreData} transactionType={transactionType} ledgerData={ledgerData} />
+                    <StoreForm data={storeData} onChange={setStoreData} transactionType={transactionType} ledgerData={ledgerData} hideSector6={true} />
                   )}
                   {propertyType === 'OFFICE' && (
                     <OfficeForm data={officeData} onChange={setOfficeData} />
@@ -2149,7 +2316,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   )}
                 </div>
 
-                {/* 6.5 기타 특이 옵션 직접 추가 (매물사진등록 바로 위 위치) */}
+                {/* 6.5 기타 특이 옵션 직접 추가 */}
                 <div className="p-4 bg-slate-50/90 rounded-xl border border-slate-200 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
@@ -2210,6 +2377,26 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* 6.8 상담 내용 및 특이사항 메모 (사용자 요청: 매물사진등록란 바로 위에 위치) */}
+                <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-amber-950 flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-amber-700" />
+                      <span>상담내용 및 매물 메모 (타자 & 마이크 음성 입력)</span>
+                    </label>
+                    <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                      중개사 대외비 (고객 카톡/문자 미전송)
+                    </span>
+                  </div>
+                  <VoiceTextarea
+                    label=""
+                    rows={3}
+                    value={consultationNotes}
+                    onChange={setConsultationNotes}
+                    placeholder="고객 요청사항, 가격 협의 가능 여부, 방문 예약 주의사항 등 직접 입력하거나 마이크 버튼을 눌러 음성으로 입력하세요. (등록 권한자와 관리자만 열람 가능)"
+                  />
                 </div>
 
                 {/* 7. 매물 현장 사진 등록 (최대 20장 - 맨 밑으로 배치) */}

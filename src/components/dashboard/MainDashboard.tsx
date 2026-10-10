@@ -10,11 +10,12 @@ import { PropertyRegistrationForm } from '../properties/PropertyRegistrationForm
 import { CustomerFormModal } from '../crm/CustomerFormModal';
 import { PropertyDetailModal } from '../properties/PropertyDetailModal';
 import { CustomerDetailModal } from '../crm/CustomerDetailModal';
+import { CustomerPropertyBriefing } from '../properties/CustomerPropertyBriefing';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { LoginModal } from '../auth/LoginModal';
 import { AdminLogModal } from '../auth/AdminLogModal';
 import { DataSyncModal } from '../common/DataSyncModal';
-import { initKakao } from '@/lib/kakao';
+import { initKakao, AddressShareMode } from '@/lib/kakao';
 import { 
   getCustomProperties, 
   saveCustomProperty, 
@@ -55,6 +56,8 @@ const DashboardContent: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<CustomerItem | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
+  const [sharedBriefingProperty, setSharedBriefingProperty] = useState<PropertyItem | null>(null);
+  const [sharedAddressMode, setSharedAddressMode] = useState<AddressShareMode>('dong');
 
   // Auth, Admin & Sync Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -167,20 +170,61 @@ const DashboardContent: React.FC = () => {
     }
   }, [currentUser, fetchData]);
 
-  // 휴대폰(모바일) 접속 시 외부 공유 파라미터로 인해 2번째 이미지(고객 전용 안내장 단독화면)로 가로채지지 않도록 방지
-  // 항상 첨부한 첫번째 파일 화면(메인 대시보드)이 화면에 표시됩니다.
+  // 카카오톡/문자 공유 링크로 접속 시 매물 브리핑 화면 자동 연결 (고객 및 중개사 즉시 조회)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const propId = searchParams.get('propertyId');
       const pDataRaw = searchParams.get('pData');
-      if (propId || pDataRaw) {
-        // 주소창을 정리하여 새로고침/뒤로가기 시에도 항상 깔끔한 첫번째 화면이 유지되도록 함
-        window.history.replaceState({}, '', window.location.pathname);
+      const addrMode = (searchParams.get('addrMode') as any) || 'dong';
+      if (addrMode) setSharedAddressMode(addrMode);
+
+      if (pDataRaw) {
+        try {
+          const binaryStr = atob(pDataRaw);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          const decoder = new TextDecoder('utf-8');
+          const decoded = JSON.parse(decoder.decode(bytes));
+          if (decoded && (decoded.id || decoded.propertyNumber)) {
+            setSharedBriefingProperty(decoded);
+            return;
+          }
+        } catch (e) {
+          try {
+            const fallback = JSON.parse(decodeURIComponent(escape(atob(pDataRaw))));
+            if (fallback && (fallback.id || fallback.propertyNumber)) {
+              setSharedBriefingProperty(fallback);
+              return;
+            }
+          } catch (err) {}
+        }
+      }
+
+      if (propId) {
+        // 1. 현재 로드된 매물 목록에서 검색
+        const found = properties.find((p) => p.id === propId || p.propertyNumber === propId);
+        if (found) {
+          setSharedBriefingProperty(found);
+        } else {
+          // 2. 비로그인 고객을 위해 서버 API 조회
+          fetch('/api/properties')
+            .then((res) => res.json())
+            .then((data) => {
+              const list: PropertyItem[] = data.properties || [];
+              const match = list.find((p) => p.id === propId || p.propertyNumber === propId);
+              if (match) {
+                setSharedBriefingProperty(match);
+              }
+            })
+            .catch(() => {});
+        }
       }
     } catch (e) {}
-  }, []);
+  }, [properties]);
 
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
@@ -687,6 +731,29 @@ const DashboardContent: React.FC = () => {
         onSuccess={handleCustomerSaved}
         defaultGroup={activeTab === 'SEARCHING_GROUP' ? 'SEARCHING' : 'RECEIVED'}
       />
+
+      {/* 2.5) 카카오톡/문자 공유 링크 접속 시 고객 전용 공식 매물 브리핑 안내장 화면 */}
+      {sharedBriefingProperty && (
+        <div className="fixed inset-0 z-[120] overflow-y-auto bg-slate-100">
+          <CustomerPropertyBriefing
+            property={sharedBriefingProperty}
+            addressMode={sharedAddressMode}
+            currentUser={currentUser}
+            onSwitchToAdmin={() => {
+              const found = properties.find((p) => p.id === sharedBriefingProperty.id || p.propertyNumber === sharedBriefingProperty.propertyNumber) || sharedBriefingProperty;
+              setSelectedProperty(found);
+              setSharedBriefingProperty(null);
+            }}
+            onOpenLogin={() => setIsLoginOpen(true)}
+            onClose={() => {
+              setSharedBriefingProperty(null);
+              try {
+                window.history.replaceState({}, '', window.location.pathname);
+              } catch (e) {}
+            }}
+          />
+        </div>
+      )}
 
       {/* 3) 매물 상세 모달 (로그인 시에만 열림) */}
       <PropertyDetailModal

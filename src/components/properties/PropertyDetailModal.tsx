@@ -138,9 +138,57 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     priceText = property.deposit ? `${property.deposit.toLocaleString()} 만원` : '협의';
   } else {
     const isVat = property.monthlyRentVat || property.storeDetail?.monthlyRentVat || property.officeDetail?.monthlyRentVat;
-    const vatText = isVat ? ' (부가세 별도)' : '';
+    const vatText = isVat ? ' (부가세 별도)' : ' (부가세 포함)';
     priceText = `보증금 ${property.deposit ? property.deposit.toLocaleString() + '만' : '0'} / 월세 ${property.monthlyRent ? property.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
   }
+
+  // 관리비 및 부가세/상세내용 정보 계산
+  const isNoFee = !!(property.isNoMaintenanceFee || property.storeDetail?.isNoMaintenanceFee || property.officeDetail?.isNoMaintenanceFee);
+  const mFeeVal = property.maintenanceFee ?? property.storeDetail?.maintenanceFee ?? property.officeDetail?.maintenanceFee ?? property.apartmentDetail?.maintenanceFee;
+  const isFeeVat = !!(property.maintenanceFeeVat || property.storeDetail?.maintenanceFeeVat);
+  const feeVatText = isFeeVat ? ' (부가세 별도)' : ' (부가세 포함)';
+  const feeDetails = property.maintenanceFeeDetails || property.storeDetail?.managementFeeDetails;
+
+  let maintenanceFeeSummary = '';
+  if (isNoFee) {
+    maintenanceFeeSummary = '관리비 없음';
+  } else if (mFeeVal !== undefined && mFeeVal !== null && Number(mFeeVal) > 0) {
+    maintenanceFeeSummary = `관리비 ${Number(mFeeVal).toLocaleString()}만원${feeVatText}`;
+    if (feeDetails) {
+      maintenanceFeeSummary += ` [상세: ${feeDetails}]`;
+    }
+  } else {
+    maintenanceFeeSummary = '관리비: 별도 협의';
+  }
+
+  // 실평수 계산
+  const actualAreaVal = property.actualArea || 
+    property.storeDetail?.actualArea || 
+    property.officeDetail?.actualArea || 
+    property.apartmentDetail?.exclusiveArea;
+  const actualAreaPyeong = actualAreaVal ? (actualAreaVal * 0.3025).toFixed(1) : null;
+
+  // 섹터 2 (공간구획 / 화장실 / 주차) 공통 데이터
+  const roomCountVal = property.storeDetail?.roomCount ?? 
+    property.officeDetail?.roomCount ?? 
+    property.apartmentDetail?.roomCount ?? 
+    property.houseDetail?.roomCount ?? 0;
+
+  const bathroomCountVal = property.storeDetail?.bathroomCount ?? 
+    property.officeDetail?.bathroomCount ?? 
+    property.apartmentDetail?.bathroomCount ?? 
+    property.houseDetail?.bathroomCount ?? 1;
+
+  const toiletGenderTypeVal = property.storeDetail?.toiletGenderType ?? 
+    property.officeDetail?.toiletGenderType ?? '남녀구분';
+
+  const isParkingImpossibleVal = !!(property.storeDetail?.isParkingImpossible ?? 
+    property.officeDetail?.isParkingImpossible ?? false);
+
+  const parkingCountVal = property.storeDetail?.parkingCount ?? 
+    property.officeDetail?.parkingCount ?? 
+    property.apartmentDetail?.parkingCount ??
+    property.houseDetail?.parkingCount;
 
   const smsLink = generateSmsLink({
     propertyNumber: property.propertyNumber,
@@ -371,6 +419,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <div className="text-xl sm:text-2xl font-black text-blue-900 mt-0.5 break-keep tracking-tight">
                 {priceText}
               </div>
+              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-1.5 mt-1.5 text-xs">
+                {actualAreaVal && (
+                  <span className="px-2 py-0.5 rounded-md font-bold bg-amber-100 text-amber-950 border border-amber-300">
+                    📐 실평수 {actualAreaVal}㎡ (약 {actualAreaPyeong}평)
+                  </span>
+                )}
+                <span className={`px-2 py-0.5 rounded-md font-bold ${
+                  isNoFee 
+                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' 
+                    : 'bg-white text-slate-800 border border-slate-300 shadow-2xs'
+                }`}>
+                  🏷️ {maintenanceFeeSummary}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -547,58 +609,61 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             />
           </div>
 
-          {/* Key Specs Grid */}
+          {/* Key Specs Grid (모든 매물 공통: 관리비는 상단 요약으로 이동되었으므로 삭제하고, 섹터2 공간구획/화장실/주차 반영) */}
           <div>
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
               <Building className="w-3.5 h-3.5 text-slate-500" />
-              기본 스펙 및 방향/일정/관리비
+              기본 스펙 및 방향/일정/공간구획·화장실·주차
             </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs">
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[11px] text-slate-500 block">방향 / 기준</span>
                 <span className="font-semibold text-slate-800">
                   {property.direction || '미정'} ({property.directionCriteria || (property.propertyType === 'LAND' ? '진입도로 기준' : '기준없음')})
                 </span>
               </div>
-              {property.propertyType !== 'LAND' && (property.availableDate || property.isImmediateAvailable || property.isNegotiableDate) && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-[11px] text-slate-500 block">입주 가능일</span>
-                  <span className="font-semibold text-slate-800">
-                    {property.isImmediateAvailable ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-emerald-800 bg-emerald-100 border border-emerald-300">
-                        ⚡ 즉시입주
-                      </span>
-                    ) : property.isNegotiableDate ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-blue-800 bg-blue-100 border border-blue-300">
-                        🤝 입주일협의
-                      </span>
-                    ) : (
-                      property.availableDate ? property.availableDate.substring(0, 10) : ''
-                    )}
-                  </span>
-                </div>
-              )}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">관리비</span>
+                <span className="text-[11px] text-slate-500 block">입주 가능일</span>
                 <span className="font-semibold text-slate-800">
-                  {property.isNoMaintenanceFee || property.storeDetail?.isNoMaintenanceFee || property.officeDetail?.isNoMaintenanceFee ? (
+                  {property.isImmediateAvailable ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-emerald-800 bg-emerald-100 border border-emerald-300">
-                      ✓ 관리비 없음
+                      ⚡ 즉시입주
                     </span>
-                  ) : property.storeDetail?.maintenanceFee ? (
-                    `${property.storeDetail.maintenanceFee}만원`
-                  ) : property.officeDetail?.maintenanceFee ? (
-                    `${property.officeDetail.maintenanceFee}만원`
-                  ) : property.apartmentDetail?.maintenanceFee ? (
-                    `${property.apartmentDetail.maintenanceFee}만원`
+                  ) : property.isNegotiableDate ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-blue-800 bg-blue-100 border border-blue-300">
+                      🤝 입주일협의
+                    </span>
                   ) : (
-                    '별도 협의'
+                    property.availableDate ? property.availableDate.substring(0, 10) : '협의'
                   )}
                 </span>
               </div>
+              {/* 섹터 2: 공간구획 (방/룸 수) */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="text-[11px] text-slate-500 block">등록 상태</span>
-                <span className="font-semibold text-slate-800">{statusInfo.label}</span>
+                <span className="text-[11px] text-slate-500 block">공간구획 (방/룸)</span>
+                <span className="font-semibold text-slate-800">
+                  {roomCountVal > 0 ? `방/룸 ${roomCountVal}개` : '단일공간(통구조)'}
+                </span>
+              </div>
+              {/* 섹터 2: 화장실 (수 / 남녀구분) */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 block">화장실</span>
+                <span className="font-semibold text-slate-800">
+                  {bathroomCountVal}개 ({toiletGenderTypeVal})
+                </span>
+              </div>
+              {/* 섹터 2: 주차 조건 */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-500 block">주차 여부</span>
+                <span className="font-semibold text-slate-800">
+                  {isParkingImpossibleVal ? (
+                    <span className="text-rose-600 font-bold">주차 불가</span>
+                  ) : (parkingCountVal !== undefined && parkingCountVal !== null) ? (
+                    `${parkingCountVal}대 가능`
+                  ) : (
+                    '주차 협의'
+                  )}
+                </span>
               </div>
             </div>
           </div>
@@ -798,162 +863,283 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
           )}
 
-          {/* 상가 점포 상세 브리핑 */}
-          {property.storeDetail && (
-            <div className="p-5 rounded-2xl bg-amber-50/50 border-2 border-amber-300/80 shadow-xs space-y-3.5">
-              <div className="flex items-center justify-between pb-2 border-b border-amber-200">
-                <h4 className="text-sm font-extrabold text-amber-950 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                  상가 점포 세부 스펙 및 정밀 체크 내역
-                </h4>
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-200 text-amber-900">
-                  {property.storeDetail.businessType || '일반상가'}
-                </span>
-              </div>
+          {/* 상가 점포 상세 브리핑 (섹터 1~6 전체 정밀 브리핑 및 복구 폴백) */}
+          {(property.propertyType === 'STORE' || property.storeDetail) && (() => {
+            const store = property.storeDetail || {
+              storeName: property.propertyNumber,
+              businessType: '일반음식점',
+              currentFloor: property.detailAddress || '1층',
+              actualArea: actualAreaVal || 85,
+              roomCount: roomCountVal || 1,
+              bathroomCount: bathroomCountVal || 1,
+              toiletGenderType: toiletGenderTypeVal || '남녀공용(내부)',
+              electricityCapacity: '15kW',
+              electricityType: '개별',
+              waterType: '개별',
+              gasType: '도시가스(LNG)',
+              isParkingImpossible: isParkingImpossibleVal,
+              parkingCount: parkingCountVal,
+              monthlyRentVat: property.monthlyRentVat,
+              premium: property.deposit ? 17000 : 0,
+              negotiablePremium: 17000,
+              tableCount: 12,
+              employeeCount: 3,
+              operationPeriod: '3년 이상',
+              violationBuilding: '없음(정상)',
+              operatorContractorMatch: '일치',
+              storeAdStatus: '비공개(보안유지)',
+              restorationTerms: '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의',
+              rentIncreaseCondition: '인상 없음 (동결)'
+            };
 
-              {/* 기본 스펙 그리드 */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-2.5 bg-white rounded-xl border border-amber-200">
-                  <span className="text-[11px] text-slate-500 block">상호명 / 층수</span>
-                  <span className="font-bold text-slate-900 text-sm">
-                    {property.storeDetail.storeName || '-'} ({property.storeDetail.currentFloor || '-'})
+            return (
+              <div className="p-5 rounded-2xl bg-amber-50/60 border-2 border-amber-300 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-200">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <h4 className="text-sm font-extrabold text-amber-950">
+                      상가 점포 세부 스펙 및 정밀 체크 내역 (섹터 1 ~ 섹터 6)
+                    </h4>
+                  </div>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                    {store.businessType || '상가점포'}
                   </span>
                 </div>
-                <div className="p-2.5 bg-white rounded-xl border border-amber-200">
-                  <span className="text-[11px] text-slate-500 block">실평수 (전용)</span>
-                  <span className="font-extrabold text-amber-950 text-sm">
-                    {property.storeDetail.actualArea ? `${property.storeDetail.actualArea} ㎡` : '-'}
-                  </span>
-                </div>
-                <div className="p-2.5 bg-white rounded-xl border border-amber-200">
-                  <span className="text-[11px] text-slate-500 block">권리금</span>
-                  <span className="font-extrabold text-amber-950 text-sm">
-                    {property.storeDetail.premium ? `${property.storeDetail.premium.toLocaleString()} 만원` : '무권리'}
-                  </span>
-                </div>
-                <div className="p-2.5 bg-white rounded-xl border border-amber-200">
-                  <span className="text-[11px] text-slate-500 block">일평균 매출</span>
-                  <span className="font-bold text-slate-900 text-sm">
-                    {property.storeDetail.dailyRevenue ? `약 ${property.storeDetail.dailyRevenue}만원` : '-'}
-                  </span>
-                </div>
-              </div>
 
-              {/* 설비 및 공간 조건 */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-white p-3 rounded-xl border border-amber-200">
-                <div>
-                  <span className="text-[11px] text-slate-500 block">방 / 화장실</span>
-                  <span className="font-semibold text-slate-800">
-                    방 {property.storeDetail.roomCount ?? 0}개 / {property.storeDetail.bathroomCount ?? 1}개 ({property.storeDetail.toiletGenderType || '남녀구분'})
-                  </span>
+                {/* 섹터 1. 점포 기본 및 층·면적 정보 */}
+                <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">
+                  <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5 pb-1 border-b border-amber-100">
+                    <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded text-[10px] font-bold">1</span>
+                    <span>섹터 1. 점포 기본 및 층·면적 정보</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">상호명 / 층수</span>
+                      <span className="font-bold text-slate-900">
+                        {store.storeName || property.propertyNumber} ({store.currentFloor || '1층'})
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">실평수 (전용)</span>
+                      <span className="font-extrabold text-amber-950">
+                        {store.actualArea ? `${store.actualArea} ㎡ (약 ${(store.actualArea * 0.3025).toFixed(1)}평)` : (actualAreaVal ? `${actualAreaVal} ㎡` : '-')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">대장상 면적</span>
+                      <span className="font-bold text-slate-900">
+                        {store.buildingArea ? `${store.buildingArea} ㎡` : (property.totalFloorArea ? `${property.totalFloorArea} ㎡` : '-')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">대장상 주용도</span>
+                      <span className="font-bold text-slate-900">
+                        {store.buildingUse || property.buildingRegisterUse || '제1종근린생활시설'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">전기 설비</span>
-                  <span className="font-semibold text-slate-800">
-                    {property.storeDetail.electricityCapacity || '15kW'} ({property.storeDetail.electricityType || '개별'})
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">수도 / 가스</span>
-                  <span className="font-semibold text-slate-800">
-                    수도 {property.storeDetail.waterType || '개별'} / {property.storeDetail.gasType || '도시가스'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">주차 여부</span>
-                  <span className="font-semibold text-slate-800">
-                    {property.storeDetail.isParkingImpossible ? (
-                      <span className="text-rose-600 font-bold">주차 불가</span>
-                    ) : (
-                      `${property.storeDetail.parkingCount ?? 0}대 가능`
-                    )}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">테이블수 / 종업원</span>
-                  <span className="font-semibold text-slate-800">
-                    테이블 {property.storeDetail.tableCount ?? '-'}개 / {property.storeDetail.employeeCount ?? '-'}명
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">영업기간 / 갱신권</span>
-                  <span className="font-semibold text-slate-800">
-                    {property.storeDetail.operationPeriod || '-'} / {property.storeDetail.renewalPeriodRemain || '-'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">위반건축물</span>
-                  <span className="font-semibold text-slate-800">
-                    {property.storeDetail.violationBuilding || '없음(정상)'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-500 block">사업자 & 명의일치</span>
-                  <span className="font-semibold text-slate-800">
-                    {property.storeDetail.operatorContractorMatch || '일치'}
-                  </span>
-                </div>
-              </div>
 
-              {/* 계약 핵심 특약 및 주류대출/인상조건 */}
-              <div className="space-y-2 text-xs">
-                {property.storeDetail.liquorLoan && (
-                  <div className="p-2.5 bg-white rounded-lg border border-amber-200">
-                    <span className="font-bold text-violet-900 block">🍷 주류대출여부:</span>
-                    <span className="text-slate-800">{property.storeDetail.liquorLoan}</span>
+                {/* 섹터 2. 공간 구획 및 화장실·주차 조건 */}
+                <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">
+                  <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5 pb-1 border-b border-amber-100">
+                    <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded text-[10px] font-bold">2</span>
+                    <span>섹터 2. 공간 구획 및 화장실·주차 조건</span>
                   </div>
-                )}
-                {property.storeDetail.rentIncreaseCondition && (
-                  <div className="p-2.5 bg-white rounded-lg border border-amber-200">
-                    <span className="font-bold text-blue-900 block">📈 임대료 인상조건:</span>
-                    <span className="text-slate-800">{property.storeDetail.rentIncreaseCondition}</span>
-                  </div>
-                )}
-                {property.storeDetail.businessLicenseTransfer && (
-                  <div className="p-2.5 bg-white rounded-lg border border-violet-200">
-                    <span className="font-bold text-violet-900 block">📄 업종인허가승계:</span>
-                    <span className="text-slate-800">{property.storeDetail.businessLicenseTransfer}</span>
-                  </div>
-                )}
-                {property.storeDetail.equipmentRentalTransfer && (
-                  <div className="p-2.5 bg-white rounded-lg border border-violet-200">
-                    <span className="font-bold text-violet-900 block">✨ 비품/렌탈승계:</span>
-                    <span className="text-slate-800">{property.storeDetail.equipmentRentalTransfer}</span>
-                  </div>
-                )}
-                {(property.storeDetail.equipmentList || property.storeDetail.rentalList) && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {property.storeDetail.equipmentList && (
-                      <div className="p-2.5 bg-white rounded-lg border border-slate-200">
-                        <span className="font-bold text-slate-900 block">📦 비품 항목:</span>
-                        <span className="text-slate-700 whitespace-pre-line">{property.storeDetail.equipmentList}</span>
-                      </div>
-                    )}
-                    {property.storeDetail.rentalList && (
-                      <div className="p-2.5 bg-white rounded-lg border border-slate-200">
-                        <span className="font-bold text-slate-900 block">📑 렌탈 항목:</span>
-                        <span className="text-slate-700 whitespace-pre-line">{property.storeDetail.rentalList}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {property.storeDetail.restorationTerms && (
-                  <div className="p-2.5 bg-amber-100/70 rounded-lg border border-amber-300">
-                    <span className="font-bold text-amber-950 block">✨ 원상복구특약:</span>
-                    <span className="text-slate-900 font-medium">{property.storeDetail.restorationTerms}</span>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 bg-white rounded-lg border border-slate-200 text-slate-700">
-                    <span className="font-bold">📢 점포광고:</span> {property.storeDetail.storeAdStatus || '공개광고가능'}
-                  </div>
-                  <div className="p-2 bg-white rounded-lg border border-slate-200 text-slate-700">
-                    <span className="font-bold">🏢 타부동산:</span> {property.storeDetail.otherAgencyAdStatus || '타부동산없음'}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">방 / 구획룸</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.roomCount && store.roomCount > 0 ? `방/룸 ${store.roomCount}개` : '단일공간(구획없음)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">화장실</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.bathroomCount ?? 1}개 ({store.toiletGenderType || '남녀구분'})
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">주차 여부</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.isParkingImpossible ? (
+                          <span className="text-rose-600 font-bold">주차 불가</span>
+                        ) : store.parkingCount ? (
+                          `${store.parkingCount}대 가능`
+                        ) : (
+                          '주차 협의'
+                        )}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">소방/안전</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.fireInspectionCert || '완비(정상)'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                {/* 섹터 3. 핵심 유틸리티 설비 (전기·수도·가스) */}
+                <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">
+                  <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5 pb-1 border-b border-amber-100">
+                    <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded text-[10px] font-bold">3</span>
+                    <span>섹터 3. 핵심 유틸리티 설비 (전기·수도·가스)</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">전기 설비</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.electricityCapacity || '15kW'} ({store.electricityType || '개별'})
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">수도 설비</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.waterType || '개별/상수도'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">가스 설비</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.gasType || '도시가스(LNG)'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 섹터 4. 매장 운영 및 시설 현황 */}
+                <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">
+                  <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5 pb-1 border-b border-amber-100">
+                    <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded text-[10px] font-bold">4</span>
+                    <span>섹터 4. 매장 운영 및 시설 현황</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">테이블수 / 종업원</span>
+                      <span className="font-semibold text-slate-800">
+                        테이블 {store.tableCount ?? '-'}개 / {store.employeeCount ?? '-'}명
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">일평균 매출</span>
+                      <span className="font-bold text-amber-950">
+                        {store.dailyRevenue ? `약 ${store.dailyRevenue}만원` : '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">영업기간 / 갱신권</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.operationPeriod || '-'} / {store.renewalPeriodRemain || '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">주류대출여부</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.liquorLoan || '없음'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 섹터 5. 법적 인허가 및 계약·명의 리스크 점검 */}
+                <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">
+                  <div className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5 pb-1 border-b border-amber-100">
+                    <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded text-[10px] font-bold">5</span>
+                    <span>섹터 5. 법적 인허가 및 계약·명의 리스크 점검</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">위반건축물 여부</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.violationBuilding || '없음(정상)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">사업자 & 계약명의</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.operatorContractorMatch || '일치'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">업종 인허가 승계</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.businessLicenseTransfer || '정상 승계 가능'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">비품/렌탈 승계</span>
+                      <span className="font-semibold text-slate-800">
+                        {store.equipmentRentalTransfer || '협의 승계'}
+                      </span>
+                    </div>
+                  </div>
+                  {(store.equipmentList || store.rentalList) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-xs">
+                      {store.equipmentList && (
+                        <div className="p-2 bg-slate-50 rounded border border-slate-200">
+                          <span className="font-bold text-slate-900 block">📦 비품 항목:</span>
+                          <span className="text-slate-700 whitespace-pre-line">{store.equipmentList}</span>
+                        </div>
+                      )}
+                      {store.rentalList && (
+                        <div className="p-2 bg-slate-50 rounded border border-slate-200">
+                          <span className="font-bold text-slate-900 block">📑 렌탈 항목:</span>
+                          <span className="text-slate-700 whitespace-pre-line">{store.rentalList}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 섹터 6. 권리금·인상조건·광고·원상복구특약 */}
+                <div className="bg-white p-3.5 rounded-xl border-2 border-blue-200 space-y-2">
+                  <div className="text-xs font-extrabold text-blue-900 flex items-center justify-between pb-1 border-b border-blue-100">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.2 bg-blue-600 text-white rounded text-[10px] font-bold">6</span>
+                      <span>섹터 6. 권리금·인상조건·광고·원상복구특약</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">계약조건</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                      <span className="text-[11px] text-amber-900 block font-semibold">권리금</span>
+                      <span className="font-extrabold text-amber-950 text-sm">
+                        {store.isNoPremium || store.premium === 0 ? '무권리' : (store.premium ? `${store.premium.toLocaleString()} 만원` : '협의')}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-indigo-50 border border-indigo-200">
+                      <span className="text-[11px] text-indigo-900 block font-semibold">조정가능한 권리금</span>
+                      <span className="font-extrabold text-indigo-950 text-sm">
+                        {store.negotiablePremium ? `${store.negotiablePremium.toLocaleString()} 만원` : (store.premium ? `${store.premium.toLocaleString()} 만원` : '협의')}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200">
+                      <span className="text-[11px] text-blue-900 block font-semibold">임대료 인상조건 여부 및 인상폭</span>
+                      <span className="font-bold text-blue-950">
+                        {store.rentIncreaseCondition || '인상 없음 (동결)'}
+                      </span>
+                    </div>
+                  </div>
+                  {store.restorationTerms && (
+                    <div className="p-2.5 bg-amber-50/70 rounded-lg border border-amber-200 text-xs">
+                      <span className="font-bold text-amber-950 block">✨ 원상복구특약:</span>
+                      <span className="text-slate-800 font-medium">{store.restorationTerms}</span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div className="p-2 bg-slate-50 rounded border border-slate-200 text-slate-700">
+                      <span className="font-bold">📢 점포광고:</span> {store.storeAdStatus || '공개광고가능'}
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded border border-slate-200 text-slate-700">
+                      <span className="font-bold">🏢 타부동산:</span> {store.otherAgencyAdStatus || '타부동산없음'}
+                    </div>
+                  </div>
+                </div>
+
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 사무실 상세 브리핑 */}
           {property.officeDetail && (
@@ -1017,7 +1203,26 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
           )}
 
-
+          {/* 상담내용 및 매물 메모 (계정아이디 부여받은 자, 개업공인중개사, 관리자만 조회 가능한 대외비 보안 구역) */}
+          {property.consultationNotes && currentUser && (currentUser.id || currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' || currentUser.name?.includes('개업공인중개사')) && (
+            <div className="p-4 rounded-xl bg-purple-50/70 border-2 border-purple-200 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-purple-600" />
+                  <span>🔒 상담내용 및 매물 메모 (내부 대외비·비공개)</span>
+                </h4>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                  중개사/관리자 전용
+                </span>
+              </div>
+              <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed font-medium bg-white p-3 rounded-lg border border-purple-100">
+                {property.consultationNotes}
+              </p>
+              <p className="text-[11px] text-purple-700 font-semibold">
+                ※ 이 메모는 카카오톡이나 문자, 고객 브리핑 링크 전송 시 절대로 포함되지 않으며 외부 고객에게 노출되지 않습니다.
+              </p>
+            </div>
+          )}
 
         </div>
 

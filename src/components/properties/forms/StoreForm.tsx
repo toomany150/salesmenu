@@ -30,9 +30,10 @@ interface StoreFormProps {
   onChange: (updated: Partial<StoreData>) => void;
   transactionType?: string;
   ledgerData?: any;
+  hideSector6?: boolean;
 }
 
-export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactionType, ledgerData }) => {
+export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactionType, ledgerData, hideSector6 }) => {
   const updateField = (field: keyof StoreData, value: any) => {
     onChange({ ...data, [field]: value });
   };
@@ -1290,9 +1291,9 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
       )}
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 임대차 전용: 섹터 5. 권리금·인상조건·광고·원상복구특약 (매매 시 숨김) */}
+      {/* 임대차 전용: 섹터 6. 권리금·인상조건·광고·원상복구특약 (매매 또는 외부 배치 시 숨김) */}
       {/* ────────────────────────────────────────────────────────── */}
-      {transactionType !== '매매' && (
+      {transactionType !== '매매' && !hideSector6 && (
       <div className="bg-white rounded-2xl border-2 border-blue-200/90 shadow-xs overflow-hidden">
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1301,7 +1302,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
             </div>
             <div>
               <h4 className="text-sm font-bold text-blue-950">
-                섹터 5. 권리금·인상조건·광고·원상복구특약
+                섹터 6. 권리금·인상조건·광고·원상복구특약
               </h4>
               <span className="text-xs text-blue-700">
                 권리금 및 조정가능 권리금, 임대료 인상액, 광고 동의, 원상복구특약
@@ -1315,7 +1316,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
 
         <div className="p-4 sm:p-5 space-y-4">
           
-          {/* 권리금 & 조정가능한 권리금 (사용자 요청: 관리비 항목 삭제 및 조정가능 권리금 배치) */}
+          {/* 권리금 & 조정가능한 권리금 (직접 입력 지원) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -1327,7 +1328,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                 <button
                   type="button"
                   onClick={() => {
-                    const isCurrentlyNoPremium = data.isNoPremium || data.premium === 0;
+                    const isCurrentlyNoPremium = !!data.isNoPremium;
                     const nextNoPremium = !isCurrentlyNoPremium;
                     onChange({
                       ...data,
@@ -1337,7 +1338,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                     });
                   }}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold border transition-all cursor-pointer ${
-                    data.isNoPremium || data.premium === 0
+                    data.isNoPremium
                       ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
                       : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
                   }`}
@@ -1348,14 +1349,22 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               </div>
               <input
                 type="number"
-                disabled={data.isNoPremium || data.premium === 0}
-                value={data.isNoPremium || data.premium === 0 ? 0 : (data.premium !== undefined && data.premium !== null ? data.premium : '')}
-                onChange={(e) => updateField('premium', e.target.value ? parseFloat(e.target.value) : undefined)}
-                placeholder={data.isNoPremium || data.premium === 0 ? '0 (무권리)' : '예: 3000 (무권리 시 0 입력)'}
+                disabled={!!data.isNoPremium}
+                value={data.isNoPremium ? 0 : (data.premium !== undefined && data.premium !== null ? data.premium : '')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const parsed = val !== '' ? parseFloat(val) : undefined;
+                  onChange({
+                    ...data,
+                    isNoPremium: false,
+                    premium: parsed,
+                  });
+                }}
+                placeholder={data.isNoPremium ? '0 (무권리)' : '예: 3000 (직접 입력, 무권리 시 0)'}
                 className={`w-full text-sm px-3.5 py-2.5 border rounded-xl font-bold ${
-                  data.isNoPremium || data.premium === 0
-                    ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-extrabold'
-                    : 'bg-amber-50/60 border-amber-300 focus:ring-2 focus:ring-amber-500 font-extrabold text-amber-950'
+                  data.isNoPremium
+                    ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 font-extrabold cursor-not-allowed'
+                    : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 font-extrabold text-slate-900'
                 }`}
               />
             </div>
@@ -1372,11 +1381,22 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               </div>
               <input
                 type="number"
-                disabled={data.isNoPremium || data.premium === 0}
-                value={data.isNoPremium || data.premium === 0 ? 0 : (data.negotiablePremium !== undefined && data.negotiablePremium !== null ? data.negotiablePremium : '')}
-                onChange={(e) => updateField('negotiablePremium', e.target.value ? parseFloat(e.target.value) : undefined)}
-                placeholder="예: 2500 (조정 가능한 권리금)"
-                className="w-full text-sm px-3.5 py-2.5 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
+                disabled={!!data.isNoPremium}
+                value={data.isNoPremium ? 0 : (data.negotiablePremium !== undefined && data.negotiablePremium !== null ? data.negotiablePremium : '')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const parsed = val !== '' ? parseFloat(val) : undefined;
+                  onChange({
+                    ...data,
+                    negotiablePremium: parsed,
+                  });
+                }}
+                placeholder="예: 2500 (직접 입력, 협의 하한선)"
+                className={`w-full text-sm px-3.5 py-2.5 rounded-xl font-bold border ${
+                  data.isNoPremium
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-white border-slate-300 focus:ring-2 focus:ring-blue-500 text-slate-900'
+                }`}
               />
             </div>
           </div>

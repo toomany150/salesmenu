@@ -288,14 +288,105 @@ export async function POST(request: NextRequest) {
           creatorName: prop.creatorName || null,
         };
 
-        await prisma.property.upsert({
+        const savedProp = await prisma.property.upsert({
           where: { propertyNumber: propNum },
           update: propDataToSave,
           create: {
             id: prop.id || `prop-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
             ...propDataToSave,
           },
-        }).catch((err) => console.warn('Sync property upsert error:', err));
+        }).catch((err) => {
+          console.warn('Sync property upsert error:', err);
+          return null;
+        });
+
+        if (savedProp && prop.propertyType === 'STORE' && prop.storeDetail) {
+          const sd = prop.storeDetail;
+          await prisma.storeDetail.upsert({
+            where: { propertyId: savedProp.id },
+            update: {
+              storeName: sd.storeName || null,
+              businessType: sd.businessType || null,
+              totalFloors: sd.totalFloors ? parseInt(String(sd.totalFloors)) : null,
+              currentFloor: sd.currentFloor || null,
+              landArea: sd.landArea !== undefined && sd.landArea !== null ? parseFloat(String(sd.landArea)) : null,
+              buildingArea: sd.buildingArea !== undefined && sd.buildingArea !== null ? parseFloat(String(sd.buildingArea)) : null,
+              buildingUse: sd.buildingUse || null,
+              actualArea: sd.actualArea !== undefined && sd.actualArea !== null ? parseFloat(String(sd.actualArea)) : null,
+              roomCount: sd.roomCount ? parseInt(String(sd.roomCount)) : null,
+              bathroomCount: sd.bathroomCount ? parseInt(String(sd.bathroomCount)) : null,
+              toiletGenderType: sd.toiletGenderType || null,
+              approvalDate: sd.approvalDate ? new Date(sd.approvalDate) : null,
+              parkingCount: sd.parkingCount ? parseInt(String(sd.parkingCount)) : null,
+              isParkingImpossible: !!sd.isParkingImpossible,
+              electricityCapacity: sd.electricityCapacity || null,
+              electricityType: sd.electricityType || null,
+              waterType: sd.waterType || null,
+              gasType: sd.gasType || null,
+              monthlyRentVat: !!sd.monthlyRentVat,
+              premium: sd.premium !== undefined && sd.premium !== null ? parseFloat(String(sd.premium)) : null,
+              maintenanceFee: sd.maintenanceFee !== undefined && sd.maintenanceFee !== null ? parseFloat(String(sd.maintenanceFee)) : null,
+              isNoMaintenanceFee: !!sd.isNoMaintenanceFee,
+              maintenanceFeeVat: !!sd.maintenanceFeeVat,
+              tableCount: sd.tableCount ? parseInt(String(sd.tableCount)) : null,
+              tableCountHall: sd.tableCountHall ? parseInt(String(sd.tableCountHall)) : null,
+              tableCountRoom: sd.tableCountRoom ? parseInt(String(sd.tableCountRoom)) : null,
+              employeeCount: sd.employeeCount ? parseInt(String(sd.employeeCount)) : null,
+              operationPeriod: sd.operationPeriod || null,
+              contractYear: sd.contractYear || null,
+              renewalPeriodRemain: sd.renewalPeriodRemain || null,
+              violationBuilding: sd.violationBuilding || null,
+              businessRegistrationStatus: sd.businessRegistrationStatus || null,
+              operatorContractorMatch: sd.operatorContractorMatch || null,
+              liquorLoan: sd.liquorLoan || null,
+              rentIncreaseCondition: sd.rentIncreaseCondition || null,
+              storeAdStatus: sd.storeAdStatus || null,
+              otherAgencyAdStatus: sd.otherAgencyAdStatus || null,
+              restorationTerms: sd.restorationTerms || null,
+            },
+            create: {
+              propertyId: savedProp.id,
+              storeName: sd.storeName || null,
+              businessType: sd.businessType || null,
+              totalFloors: sd.totalFloors ? parseInt(String(sd.totalFloors)) : null,
+              currentFloor: sd.currentFloor || null,
+              landArea: sd.landArea !== undefined && sd.landArea !== null ? parseFloat(String(sd.landArea)) : null,
+              buildingArea: sd.buildingArea !== undefined && sd.buildingArea !== null ? parseFloat(String(sd.buildingArea)) : null,
+              buildingUse: sd.buildingUse || null,
+              actualArea: sd.actualArea !== undefined && sd.actualArea !== null ? parseFloat(String(sd.actualArea)) : null,
+              roomCount: sd.roomCount ? parseInt(String(sd.roomCount)) : null,
+              bathroomCount: sd.bathroomCount ? parseInt(String(sd.bathroomCount)) : null,
+              toiletGenderType: sd.toiletGenderType || null,
+              approvalDate: sd.approvalDate ? new Date(sd.approvalDate) : null,
+              parkingCount: sd.parkingCount ? parseInt(String(sd.parkingCount)) : null,
+              isParkingImpossible: !!sd.isParkingImpossible,
+              electricityCapacity: sd.electricityCapacity || null,
+              electricityType: sd.electricityType || null,
+              waterType: sd.waterType || null,
+              gasType: sd.gasType || null,
+              monthlyRentVat: !!sd.monthlyRentVat,
+              premium: sd.premium !== undefined && sd.premium !== null ? parseFloat(String(sd.premium)) : null,
+              maintenanceFee: sd.maintenanceFee !== undefined && sd.maintenanceFee !== null ? parseFloat(String(sd.maintenanceFee)) : null,
+              isNoMaintenanceFee: !!sd.isNoMaintenanceFee,
+              maintenanceFeeVat: !!sd.maintenanceFeeVat,
+              tableCount: sd.tableCount ? parseInt(String(sd.tableCount)) : null,
+              tableCountHall: sd.tableCountHall ? parseInt(String(sd.tableCountHall)) : null,
+              tableCountRoom: sd.tableCountRoom ? parseInt(String(sd.tableCountRoom)) : null,
+              employeeCount: sd.employeeCount ? parseInt(String(sd.employeeCount)) : null,
+              operationPeriod: sd.operationPeriod || null,
+              contractYear: sd.contractYear || null,
+              renewalPeriodRemain: sd.renewalPeriodRemain || null,
+              violationBuilding: sd.violationBuilding || null,
+              businessRegistrationStatus: sd.businessRegistrationStatus || null,
+              operatorContractorMatch: sd.operatorContractorMatch || null,
+              liquorLoan: sd.liquorLoan || null,
+              rentIncreaseCondition: sd.rentIncreaseCondition || null,
+              storeAdStatus: sd.storeAdStatus || null,
+              otherAgencyAdStatus: sd.otherAgencyAdStatus || null,
+              restorationTerms: sd.restorationTerms || null,
+            },
+          }).catch((err) => console.warn('Sync storeDetail upsert error:', err));
+        }
       }
     } catch (dbPropErr) {
       console.warn('Sync DB properties upsert notice:', dbPropErr);
