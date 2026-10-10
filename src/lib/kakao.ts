@@ -207,6 +207,7 @@ export interface SharePropertyParams {
   propertyType: string;
   property?: any;
   addressMode?: AddressShareMode;
+  hidePropertyName?: boolean;
 }
 
 export async function shareViaKakao(params: SharePropertyParams): Promise<boolean> {
@@ -215,6 +216,7 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
   const baseUrl = getAppBaseUrl();
   const propIdentifier = params.propertyNumber || params.id || '';
   const addrMode: AddressShareMode = params.addressMode || 'dong';
+  const isHideName = params.hidePropertyName ?? true;
 
   const { displayAddress } = formatAddressByMode(params.address, params.detailAddress, addrMode);
 
@@ -241,6 +243,7 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
       images: cleanImages,
       isCustomerBriefing: true,
       addressMode: addrMode,
+      hidePropertyName: isHideName,
     };
 
     // 보안 강화: 외부 고객에게 절대 노출되면 안 되는 소유주/임대인 및 내부 중개 메모 철저 제거
@@ -277,7 +280,7 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
   }
 
   const shareUrl = propIdentifier
-    ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}&addrMode=${addrMode}${pDataQuery}`
+    ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}&addrMode=${addrMode}&hideName=${isHideName ? '1' : '0'}${pDataQuery}`
     : baseUrl;
   const kakaoKey = getKakaoKey();
 
@@ -308,14 +311,21 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
 
   const txType = params.property?.transactionType || (params.priceText?.includes('전세') ? '전세' : params.priceText?.includes('매매') ? '매매' : '월세');
   const transactionItemTitle = txType === '매매' ? '매매물건' : txType === '전세' ? '전세물건' : '월세물건';
+  const originalName = params.property?.apartmentDetail?.complexName ||
+    params.property?.storeDetail?.storeName ||
+    params.property?.officeDetail?.officeName ||
+    params.property?.factoryWarehouseDetail?.companyName ||
+    params.property?.landDetail?.companyName ||
+    params.title;
+  const displayTitle = isHideName ? transactionItemTitle : (originalName || transactionItemTitle);
 
   if (isKakaoReady) {
     try {
       window.Kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: `[매물 #${params.propertyNumber}] ${transactionItemTitle}`,
-          description: `${params.priceText}\n위치: ${displayAddress}\n유형: ${transactionItemTitle}\n문의: ${BROKER_OFFICE_INFO.officeName} (${BROKER_OFFICE_INFO.tel})`,
+          title: `[매물 #${params.propertyNumber}] ${displayTitle}`,
+          description: `${params.priceText}\n위치: ${displayAddress}\n유형: ${displayTitle}\n문의: ${BROKER_OFFICE_INFO.officeName} (${BROKER_OFFICE_INFO.tel})`,
           imageUrl: previewImage,
           link: {
             mobileWebUrl: shareUrl,
@@ -339,8 +349,8 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
   }
 
   // 카카오 SDK 미설정/도메인 미등록 시 클립보드 복사 폴백
-  const summaryText = `[${BROKER_OFFICE_INFO.officeName} 매물안내 - 매물번호 #${params.propertyNumber}]
-● 매물유형: ${params.propertyType}
+  const summaryText = `[${BROKER_OFFICE_INFO.officeName} 매물안내 - 매물번호 #${params.propertyNumber} ${displayTitle}]
+● 매물유형: ${displayTitle}
 ● 거래정보: ${params.priceText}
 ● 소재지: ${displayAddress}
 ● 문의처: ${BROKER_OFFICE_INFO.officeName} ☎ ${BROKER_OFFICE_INFO.tel}
@@ -363,7 +373,11 @@ ${shareUrl}`;
   }
 }
 
-export async function copyPropertyShareLink(property: any, addressMode: AddressShareMode = 'dong'): Promise<boolean> {
+export async function copyPropertyShareLink(
+  property: any, 
+  addressMode: AddressShareMode = 'dong',
+  hidePropertyName: boolean = true
+): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
   const propId = property.propertyNumber || property.id || '';
   
@@ -378,6 +392,7 @@ export async function copyPropertyShareLink(property: any, addressMode: AddressS
       images: cleanImages,
       isCustomerBriefing: true,
       addressMode,
+      hidePropertyName,
     };
     delete payload.customer;
     delete payload.customerId;
@@ -408,7 +423,7 @@ export async function copyPropertyShareLink(property: any, addressMode: AddressS
     }
   } catch {}
 
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}${pDataQuery}`;
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}${pDataQuery}`;
   
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -422,8 +437,17 @@ export async function copyPropertyShareLink(property: any, addressMode: AddressS
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
 
-  const text = `[${BROKER_OFFICE_INFO.officeName} 매물안내 - #${property.propertyNumber || propId}]
-● 매물유형: ${property.propertyType || ''} (${property.transactionType || ''})
+  const txType = property.transactionType || '월세';
+  const transactionItemTitle = txType === '매매' ? '매매물건' : txType === '전세' ? '전세물건' : '월세물건';
+  const originalName = property.apartmentDetail?.complexName ||
+    property.storeDetail?.storeName ||
+    property.officeDetail?.officeName ||
+    property.factoryWarehouseDetail?.companyName ||
+    property.landDetail?.companyName || '';
+  const displayTitle = hidePropertyName ? transactionItemTitle : (originalName || transactionItemTitle);
+
+  const text = `[${BROKER_OFFICE_INFO.officeName} 매물안내 - #${property.propertyNumber || propId} ${displayTitle}]
+● 매물유형: ${displayTitle}
 ● 거래금액: ${priceStr}
 ● 소재지: ${displayAddress}
 ● 담당문의: ${BROKER_OFFICE_INFO.officeName} ☎ ${BROKER_OFFICE_INFO.tel}
@@ -456,11 +480,17 @@ export function generateSmsLink(
     address: string;
     detailAddress?: string;
     consultationNotes?: string;
+    storeDetail?: any;
+    apartmentDetail?: any;
+    officeDetail?: any;
+    factoryWarehouseDetail?: any;
+    landDetail?: any;
   },
-  addressMode: AddressShareMode = 'dong'
+  addressMode: AddressShareMode = 'dong',
+  hidePropertyName: boolean = true
 ): string {
   const baseUrl = getAppBaseUrl();
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}&addrMode=${addressMode}`;
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}`;
 
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -487,9 +517,18 @@ export function generateSmsLink(
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
 
+  const txType = property.transactionType || '월세';
+  const transactionItemTitle = txType === '매매' ? '매매물건' : txType === '전세' ? '전세물건' : '월세물건';
+  const originalName = property.apartmentDetail?.complexName ||
+    property.storeDetail?.storeName ||
+    property.officeDetail?.officeName ||
+    property.factoryWarehouseDetail?.companyName ||
+    property.landDetail?.companyName || '';
+  const displayTitle = hidePropertyName ? transactionItemTitle : (originalName || transactionItemTitle);
+
   const message = `[${BROKER_OFFICE_INFO.officeName} 매물안내]
 - 매물번호: #${property.propertyNumber}
-- 매물유형: ${property.propertyType} (${property.transactionType})
+- 매물구분: ${displayTitle}
 - 금액조건: ${priceStr}
 - 소재지: ${displayAddress}
 - 문의전화: ${BROKER_OFFICE_INFO.tel}
@@ -521,10 +560,14 @@ export function isIOSDevice(): boolean {
 /**
  * 매물 문자 전송용 완성된 요약 안내 문구 생성
  */
-export function getSmsText(property: any, addressMode: AddressShareMode = 'dong'): string {
+export function getSmsText(
+  property: any, 
+  addressMode: AddressShareMode = 'dong',
+  hidePropertyName: boolean = true
+): string {
   const baseUrl = getAppBaseUrl();
   const propId = property.propertyNumber || property.id || '';
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}`;
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}`;
 
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -551,8 +594,17 @@ export function getSmsText(property: any, addressMode: AddressShareMode = 'dong'
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
 
-  return `[${BROKER_OFFICE_INFO.officeName} 매물안내 - #${property.propertyNumber || propId}]
-● 매물유형: ${property.propertyType || ''} (${property.transactionType || ''})
+  const txType = property.transactionType || '월세';
+  const transactionItemTitle = txType === '매매' ? '매매물건' : txType === '전세' ? '전세물건' : '월세물건';
+  const originalName = property.apartmentDetail?.complexName ||
+    property.storeDetail?.storeName ||
+    property.officeDetail?.officeName ||
+    property.factoryWarehouseDetail?.companyName ||
+    property.landDetail?.companyName || '';
+  const displayTitle = hidePropertyName ? transactionItemTitle : (originalName || transactionItemTitle);
+
+  return `[${BROKER_OFFICE_INFO.officeName} 매물안내 - #${property.propertyNumber || propId} ${displayTitle}]
+● 매물유형: ${displayTitle}
 ● 금액조건: ${priceStr}
 ● 소재지: ${displayAddress}
 ● 문의처: ${BROKER_OFFICE_INFO.officeName} ☎ ${BROKER_OFFICE_INFO.tel}
@@ -571,9 +623,10 @@ ${shareUrl}
 export function handleSmartSms(
   property: any,
   recipientPhone?: string,
-  addressMode: AddressShareMode = 'dong'
+  addressMode: AddressShareMode = 'dong',
+  hidePropertyName: boolean = true
 ): { isMobile: boolean; message: string } {
-  const message = getSmsText(property, addressMode);
+  const message = getSmsText(property, addressMode, hidePropertyName);
   const isMobile = isMobileDevice();
 
   if (isMobile) {

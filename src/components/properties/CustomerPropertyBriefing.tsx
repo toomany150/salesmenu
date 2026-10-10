@@ -39,6 +39,7 @@ import { KakaoAddressMap } from '../map/KakaoAddressMap';
 interface CustomerPropertyBriefingProps {
   property: PropertyItem;
   addressMode?: AddressShareMode;
+  hidePropertyName?: boolean;
   currentUser?: any;
   onSwitchToAdmin?: () => void;
   onOpenLogin?: () => void;
@@ -48,6 +49,7 @@ interface CustomerPropertyBriefingProps {
 export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> = ({
   property,
   addressMode = 'dong',
+  hidePropertyName,
   currentUser,
   onSwitchToAdmin,
   onOpenLogin,
@@ -69,6 +71,36 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
     property.detailAddress, 
     effectiveMode
   );
+
+  // 매물명 숨김 여부 판정 (prop > payload > URL 파라미터 > 기본값 true)
+  const isNameHiddenFromPayload = (property as any).hidePropertyName !== undefined
+    ? !!(property as any).hidePropertyName
+    : undefined;
+
+  let isNameHiddenUrl: boolean | undefined = undefined;
+  if (typeof window !== 'undefined') {
+    const sp = new URLSearchParams(window.location.search);
+    const hn = sp.get('hideName');
+    if (hn !== null) {
+      isNameHiddenUrl = hn === '1' || hn === 'true';
+    }
+  }
+
+  const isNameHidden = hidePropertyName ?? isNameHiddenFromPayload ?? isNameHiddenUrl ?? true;
+
+  const originalName = property.apartmentDetail?.complexName || 
+    property.storeDetail?.storeName || 
+    property.officeDetail?.officeName || 
+    property.factoryWarehouseDetail?.companyName || 
+    property.landDetail?.companyName || '';
+
+  const transactionItemTitle = property.transactionType === '매매' 
+    ? '매매물건' 
+    : property.transactionType === '전세' 
+      ? '전세물건' 
+      : '월세물건';
+
+  const displayTitle = isNameHidden ? transactionItemTitle : (originalName || transactionItemTitle);
 
   // 금액 포맷 (월세 부가세 포함여부 명시)
   // 권리금 (상가)
@@ -286,7 +318,7 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
           </div>
 
           <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-2 break-keep leading-snug">
-            {property.transactionType === '매매' ? '매매물건' : property.transactionType === '전세' ? '전세물건' : '월세물건'}
+            {displayTitle}
           </h1>
 
           {/* 소재지 표시 */}

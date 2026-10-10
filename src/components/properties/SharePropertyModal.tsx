@@ -43,14 +43,19 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
   initialMode = 'dong',
 }) => {
   const [addressMode, setAddressMode] = useState<AddressShareMode>(initialMode);
+  const [hidePropertyName, setHidePropertyName] = useState<boolean>(true);
   const [isCopied, setIsCopied] = useState(false);
   const [isSendingKakao, setIsSendingKakao] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('pref_address_share_mode') as AddressShareMode | null;
-      if (saved && (saved === 'full' || saved === 'dong' || saved === 'hidden')) {
-        setAddressMode(saved);
+      const savedAddr = localStorage.getItem('pref_address_share_mode') as AddressShareMode | null;
+      if (savedAddr && (savedAddr === 'full' || savedAddr === 'dong' || savedAddr === 'hidden')) {
+        setAddressMode(savedAddr);
+      }
+      const savedHideName = localStorage.getItem('pref_hide_property_name');
+      if (savedHideName !== null) {
+        setHidePropertyName(savedHideName === 'true');
       }
     }
   }, [isOpen]);
@@ -61,6 +66,13 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
     setAddressMode(mode);
     if (typeof window !== 'undefined') {
       localStorage.setItem('pref_address_share_mode', mode);
+    }
+  };
+
+  const handleHideNameChange = (hide: boolean) => {
+    setHidePropertyName(hide);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pref_hide_property_name', String(hide));
     }
   };
 
@@ -91,28 +103,36 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
 
+  const originalName = property.apartmentDetail?.complexName || 
+    property.storeDetail?.storeName || 
+    property.officeDetail?.officeName || 
+    property.factoryWarehouseDetail?.companyName || 
+    property.landDetail?.companyName || '';
+
   const transactionItemTitle = property.transactionType === '매매' 
     ? '매매물건' 
     : property.transactionType === '전세' 
       ? '전세물건' 
       : '월세물건';
 
-  const previewTitle = `[매물 #${property.propertyNumber}] ${transactionItemTitle}`;
+  const displayTitle = hidePropertyName ? transactionItemTitle : (originalName || transactionItemTitle);
+  const previewTitle = `[매물 #${property.propertyNumber}] ${displayTitle}`;
 
   const handleKakao = async () => {
     setIsSendingKakao(true);
     try {
       await shareViaKakao({
         id: property.id,
-        title: transactionItemTitle,
+        title: originalName || transactionItemTitle,
         description: `${property.address} ${property.detailAddress || ''}`,
         priceText: `${property.transactionType} ${priceStr}`,
         address: property.address,
         detailAddress: property.detailAddress,
         propertyNumber: property.propertyNumber,
-        propertyType: transactionItemTitle,
+        propertyType: displayTitle,
         property: property,
         addressMode: addressMode,
+        hidePropertyName: hidePropertyName,
       });
     } finally {
       setIsSendingKakao(false);
@@ -120,24 +140,14 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
   };
 
   const handleCopyLink = async () => {
-    const success = await copyPropertyShareLink(property, addressMode);
+    const success = await copyPropertyShareLink(property, addressMode, hidePropertyName);
     if (success) {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2500);
     }
   };
 
-  const smsLink = generateSmsLink({
-    propertyNumber: property.propertyNumber,
-    propertyType: propType,
-    transactionType: property.transactionType,
-    price: property.price,
-    deposit: property.deposit,
-    monthlyRent: property.monthlyRent,
-    monthlyRentVat: property.monthlyRentVat,
-    address: property.address,
-    detailAddress: property.detailAddress,
-  }, addressMode);
+  const smsLink = generateSmsLink(property, addressMode, hidePropertyName);
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
@@ -284,6 +294,81 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
             </div>
           </div>
 
+          {/* 1.5. 매물명(상호/단지명) 표기 방식 선택 */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Share2 className="w-3.5 h-3.5 text-blue-600" />
+              <span>매물명(상호/단지명) 표기 방식 선택</span>
+            </label>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* 옵션 1: 매물명 숨김 (매매물건/전세물건/월세물건) */}
+              <label 
+                className={`flex items-start gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${
+                  hidePropertyName
+                    ? 'border-blue-600 bg-blue-50/70 shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+                onClick={() => handleHideNameChange(true)}
+              >
+                <input
+                  type="radio"
+                  name="hidePropertyName"
+                  checked={hidePropertyName}
+                  onChange={() => handleHideNameChange(true)}
+                  className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900">
+                      [{transactionItemTitle}]으로 표기
+                    </span>
+                    <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-blue-600 text-white">
+                      보안 추천
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    상호명/단지명을 가려 검색을 통한 위치 유출 및 직거래를 방지합니다.
+                  </p>
+                  <p className="text-[11px] font-mono font-bold text-blue-800 bg-white/80 px-2 py-0.5 rounded border border-blue-200 mt-1">
+                    미리보기: {transactionItemTitle}
+                  </p>
+                </div>
+              </label>
+
+              {/* 옵션 2: 원래 매물명 표시 (상호명/단지명 노출) */}
+              <label 
+                className={`flex items-start gap-2.5 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${
+                  !hidePropertyName
+                    ? 'border-blue-600 bg-blue-50/70 shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+                onClick={() => handleHideNameChange(false)}
+              >
+                <input
+                  type="radio"
+                  name="hidePropertyName"
+                  checked={!hidePropertyName}
+                  onChange={() => handleHideNameChange(false)}
+                  className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900">
+                      원래 매물명 표시
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    상호명이나 단지명을 고객에게 그대로 보여줍니다.
+                  </p>
+                  <p className="text-[11px] font-mono text-slate-700 bg-white/80 px-2 py-0.5 rounded border border-slate-200 mt-1 truncate">
+                    미리보기: {originalName || transactionItemTitle}
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
           {/* 2. Security Shield Notice: 매물주(의뢰인) 정보 철저 배제 확인 */}
           <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -370,7 +455,7 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              handleSmartSms(property, undefined, addressMode);
+              handleSmartSms(property, undefined, addressMode, hidePropertyName);
             }}
             className="flex md:hidden w-full sm:w-auto py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs items-center justify-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
             title="스마트폰 문자 앱 즉시 실행"

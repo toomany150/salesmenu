@@ -59,6 +59,7 @@ const DashboardContent: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem | null>(null);
   const [sharedBriefingProperty, setSharedBriefingProperty] = useState<PropertyItem | null>(null);
   const [sharedAddressMode, setSharedAddressMode] = useState<AddressShareMode>('dong');
+  const [sharedHideName, setSharedHideName] = useState<boolean | undefined>(undefined);
 
   // Auth, Admin & Sync Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -179,7 +180,11 @@ const DashboardContent: React.FC = () => {
       const propId = searchParams.get('propertyId');
       const pDataRaw = searchParams.get('pData');
       const addrMode = (searchParams.get('addrMode') as any) || 'dong';
+      const hideNameParam = searchParams.get('hideName');
       if (addrMode) setSharedAddressMode(addrMode);
+      if (hideNameParam !== null) {
+        setSharedHideName(hideNameParam === '1' || hideNameParam === 'true');
+      }
 
       if (pDataRaw) {
         try {
@@ -765,6 +770,7 @@ const DashboardContent: React.FC = () => {
           <CustomerPropertyBriefing
             property={sharedBriefingProperty}
             addressMode={sharedAddressMode}
+            hidePropertyName={sharedHideName}
             currentUser={currentUser}
             onSwitchToAdmin={() => {
               const found = properties.find((p) => p.id === sharedBriefingProperty.id || p.propertyNumber === sharedBriefingProperty.propertyNumber) || sharedBriefingProperty;
