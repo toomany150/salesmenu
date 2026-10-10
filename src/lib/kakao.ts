@@ -306,13 +306,16 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
     ? params.property.images[0]
     : 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=60';
 
+  const txType = params.property?.transactionType || (params.priceText?.includes('전세') ? '전세' : params.priceText?.includes('매매') ? '매매' : '월세');
+  const transactionItemTitle = txType === '매매' ? '매매물건' : txType === '전세' ? '전세물건' : '월세물건';
+
   if (isKakaoReady) {
     try {
       window.Kakao.Share.sendDefault({
         objectType: 'feed',
         content: {
-          title: `[매물 #${params.propertyNumber}] ${params.title}`,
-          description: `${params.priceText}\n위치: ${displayAddress}\n유형: ${params.propertyType}\n문의: ${BROKER_OFFICE_INFO.officeName} (${BROKER_OFFICE_INFO.tel})`,
+          title: `[매물 #${params.propertyNumber}] ${transactionItemTitle}`,
+          description: `${params.priceText}\n위치: ${displayAddress}\n유형: ${transactionItemTitle}\n문의: ${BROKER_OFFICE_INFO.officeName} (${BROKER_OFFICE_INFO.tel})`,
           imageUrl: previewImage,
           link: {
             mobileWebUrl: shareUrl,

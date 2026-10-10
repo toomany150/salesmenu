@@ -91,20 +91,26 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
 
   const { displayAddress } = formatAddressByMode(property.address, property.detailAddress, addressMode);
 
-  const previewTitle = `[매물 #${property.propertyNumber}] ${propType} (${property.transactionType})`;
+  const transactionItemTitle = property.transactionType === '매매' 
+    ? '매매물건' 
+    : property.transactionType === '전세' 
+      ? '전세물건' 
+      : '월세물건';
+
+  const previewTitle = `[매물 #${property.propertyNumber}] ${transactionItemTitle}`;
 
   const handleKakao = async () => {
     setIsSendingKakao(true);
     try {
       await shareViaKakao({
         id: property.id,
-        title: `${propType} (${property.transactionType})`,
+        title: transactionItemTitle,
         description: `${property.address} ${property.detailAddress || ''}`,
         priceText: `${property.transactionType} ${priceStr}`,
         address: property.address,
         detailAddress: property.detailAddress,
         propertyNumber: property.propertyNumber,
-        propertyType: propType,
+        propertyType: transactionItemTitle,
         property: property,
         addressMode: addressMode,
       });

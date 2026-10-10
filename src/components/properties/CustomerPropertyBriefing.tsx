@@ -285,13 +285,8 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
             )}
           </div>
 
-          <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight mb-2 break-keep leading-snug">
-            {property.apartmentDetail?.complexName || 
-             property.storeDetail?.storeName || 
-             property.officeDetail?.officeName || 
-             property.factoryWarehouseDetail?.companyName || 
-             property.landDetail?.companyName || 
-             `${propType} (${property.transactionType}) 추천 매물`}
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-2 break-keep leading-snug">
+            {property.transactionType === '매매' ? '매매물건' : property.transactionType === '전세' ? '전세물건' : '월세물건'}
           </h1>
 
           {/* 소재지 표시 */}
@@ -323,31 +318,37 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
             )}
           </div>
 
-          {/* 금액 하이라이트 박스 (모바일 글자 크기 및 줄바꿈 최적화) */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/70 border border-blue-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-            <div className="min-w-0">
-              <span className="text-xs font-bold text-blue-800 block mb-0.5">
-                {property.transactionType} 조건
-              </span>
-              <div className="text-xl sm:text-2xl md:text-3xl font-black text-blue-950 tracking-tight break-keep whitespace-normal sm:whitespace-nowrap">
+          {/* 금액 및 조건 하이라이트 박스 (가로형 와이드 & 모바일-데스크톱 반응형 최적화) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-blue-50/95 via-sky-50/70 to-indigo-50/80 border border-blue-200 shadow-sm flex flex-col gap-3.5">
+            {/* 1층: 거래조건 뱃지 + 메인 금액 (가로형 정돈) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pb-3 border-b border-blue-200/60">
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="px-3 py-1 text-xs font-black rounded-lg bg-blue-600 text-white shadow-2xs whitespace-nowrap tracking-wide">
+                  {property.transactionType} 조건
+                </span>
+              </div>
+              <div className="text-xl sm:text-2xl md:text-3xl font-black text-blue-950 tracking-tight break-keep leading-tight sm:text-right">
                 {priceMainText}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* 2층: 세부 조건 요약 (실평수, 권리금, 관리비 가로 카드 칩 - 넘침 없이 한눈에 정돈) */}
+            <div className="flex flex-wrap items-center gap-2">
               {actualAreaVal && (
-                <div className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-950 font-bold text-xs shadow-2xs">
-                  📐 실평수 {actualAreaVal}㎡ (약 {actualAreaPyeong}평)
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 border border-indigo-200 text-indigo-950 font-bold text-xs shadow-2xs">
+                  <span className="text-indigo-600">📐</span>
+                  <span className="whitespace-nowrap">실평수 {actualAreaVal}㎡ (약 {actualAreaPyeong}평)</span>
                 </div>
               )}
               {premiumText && (
-                <div className="px-3 py-1.5 rounded-lg bg-amber-100/90 border border-amber-300 text-amber-950 font-bold text-xs shadow-2xs">
-                  {premiumText}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/95 border border-amber-300 text-amber-950 font-bold text-xs shadow-2xs">
+                  <span className="break-keep">{premiumText}</span>
                 </div>
               )}
               {maintenanceText && (
-                <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-xs shadow-2xs">
-                  {maintenanceText}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 border border-slate-200 text-slate-800 font-medium text-xs shadow-2xs max-w-full">
+                  <span className="text-slate-400 shrink-0">🏷️</span>
+                  <span className="break-keep">{maintenanceText}</span>
                 </div>
               )}
             </div>
