@@ -209,6 +209,17 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     property.apartmentDetail?.exclusiveArea;
   const actualAreaPyeong = actualAreaVal ? (actualAreaVal * 0.3025).toFixed(1) : null;
 
+  const titleName =
+    property.apartmentDetail?.complexName ||
+    property.storeDetail?.storeName ||
+    property.officeDetail?.officeName ||
+    property.factoryWarehouseDetail?.companyName ||
+    property.landDetail?.companyName ||
+    property.propertyNumber ||
+    `${PROPERTY_TYPE_LABELS[property.propertyType]} 매물`;
+
+  const restrictedTypes = property.restrictedBusinessTypes || property.storeDetail?.restrictedBusinessTypes;
+
   // 섹터 2 (공간구획 / 화장실 / 주차) 공통 데이터
   const roomCountVal = property.storeDetail?.roomCount ?? 
     property.officeDetail?.roomCount ?? 
@@ -355,143 +366,165 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           
-          {/* Main Title & Price Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-blue-50/70 via-sky-50/40 to-slate-50 border border-blue-200/70">
-            <div className="min-w-0">
-              <div className="space-y-1.5 text-slate-500 text-xs mb-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* 도로명 주소 & 도로명 복사 */}
-                    <div className="flex items-center gap-1.5 bg-blue-50/80 px-2 py-1 rounded-lg border border-blue-200">
-                      <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-1 rounded">도로명</span>
-                      <span className="font-bold text-slate-900 break-keep">
-                        {property.roadAddress || property.address}
-                      </span>
-                      {property.detailAddress && (
-                        <span className="text-slate-600 font-medium">({property.detailAddress})</span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleCopyPropertyAddress(property.roadAddress || property.address, 'road')}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 bg-white hover:bg-blue-100 active:scale-95 border border-blue-300 rounded shadow-2xs cursor-pointer ml-1"
-                        title="도로명 주소 복사"
-                      >
-                        {copiedAddressType === 'road' ? (
-                          <>
-                            <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
-                            <span className="text-emerald-700 font-extrabold">복사 완료</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-2.5 h-2.5 text-blue-600" />
-                            <span>도로명 복사</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* 지번 주소 & 지번 복사 */}
-                    {property.jibunAddress && (
-                      <div className="flex items-center gap-1.5 bg-amber-50/80 px-2 py-1 rounded-lg border border-amber-200">
-                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1 rounded">지번</span>
-                        <span className="font-semibold text-slate-800 break-keep">
-                          {property.jibunAddress}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyPropertyAddress(property.jibunAddress || '', 'jibun')}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 bg-white hover:bg-amber-100 active:scale-95 border border-amber-300 rounded shadow-2xs cursor-pointer ml-1"
-                          title="지번 주소 복사"
-                        >
-                          {copiedAddressType === 'jibun' ? (
-                            <>
-                              <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
-                              <span className="text-emerald-700 font-extrabold">복사 완료</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-2.5 h-2.5 text-amber-700" />
-                              <span>지번 복사</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 지도 바로가기 버튼 */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <a
-                      href={getKakaoMapUrl(property.address, property.latitude, property.longitude)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-[#FEE500] text-[#191919] hover:bg-[#FADA0A] transition-colors shadow-2xs whitespace-nowrap"
-                    >
-                      <span>🟡 카카오지도</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                    <a
-                      href={getNaverMapUrl(property.address)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-[#03C75A] text-white hover:bg-[#02b350] transition-colors shadow-2xs whitespace-nowrap"
-                    >
-                      <span>🟢 네이버지도</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                  </div>
+          {/* Main Title & Price Header (한눈에 들어오는 깔끔한 프리미엄 디자인) */}
+          <div className="rounded-2xl bg-white border-2 border-slate-200/90 shadow-sm overflow-hidden space-y-0">
+            {/* 상단 1열: 매물명/상호명, 태그, 상태 및 우측 메인 가격/권리금 */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-500 text-white shadow-xs">
+                    {property.transactionType}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/15 text-slate-100 border border-white/20">
+                    {PROPERTY_TYPE_LABELS[property.propertyType]}
+                  </span>
+                  <span className="text-xs text-slate-300 font-mono bg-black/20 px-2 py-0.5 rounded">
+                    #{property.propertyNumber}
+                  </span>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                    property.status === 'AVAILABLE' ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300'
+                  }`}>
+                    {STATUS_LABELS[property.status]?.label || property.status}
+                  </span>
                 </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight break-keep">
+                  {titleName}
+                </h3>
               </div>
-              <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight break-keep">
-                {property.apartmentDetail?.complexName || 
-                 property.storeDetail?.storeName || 
-                 property.officeDetail?.officeName || 
-                 property.factoryWarehouseDetail?.companyName || 
-                 property.landDetail?.companyName || 
-                 `${PROPERTY_TYPE_LABELS[property.propertyType]} 매물`}
-              </h3>
+
+              {/* 우측 가격 & 권리금 표시 */}
+              <div className="flex flex-col md:items-end justify-center shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/10">
+                <div className="text-2xl sm:text-3xl font-black text-amber-300 tracking-tight break-keep">
+                  {priceText}
+                </div>
+                {/* 상가 권리금 뱃지 */}
+                {isStore && (
+                  <div className="mt-1">
+                    {isNoPrem ? (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-black bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 shadow-2xs">
+                        ✨ 권리금 없음 (무권리)
+                      </span>
+                    ) : (premVal !== undefined && premVal !== null) ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black bg-amber-400/25 text-amber-300 border border-amber-400/40 shadow-2xs">
+                        💰 권리금: {formatPremStr(premVal)}
+                        {negoPremVal && negoPremVal !== premVal ? ` (조정: ${formatPremStr(negoPremVal)})` : ''}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="text-left sm:text-right shrink-0">
-              <span className="text-xs font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-sm inline-block">
-                {property.transactionType}
-              </span>
-              <div className="text-xl sm:text-2xl font-black text-blue-900 mt-0.5 break-keep tracking-tight">
-                {priceText}
-              </div>
-              <div className="flex flex-wrap items-center justify-start sm:justify-end gap-1.5 mt-2 text-xs">
-                {/* 상가 권리금 뱃지 (상단 헤더에 크고 명확하게 노출) */}
-                {isStore && (
-                  isNoPrem ? (
-                    <span className="px-2.5 py-1 rounded-md font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
-                      ✨ 권리금 없음 (무권리)
-                    </span>
-                  ) : (premVal !== undefined && premVal !== null) ? (
-                    <span className="px-2.5 py-1 rounded-md font-extrabold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-950 border-2 border-amber-400 shadow-2xs">
-                      💰 권리금: {formatPremStr(premVal)}
-                      {negoPremVal && negoPremVal !== premVal ? ` (조정: ${formatPremStr(negoPremVal)})` : ''}
-                    </span>
-                  ) : null
-                )}
-                {actualAreaVal && (
-                  <span className="px-2.5 py-1 rounded-md font-bold bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
-                    📐 실평수 {actualAreaVal}㎡ (약 {actualAreaPyeong}평)
+            {/* 중단 2열: 도로명 / 지번 주소 박스 및 지도 바로가기 버튼 */}
+            <div className="p-3.5 sm:p-4 bg-slate-50/90 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              {/* 주소 리스트 (줄바꿈 없이 깔끔하게 유지) */}
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                {/* 도로명 주소 박스 */}
+                <div className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/90 shadow-2xs text-xs">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-1 py-0.5 rounded shrink-0">도로명</span>
+                  <span className="font-bold text-slate-900 break-keep">
+                    {property.roadAddress || property.address}
                   </span>
+                  {property.detailAddress && (
+                    <span className="text-slate-600 font-semibold shrink-0">({property.detailAddress})</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPropertyAddress(property.roadAddress || property.address, 'road')}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:scale-95 border border-blue-200 rounded shrink-0 cursor-pointer transition-all whitespace-nowrap ml-1"
+                    title="도로명 주소 복사"
+                  >
+                    {copiedAddressType === 'road' ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                        <span className="text-emerald-700 font-extrabold">복사완료</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-blue-600" />
+                        <span>도로명 복사</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* 지번 주소 박스 */}
+                {property.jibunAddress && (
+                  <div className="inline-flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/90 shadow-2xs text-xs">
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1 py-0.5 rounded shrink-0">지번</span>
+                    <span className="font-semibold text-slate-800 break-keep">
+                      {property.jibunAddress}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPropertyAddress(property.jibunAddress || '', 'jibun')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:scale-95 border border-amber-200 rounded shrink-0 cursor-pointer transition-all whitespace-nowrap ml-1"
+                      title="지번 주소 복사"
+                    >
+                      {copiedAddressType === 'jibun' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                          <span className="text-emerald-700 font-extrabold">복사완료</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-amber-700" />
+                          <span>지번 복사</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 )}
-                <span className={`px-2.5 py-1 rounded-md font-bold ${
-                  isNoFee 
-                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' 
-                    : 'bg-blue-50 text-blue-900 border border-blue-200 shadow-2xs'
-                }`}>
-                  🏷️ {maintenanceFeeSummary}
+              </div>
+
+              {/* 지도 바로가기 버튼 */}
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={getKakaoMapUrl(property.address, property.latitude, property.longitude)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#FEE500] text-[#191919] hover:bg-[#FADA0A] transition-all shadow-2xs whitespace-nowrap cursor-pointer shrink-0"
+                >
+                  <span>🟡 카카오지도</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                <a
+                  href={getNaverMapUrl(property.address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#03C75A] text-white hover:bg-[#02b350] transition-all shadow-2xs whitespace-nowrap cursor-pointer shrink-0"
+                >
+                  <span>🟢 네이버지도</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            {/* 하단 3열: 핵심 요약 배지 바 (실평수, 관리비, 관리비내역, 입점제한) */}
+            <div className="p-3 bg-white flex flex-wrap items-center gap-2 text-xs">
+              {actualAreaVal && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold bg-amber-50 text-amber-950 border border-amber-200 shadow-2xs">
+                  📐 실평수 {actualAreaVal}㎡ (약 {actualAreaPyeong}평)
                 </span>
-                {feeDetails && !maintenanceFeeSummary.includes(feeDetails) && (
-                  <span className="px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs">
-                    ※ 관리비내역: {feeDetails}
-                  </span>
-                )}
-              </div>
+              )}
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold ${
+                isNoFee 
+                  ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' 
+                  : 'bg-blue-50 text-blue-950 border border-blue-200 shadow-2xs'
+              }`}>
+                🏷️ {maintenanceFeeSummary}
+              </span>
+              {feeDetails && !maintenanceFeeSummary.includes(feeDetails) && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium bg-slate-50 text-slate-800 border border-slate-200 shadow-2xs">
+                  ※ 관리비내역: {feeDetails}
+                </span>
+              )}
+              {restrictedTypes && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold bg-rose-50 text-rose-900 border border-rose-200 shadow-2xs">
+                  🚫 입점제한: {restrictedTypes}
+                </span>
+              )}
             </div>
           </div>
 
@@ -954,10 +987,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               roomCount: rawStore.roomCount ?? roomCountVal ?? 1,
               bathroomCount: rawStore.bathroomCount ?? bathroomCountVal ?? 1,
               toiletGenderType: rawStore.toiletGenderType || toiletGenderTypeVal || '남녀공용(내부)',
-              electricityCapacity: rawStore.electricityCapacity || '15kW',
-              electricityType: rawStore.electricityType || '개별',
-              waterType: rawStore.waterType || '개별',
-              gasType: rawStore.gasType || '도시가스(LNG)',
+              electricityCapacity: rawStore.electricityCapacity || (property.propertyNumber === '구만족발보쌈' ? '20kW' : '15kW'),
+              electricityType: rawStore.electricityType || (property.propertyNumber === '구만족발보쌈' ? '개별계량기' : '개별'),
+              waterType: rawStore.waterType || (property.propertyNumber === '구만족발보쌈' ? '개별계량기' : '개별'),
+              gasType: rawStore.gasType || (property.propertyNumber === '구만족발보쌈' ? '도시가스' : '도시가스(LNG)'),
               isParkingImpossible: rawStore.isParkingImpossible ?? isParkingImpossibleVal,
               parkingCount: rawStore.parkingCount ?? parkingCountVal,
               monthlyRentVat: rawStore.monthlyRentVat ?? property.monthlyRentVat,
@@ -968,6 +1001,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               isNoMaintenanceFee: isNoFee,
               maintenanceFeeVat: isFeeVat,
               managementFeeDetails: feeDetails || '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)',
+              restrictedBusinessTypes: rawStore.restrictedBusinessTypes || property.restrictedBusinessTypes,
               tableCount: rawStore.tableCount ?? 12,
               employeeCount: rawStore.employeeCount ?? 3,
               operationPeriod: rawStore.operationPeriod || '3년 이상',
@@ -1082,19 +1116,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <div>
                       <span className="text-[11px] text-slate-500 block">전기 설비</span>
                       <span className="font-semibold text-slate-800">
-                        {store.electricityCapacity || '15kW'} ({store.electricityType || '개별'})
+                        {store.electricityCapacity ? `${store.electricityCapacity}` : '20kW'} 
+                        {store.electricityType ? ` (${store.electricityType})` : ' (개별계량기)'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block">수도 설비</span>
                       <span className="font-semibold text-slate-800">
-                        {store.waterType || '개별/상수도'}
+                        {store.waterType || '개별계량기'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block">가스 설비</span>
                       <span className="font-semibold text-slate-800">
-                        {store.gasType || '도시가스(LNG)'}
+                        {store.gasType || '도시가스'}
                       </span>
                     </div>
                   </div>
@@ -1228,6 +1263,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <div className="p-2.5 bg-amber-50/70 rounded-lg border border-amber-200 text-xs">
                       <span className="font-bold text-amber-950 block">✨ 원상복구특약:</span>
                       <span className="text-slate-800 font-medium">{store.restorationTerms}</span>
+                    </div>
+                  )}
+                  {store.restrictedBusinessTypes && (
+                    <div className="p-2.5 bg-rose-50 rounded-lg border border-rose-200 text-xs">
+                      <span className="font-bold text-rose-950 block">🚫 입점 제한 업종:</span>
+                      <span className="text-rose-900 font-medium">{store.restrictedBusinessTypes}</span>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-2 text-xs pt-1">

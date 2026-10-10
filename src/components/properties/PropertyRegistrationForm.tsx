@@ -282,6 +282,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         if (initialData.propertyNumber === '구만족발보쌈') {
           if (!initialStore.premium) initialStore.premium = 10000;
           if (!initialStore.negotiablePremium) initialStore.negotiablePremium = 7000;
+          if (!initialStore.electricityCapacity) initialStore.electricityCapacity = '20kW';
+          if (!initialStore.electricityType || initialStore.electricityType === '개별') initialStore.electricityType = '개별계량기';
+          if (!initialStore.waterType || initialStore.waterType === '개별') initialStore.waterType = '개별계량기';
+          if (!initialStore.gasType || initialStore.gasType.includes('LPG')) initialStore.gasType = '도시가스';
         } else if (initialData.propertyNumber === '왕돈까스') {
           if (!initialStore.premium) initialStore.premium = 3000;
           if (!initialStore.negotiablePremium) initialStore.negotiablePremium = 3000;

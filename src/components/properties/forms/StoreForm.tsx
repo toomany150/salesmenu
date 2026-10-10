@@ -524,20 +524,25 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">전기 구분</label>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {['개별계량기', '건물공용'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => updateField('electricityType', type)}
-                      className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition-all ${
-                        data.electricityType === type
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                  {['개별계량기', '건물공용'].map((type) => {
+                    const isSelected = data.electricityType === type || 
+                      (type === '개별계량기' && (data.electricityType === '개별' || data.electricityType === '개별계량기')) ||
+                      (type === '건물공용' && (data.electricityType === '공용' || data.electricityType === '건물공용'));
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => updateField('electricityType', type)}
+                        className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition-all ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -552,20 +557,25 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               <div className="pt-2">
                 <label className="block text-xs font-semibold text-slate-600 mb-1">수도 구분</label>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {['개별계량기', '건물공용(n분의1)'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => updateField('waterType', type)}
-                      className={`py-2 px-2 text-xs font-bold rounded-lg border transition-all ${
-                        data.waterType === type
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                  {['개별계량기', '건물공용(n분의1)'].map((type) => {
+                    const isSelected = data.waterType === type ||
+                      (type === '개별계량기' && (data.waterType === '개별' || data.waterType === '개별계량기')) ||
+                      (type === '건물공용(n분의1)' && (data.waterType === '공용' || data.waterType === '건물공용(n분의1)'));
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => updateField('waterType', type)}
+                        className={`py-2 px-2 text-xs font-bold rounded-lg border transition-all ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -580,20 +590,25 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               <div className="pt-2">
                 <label className="block text-xs font-semibold text-slate-600 mb-1">가스 종류</label>
                 <div className="grid grid-cols-3 gap-1">
-                  {['도시가스(LNG)', 'LPG(용기/탱크)', '가스없음(전기)'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => updateField('gasType', type)}
-                      className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
-                        data.gasType === type
-                          ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                      }`}
-                    >
-                      {type.split('(')[0]}
-                    </button>
-                  ))}
+                  {['도시가스(LNG)', 'LPG(용기/탱크)', '가스없음(전기)'].map((type) => {
+                    const prefix = type.split('(')[0];
+                    const isSelected = data.gasType === type ||
+                      (data.gasType && (data.gasType === prefix || type.startsWith(data.gasType) || data.gasType.startsWith(prefix)));
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => updateField('gasType', type)}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center ${
+                          isSelected
+                            ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {prefix}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

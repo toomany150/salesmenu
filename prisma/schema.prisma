@@ -204,10 +204,15 @@ model Property {
   negotiableDeposit     Float?    // 조정 가능한 보증금 (만원)
   monthlyRent           Float?    // 월세 (만원)
   negotiableMonthlyRent Float?    // 조정 가능한 월세 (만원)
+  monthlyRentVat        Boolean   @default(false) // 월세 부가세 별도 여부
   premium               Float?    // 권리금 (만원)
   negotiablePremium     Float?    // 조정 가능한 권리금 (만원)
   isNoPremium           Boolean   @default(false) // 권리금 없음 여부
+  maintenanceFee        Float?    // 관리비 (만원)
   isNoMaintenanceFee    Boolean   @default(false) // 관리비 없음 여부
+  maintenanceFeeVat     Boolean   @default(false) // 관리비 부가세 별도 여부
+  maintenanceFeeDetails String?   // 관리비 내역 직접입력
+  restrictedBusinessTypes String? // 입점 안되는 업종 직접입력
   
   consultationNotes   String?   // 상담내용(메모)
 
@@ -350,6 +355,13 @@ model StoreDetail {
   maintenanceFee             Float?   // 관리비 (만원)
   isNoMaintenanceFee         Boolean  @default(false) // 관리비 없음 여부
   maintenanceFeeVat          Boolean  @default(false) // 관리비 부가세 별도 여부
+  managementFeeDetails       String?  // 관리비 내역 직접입력
+  restrictedBusinessTypes    String?  // 입점 불가 업종 직접입력
+  equipmentList              String?  // 비품 항목
+  rentalList                 String?  // 렌탈 항목
+  businessLicenseTransfer    String?  // 업종인허가승계
+  equipmentRentalTransfer    String?  // 비품/렌탈승계
+  administrativeDisposition  String?  // 행정처분이력
 
   // 운영 및 계약 조건
   tableCount                 Int?     // 총 테이블수
