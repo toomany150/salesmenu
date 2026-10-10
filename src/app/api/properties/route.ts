@@ -271,6 +271,12 @@ export async function POST(request: NextRequest) {
 
     // 접수 고객 직접 입력 시 고객 DB 자동 등록/연동 (요구사항 10: 매도인/임대인/임차인(권리금) 자동 연계 및 가격/메모 매핑)
     let finalCustomerId = customerId || null;
+    if (finalCustomerId) {
+      const cExists = await prisma.customer.findUnique({ where: { id: finalCustomerId } }).catch(() => null);
+      if (!cExists) {
+        finalCustomerId = null;
+      }
+    }
     if (!finalCustomerId && customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {
       const custName = customerInput.name?.trim() || '접수 의뢰고객';
       const custPhone = customerInput.phone?.trim() || '010-0000-0000';
