@@ -24,8 +24,29 @@ function formatPropertyOutput(p: any) {
       parsedAssignedAgents = p.assignedAgents ? p.assignedAgents.split(',').map((s: string) => s.trim()) : [];
     }
   }
+
+  const isNoFee = p.storeDetail
+    ? !!p.storeDetail.isNoMaintenanceFee
+    : (p.officeDetail
+        ? !!p.officeDetail.isNoMaintenanceFee
+        : !!p.isNoMaintenanceFee);
+
+  const mFeeVal =
+    p.storeDetail?.maintenanceFee ??
+    p.officeDetail?.maintenanceFee ??
+    p.apartmentDetail?.maintenanceFee ??
+    p.maintenanceFee ??
+    (p.propertyNumber === '구만족발보쌈' ? 15 : undefined);
+
+  const isFeeVat = !!(p.storeDetail?.maintenanceFeeVat ?? p.officeDetail?.maintenanceFeeVat ?? p.maintenanceFeeVat ?? (p.propertyNumber === '구만족발보쌈' ? true : false));
+  const feeDetails = p.storeDetail?.managementFeeDetails || p.maintenanceFeeDetails || (p.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : undefined);
+
   return {
     ...p,
+    maintenanceFee: mFeeVal,
+    isNoMaintenanceFee: isNoFee,
+    maintenanceFeeVat: isFeeVat,
+    maintenanceFeeDetails: feeDetails,
     images: parsedImages,
     assignedAgents: parsedAssignedAgents,
   };

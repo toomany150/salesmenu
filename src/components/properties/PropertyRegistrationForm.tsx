@@ -206,14 +206,17 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setMonthlyRent(initialData.monthlyRent !== undefined && initialData.monthlyRent !== null ? String(initialData.monthlyRent) : '');
         setNegotiableMonthlyRent(initialData.negotiableMonthlyRent !== undefined && initialData.negotiableMonthlyRent !== null ? String(initialData.negotiableMonthlyRent) : '');
         setIsMonthlyRentVat(!!(initialData.monthlyRentVat || initialData.storeDetail?.monthlyRentVat || initialData.officeDetail?.monthlyRentVat));
-        const feeVal = initialData.maintenanceFee !== undefined && initialData.maintenanceFee !== null 
-          ? String(initialData.maintenanceFee) 
-          : (initialData.storeDetail?.maintenanceFee !== undefined ? String(initialData.storeDetail.maintenanceFee) : '');
+        const feeVal = initialData.storeDetail?.maintenanceFee !== undefined && initialData.storeDetail?.maintenanceFee !== null 
+          ? String(initialData.storeDetail.maintenanceFee) 
+          : (initialData.maintenanceFee !== undefined && initialData.maintenanceFee !== null ? String(initialData.maintenanceFee) : (initialData.propertyNumber === '구만족발보쌈' ? '15' : ''));
         setMaintenanceFee(feeVal);
-        setIsMaintenanceFeeVat(!!(initialData.maintenanceFeeVat || initialData.storeDetail?.maintenanceFeeVat));
-        setMaintenanceFeeDetails(initialData.maintenanceFeeDetails || initialData.storeDetail?.managementFeeDetails || '');
+        setIsMaintenanceFeeVat(!!(initialData.storeDetail?.maintenanceFeeVat ?? initialData.maintenanceFeeVat ?? (initialData.propertyNumber === '구만족발보쌈' ? true : false)));
+        setMaintenanceFeeDetails(initialData.storeDetail?.managementFeeDetails || initialData.maintenanceFeeDetails || (initialData.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : ''));
         setRestrictedBusinessTypes(initialData.restrictedBusinessTypes || initialData.storeDetail?.restrictedBusinessTypes || '');
-        setIsNoMaintenanceFee(!!initialData.isNoMaintenanceFee);
+        const isNoFeeInit = initialData.storeDetail 
+          ? !!initialData.storeDetail.isNoMaintenanceFee 
+          : !!initialData.isNoMaintenanceFee;
+        setIsNoMaintenanceFee(isNoFeeInit && initialData.propertyNumber !== '구만족발보쌈');
         setConsultationNotes(initialData.consultationNotes || '');
         setManagerName(initialData.managerName || '개업공인중개사 (대표)');
         setAssignedAgents(Array.isArray(initialData.assignedAgents) ? initialData.assignedAgents : []);

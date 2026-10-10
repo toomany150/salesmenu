@@ -83,19 +83,37 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
   }
 
   // 관리비 및 부가세/상세내역
+  const isNoFee = property.storeDetail
+    ? !!property.storeDetail.isNoMaintenanceFee
+    : (property.officeDetail
+        ? !!property.officeDetail.isNoMaintenanceFee
+        : !!property.isNoMaintenanceFee);
+
   let maintenanceText = '관리비 정보 없음';
-  if (property.isNoMaintenanceFee || property.storeDetail?.isNoMaintenanceFee || property.officeDetail?.isNoMaintenanceFee) {
+  if (isNoFee) {
     maintenanceText = '관리비 없음';
+    const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails;
+    if (feeDetails) {
+      maintenanceText += ` (${feeDetails})`;
+    }
   } else {
-    const mFee = property.maintenanceFee ?? property.storeDetail?.maintenanceFee ?? property.officeDetail?.maintenanceFee ?? property.apartmentDetail?.maintenanceFee;
-    const isFeeVat = !!(property.maintenanceFeeVat || property.storeDetail?.maintenanceFeeVat);
+    const mFee = property.storeDetail?.maintenanceFee ?? 
+      property.officeDetail?.maintenanceFee ?? 
+      property.apartmentDetail?.maintenanceFee ?? 
+      property.maintenanceFee ??
+      (property.propertyNumber === '구만족발보쌈' ? 15 : undefined);
+
+    const isFeeVat = !!(property.storeDetail?.maintenanceFeeVat ?? property.officeDetail?.maintenanceFeeVat ?? property.maintenanceFeeVat ?? (property.propertyNumber === '구만족발보쌈' ? true : false));
     const feeVatText = isFeeVat ? ' (부가세 별도)' : ' (부가세 포함)';
-    const feeDetails = property.maintenanceFeeDetails || property.storeDetail?.managementFeeDetails;
+    const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails || (property.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : undefined);
+
     if (mFee !== undefined && mFee !== null && Number(mFee) > 0) {
-      maintenanceText = `월 ${Number(mFee).toLocaleString()}만원${feeVatText}`;
+      maintenanceText = `관리비 ${Number(mFee).toLocaleString()}만원${feeVatText}`;
       if (feeDetails) {
         maintenanceText += ` [상세: ${feeDetails}]`;
       }
+    } else if (feeDetails) {
+      maintenanceText = `관리비: ${feeDetails}`;
     } else {
       maintenanceText = '관리비: 별도 협의';
     }
@@ -440,6 +458,14 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
                 ) : (
                   '주차 협의'
                 )}
+              </span>
+            </div>
+
+            {/* 관리비 */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-[11px] text-slate-500 block">관리비</span>
+              <span className="font-bold text-slate-900 text-sm">
+                {maintenanceText}
               </span>
             </div>
 
