@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Building2, Users } from 'lucide-react';
+import { Building2, Users, FileSpreadsheet } from 'lucide-react';
 import { CustomerItem, PropertyItem } from '@/lib/types';
+import { exportPropertiesToExcel, exportCustomersToExcel } from '@/lib/excelExport';
 import { Header } from '../layout/Header';
 import { PropertyList } from '../properties/PropertyList';
 import { CustomerList } from '../crm/CustomerList';
@@ -545,14 +546,40 @@ const DashboardContent: React.FC = () => {
         {/* 섹션 4. 📋 매물현황과 고객현황 */}
         {/* ────────────────────────────────────────────────────────── */}
         <section className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-slate-300 shadow-sm">
-          <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex flex-wrap items-center justify-between mb-3 px-1 gap-2">
             <span className="text-sm font-black text-slate-900 flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-slate-100 text-slate-700">📑</span>
               <span>등록 현황 바로가기</span>
             </span>
-            <span className="text-[11px] sm:text-xs font-semibold text-slate-500">
-              버튼을 누르면 해당 자세한 현황 페이지로 전환됩니다.
-            </span>
+
+            {/* 원클릭 엑셀(.xlsx) 파일 다운로드 버튼 */}
+            <div className="flex items-center gap-2">
+              {currentUser && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => exportPropertiesToExcel(properties)}
+                    title="전체 매물장을 엑셀(.xlsx) 파일로 다운로드합니다"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 group-hover:text-white" />
+                    <span>매물 엑셀 다운로드</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportCustomersToExcel(customers)}
+                    title="전체 고객장을 엑셀(.xlsx) 파일로 다운로드합니다"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 group-hover:text-white" />
+                    <span>고객 엑셀 다운로드</span>
+                  </button>
+                </>
+              )}
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 hidden sm:inline">
+                버튼을 누르면 해당 자세한 현황 페이지로 전환됩니다.
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

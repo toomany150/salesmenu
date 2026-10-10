@@ -15,7 +15,8 @@ import {
   Edit3,
   Camera,
   ImageIcon,
-  Copy
+  Copy,
+  FileSpreadsheet
 } from 'lucide-react';
 import { 
   PropertyItem, 
@@ -23,6 +24,7 @@ import {
   PROPERTY_TYPE_LABELS, 
   STATUS_LABELS 
 } from '@/lib/types';
+import { exportPropertiesToExcel } from '@/lib/excelExport';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
 import { PropertyMapView } from '../map/PropertyMapView';
 import { PropertyFilterPanel } from './PropertyFilterPanel';
@@ -134,6 +136,16 @@ export const PropertyList: React.FC<PropertyListProps> = ({
               <span>카드 뷰</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => exportPropertiesToExcel(filtered)}
+            title="현재 검색된 매물 목록을 엑셀(.xlsx) 파일로 다운로드합니다"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>엑셀 다운로드</span>
+          </button>
 
           <button
             onClick={onOpenNewProperty}

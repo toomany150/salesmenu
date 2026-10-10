@@ -15,9 +15,11 @@ import {
   Filter,
   Users,
   Building2,
-  Check
+  Check,
+  FileSpreadsheet
 } from 'lucide-react';
 import { CustomerItem, CustomerGroup, PROPERTY_TYPE_LABELS } from '@/lib/types';
+import { exportCustomersToExcel } from '@/lib/excelExport';
 import { useAuth } from '../auth/AuthContext';
 import { maskPhoneNumber, canViewCustomerContact, canAccessItem } from '@/lib/auth';
 import { CustomerFilterPanel, CustomerFilterCriteria, INITIAL_CUSTOMER_FILTER_CRITERIA } from './CustomerFilterPanel';
@@ -221,6 +223,16 @@ export const CustomerList: React.FC<CustomerListProps> = ({
             }`}>
               {showFilterPanel ? 'ON' : 'OFF'}
             </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => exportCustomersToExcel(filteredCustomers)}
+            title="현재 검색된 고객 목록을 엑셀(.xlsx) 파일로 다운로드합니다"
+            className="px-3.5 py-2 text-xs font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>엑셀 다운로드</span>
           </button>
 
           <button
