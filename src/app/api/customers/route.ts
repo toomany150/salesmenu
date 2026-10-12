@@ -1,6 +1,6 @@
 // src/app/api/customers/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, ensureDatabaseSchema } from '@/lib/prisma';
 import { INITIAL_CUSTOMERS } from '@/lib/mockData';
 import { maskPhoneNumber, recordAccessLog } from '@/lib/auth';
 
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     if (userName) {
       try { userName = decodeURIComponent(userName); } catch (e) {}
     }
+    await ensureDatabaseSchema();
 
     const whereClause: any = {};
     if (group && (group === 'RECEIVED' || group === 'SEARCHING')) {

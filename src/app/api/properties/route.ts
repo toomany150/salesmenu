@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
     if (userName) {
       try { userName = decodeURIComponent(userName); } catch (e) {}
     }
+    await ensureDatabaseSchema();
     const propertyType = searchParams.get('propertyType');
     const transactionType = searchParams.get('transactionType');
     const status = searchParams.get('status');

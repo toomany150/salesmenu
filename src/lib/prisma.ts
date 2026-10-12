@@ -222,6 +222,22 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingDemandCols.has('monthlyRenewalClaimUsed')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "monthlyRenewalClaimUsed" TEXT;`);
         if (!existingDemandCols.has('loanRequirement')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "loanRequirement" TEXT;`);
       } catch (colErr) {}
+    } else {
+      // 4. PostgreSQL (Supabase / Production) 환경 누락 컬럼 자동 보정
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "isVacantStore" BOOLEAN DEFAULT false;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantLicenseRevoked" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantBizRegRevoked" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "residenceType" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "moveOutPlanDate" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseContractPeriod" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseRemainingPeriod" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseRenewalClaimUsed" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyContractPeriod" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRemainingPeriod" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRenewalClaimUsed" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "loanRequirement" TEXT;`);
+      } catch (pgColErr) {}
     }
 
     globalForPrisma.dbInitialized = true;
