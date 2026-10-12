@@ -23,6 +23,7 @@ import {
   DollarSign,
   HelpCircle,
   MapPin,
+  Home,
   Loader2
 } from 'lucide-react';
 import { 
@@ -330,6 +331,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [minAreaReason, setMinAreaReason] = useState(''); // 최소 필요 면적 이유
   const [previousVisitedProps, setPreviousVisitedProps] = useState(''); // 둘러본 매물 및 계약하지 않은 이유
 
+  // 2-2. 매수인 / 임차인 현재 거주형태 및 대출 계획
+  const [residenceType, setResidenceType] = useState<string>(''); // 자가, 전세, 보증금,월세
+  const [moveOutPlanDate, setMoveOutPlanDate] = useState<string>(''); // 자가일 경우 이사 예정일
+  const [jeonseContractPeriod, setJeonseContractPeriod] = useState<string>(''); // 전세 최초계약기간
+  const [jeonseRemainingPeriod, setJeonseRemainingPeriod] = useState<string>(''); // 전세 남은 기간
+  const [jeonseRenewalClaimUsed, setJeonseRenewalClaimUsed] = useState<string>(''); // 전세 임차갱신권 행사여부
+  const [monthlyContractPeriod, setMonthlyContractPeriod] = useState<string>(''); // 보증금,월세 최초계약기간
+  const [monthlyRemainingPeriod, setMonthlyRemainingPeriod] = useState<string>(''); // 보증금,월세 남은 기간
+  const [monthlyRenewalClaimUsed, setMonthlyRenewalClaimUsed] = useState<string>(''); // 보증금,월세 임차갱신권 행사여부
+  const [loanRequirement, setLoanRequirement] = useState<string>(''); // 매매나 월세일 경우 대출여부
+
   // UI 상태
   const [copiedBriefing, setCopiedBriefing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -366,6 +378,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         if (d.maxBudgetReason) setMaxBudgetReason(d.maxBudgetReason);
         if (d.moveInTiming) setMoveInTiming(d.moveInTiming);
         if (d.moveInReason) setMoveInReason(d.moveInReason);
+        if (d.residenceType) setResidenceType(d.residenceType);
+        if (d.moveOutPlanDate) setMoveOutPlanDate(d.moveOutPlanDate);
+        if (d.jeonseContractPeriod) setJeonseContractPeriod(d.jeonseContractPeriod);
+        if (d.jeonseRemainingPeriod) setJeonseRemainingPeriod(d.jeonseRemainingPeriod);
+        if (d.jeonseRenewalClaimUsed) setJeonseRenewalClaimUsed(d.jeonseRenewalClaimUsed);
+        if (d.monthlyContractPeriod) setMonthlyContractPeriod(d.monthlyContractPeriod);
+        if (d.monthlyRemainingPeriod) setMonthlyRemainingPeriod(d.monthlyRemainingPeriod);
+        if (d.monthlyRenewalClaimUsed) setMonthlyRenewalClaimUsed(d.monthlyRenewalClaimUsed);
+        if (d.loanRequirement) setLoanRequirement(d.loanRequirement);
         if (d.nonNegotiableCondition) setNonNegotiableCondition(d.nonNegotiableCondition);
         if (d.negotiableCondition) setNegotiableCondition(d.negotiableCondition);
         if (d.requirements) setRequirements(d.requirements);
@@ -467,6 +488,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setParkingRequirement('');
       setMoveInTiming('즉시가능');
       setMoveInReason('');
+      setResidenceType('');
+      setMoveOutPlanDate('');
+      setJeonseContractPeriod('');
+      setJeonseRemainingPeriod('');
+      setJeonseRenewalClaimUsed('');
+      setMonthlyContractPeriod('');
+      setMonthlyRemainingPeriod('');
+      setMonthlyRenewalClaimUsed('');
+      setLoanRequirement('');
       setNonNegotiableCondition('');
       setNegotiableCondition('');
       setPremiumLimit('');
@@ -569,6 +599,18 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     script += `1. 찾으시는 물건은 [${regionText}${regionReasonText}] 부근의 [${propTypeLabel}] [${targetTransactionType}] 매물입니다.\n`;
     script += `2. 층수는 [${floorText}], 실면적은 [${areaText}], 주차는 [${parkingText}] 조건을 희망하십니다.\n`;
     script += `3. 예산은 [${budgetText}] 수준이며, 입주/오픈은 [${timingText}${timingReasonText}]을 목표로 하고 계십니다.\n`;
+
+    if (residenceType) {
+      let resDesc = `현재 [${residenceType}] 거주 중`;
+      if (residenceType === '자가' && moveOutPlanDate) resDesc += ` (이사 예정: ${moveOutPlanDate})`;
+      else if (residenceType === '전세' && (jeonseContractPeriod || jeonseRemainingPeriod)) resDesc += ` (계약: ${jeonseContractPeriod || ''}, 잔여: ${jeonseRemainingPeriod || ''})`;
+      else if (residenceType === '보증금,월세' && (monthlyContractPeriod || monthlyRemainingPeriod)) resDesc += ` (계약: ${monthlyContractPeriod || ''}, 잔여: ${monthlyRemainingPeriod || ''})`;
+      script += `4. 현재 거주 형태는 [${resDesc}]이시며`;
+      if (loanRequirement) script += `, 자금은 [${loanRequirement}] 계획이십니다.\n`;
+      else script += `입니다.\n`;
+    } else if (loanRequirement) {
+      script += `4. 자금 대출 계획은 [${loanRequirement}]입니다.\n`;
+    }
 
     if (targetPropertyType === 'STORE') {
       if (premiumLimit) {
@@ -704,6 +746,15 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         parkingRequirement: getFullParkingSummary(),
         moveInTiming: moveInTiming.trim() || undefined,
         moveInReason: moveInReason.trim() || undefined,
+        residenceType: residenceType.trim() || undefined,
+        moveOutPlanDate: moveOutPlanDate.trim() || undefined,
+        jeonseContractPeriod: jeonseContractPeriod.trim() || undefined,
+        jeonseRemainingPeriod: jeonseRemainingPeriod.trim() || undefined,
+        jeonseRenewalClaimUsed: jeonseRenewalClaimUsed.trim() || undefined,
+        monthlyContractPeriod: monthlyContractPeriod.trim() || undefined,
+        monthlyRemainingPeriod: monthlyRemainingPeriod.trim() || undefined,
+        monthlyRenewalClaimUsed: monthlyRenewalClaimUsed.trim() || undefined,
+        loanRequirement: loanRequirement.trim() || undefined,
         nonNegotiableCondition: nonNegotiableCondition.trim() || undefined,
         negotiableCondition: negotiableCondition.trim() || undefined,
         premiumLimit: premiumLimit ? parseFloat(premiumLimit) : undefined,
@@ -1304,13 +1355,17 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   <div className="space-y-2 pt-1 border-t border-indigo-100">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        희망 지역 / 상권 *
+                        {targetPropertyType === 'APARTMENT' || targetPropertyType === 'HOUSE' ? '희망 지역 *' : '희망 지역 / 상권 *'}
                       </label>
                       <input
                         type="text"
                         value={targetRegion}
                         onChange={(e) => setTargetRegion(e.target.value)}
-                        placeholder="예: 강남구 역삼/선릉 먹자골목, 역세권 도보 5분 이내 메인대로변"
+                        placeholder={
+                          targetPropertyType === 'APARTMENT' || targetPropertyType === 'HOUSE'
+                            ? '예: 강남구 대치동 학군지, 역세권 도보 5분 이내 아파트 단지, 학군 우수 지역 등'
+                            : '예: 강남구 역삼/선릉 먹자골목, 역세권 도보 5분 이내 메인대로변'
+                        }
                         className="w-full text-xs font-medium px-3 py-2 bg-white border border-slate-300 rounded-lg"
                       />
                     </div>
@@ -1318,14 +1373,18 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                         <span className="flex items-center gap-1">
                           <span className="text-indigo-600">📍</span>
-                          희망지역/상권을 선정한 이유
+                          {targetPropertyType === 'APARTMENT' || targetPropertyType === 'HOUSE' ? '희망지역 선정이유' : '희망지역/상권을 선정한 이유'}
                         </span>
                         <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-normal">음성 입력 지원</span>
                       </label>
                       <VoiceInput
                         value={regionReason}
                         onChange={setRegionReason}
-                        placeholder="예: 기존 단골 고객층 흡수 유리, 배후 3,000세대 대단지 아파트 배후수요, 직장과 도보 10분 이내 등"
+                        placeholder={
+                          targetPropertyType === 'APARTMENT' || targetPropertyType === 'HOUSE'
+                            ? '예: 직주근접, 자녀 통학 편의, 조용한 주거환경, 대단지 인프라 우수 등'
+                            : '예: 기존 단골 고객층 흡수 유리, 배후 3,000세대 대단지 아파트 배후수요, 직장과 도보 10분 이내 등'
+                        }
                         className="text-xs text-slate-800"
                       />
                     </div>
@@ -1399,6 +1458,249 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                           {item.py}평 ({item.sqm}㎡)
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* 2-1-2. 매수인 / 임차인 현재 거주형태 및 대출 계획 상세 정보 */}
+                  <div className="p-3.5 bg-white rounded-xl border border-indigo-200 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-indigo-50 pb-2">
+                      <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                        <Home className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>매수인 · 임차인 현재 거주 및 대출 정보</span>
+                      </label>
+                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                        직접 입력 지원
+                      </span>
+                    </div>
+
+                    {/* 고객 거주형태 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-slate-700">고객 거주형태</span>
+                        <span className="text-[10px] text-slate-400">자가 / 전세 / 보증금,월세 선택 및 직접입력</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        {[
+                          { key: '자가', label: '🏠 자가' },
+                          { key: '전세', label: '🔑 전세' },
+                          { key: '보증금,월세', label: '💵 보증금,월세' },
+                        ].map((tab) => (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setResidenceType(residenceType === tab.key ? '' : tab.key)}
+                            className={`py-2 px-2 text-xs font-black rounded-lg border transition-all text-center ${
+                              residenceType === tab.key
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={residenceType}
+                        onChange={(e) => setResidenceType(e.target.value)}
+                        placeholder="직접입력: 예: 자가, 전세, 보증금,월세, 부모님 동거, 사택 등"
+                        className="w-full text-xs font-medium px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
+                      />
+                    </div>
+
+                    {/* 자가일 경우: 이사 예정일 (직접입력가능) */}
+                    {residenceType === '자가' && (
+                      <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 space-y-1.5 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-amber-950 flex items-center gap-1">
+                            <span>🏠 자가 거주 — 이사 예정일</span>
+                          </label>
+                          <span className="text-[10px] text-amber-700 font-semibold">직접 입력 가능</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={moveOutPlanDate}
+                          onChange={(e) => setMoveOutPlanDate(e.target.value)}
+                          placeholder="예: 2026년 12월 말 예정 / 매도 완료 후 즉시 이사 / 잔금일 조율 가능 등 직접입력"
+                          className="w-full text-xs font-bold px-3 py-2 bg-white border border-amber-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-amber-500"
+                        />
+                      </div>
+                    )}
+
+                    {/* 전세일 경우: 최초계약기간 / 남은 기간 / 임차갱신권 행사여부 */}
+                    {residenceType === '전세' && (
+                      <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200 space-y-2.5 animate-in fade-in duration-200">
+                        <div className="text-xs font-bold text-blue-950 flex items-center justify-between">
+                          <span>🔑 전세 거주 — 세부 계약 일정 및 갱신권</span>
+                          <span className="text-[10px] text-blue-700 font-semibold">직접 입력</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              최초 계약기간
+                            </label>
+                            <input
+                              type="text"
+                              value={jeonseContractPeriod}
+                              onChange={(e) => setJeonseContractPeriod(e.target.value)}
+                              placeholder="예: 2년 (2024.03 ~ 2026.03)"
+                              className="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              남은 기간
+                            </label>
+                            <input
+                              type="text"
+                              value={jeonseRemainingPeriod}
+                              onChange={(e) => setJeonseRemainingPeriod(e.target.value)}
+                              placeholder="예: 약 5개월 남음 / 2026년 10월 만기"
+                              className="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>임차갱신권(계약갱신요구권) 행사여부</span>
+                            <span className="text-[10px] text-slate-400">선택 또는 직접입력</span>
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                            {['미행사 (행사 가능)', '행사 완료 (소진)', '미행사 (불행사 합의)'].map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setJeonseRenewalClaimUsed(opt)}
+                                className={`py-1 px-1.5 text-[10px] font-bold rounded border transition-colors truncate ${
+                                  jeonseRenewalClaimUsed === opt
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                }`}
+                                title={opt}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            type="text"
+                            value={jeonseRenewalClaimUsed}
+                            onChange={(e) => setJeonseRenewalClaimUsed(e.target.value)}
+                            placeholder="직접입력: 예: 미행사 상태이며 이번에 이사 예정"
+                            className="w-full text-xs font-medium px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 보증금,월세일 경우: 최초계약기간 / 남은 기간 / 임차갱신권 행사여부 */}
+                    {residenceType === '보증금,월세' && (
+                      <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-2.5 animate-in fade-in duration-200">
+                        <div className="text-xs font-bold text-emerald-950 flex items-center justify-between">
+                          <span>💵 보증금,월세 거주 — 세부 계약 일정 및 갱신권</span>
+                          <span className="text-[10px] text-emerald-700 font-semibold">직접 입력</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              최초 계약기간
+                            </label>
+                            <input
+                              type="text"
+                              value={monthlyContractPeriod}
+                              onChange={(e) => setMonthlyContractPeriod(e.target.value)}
+                              placeholder="예: 1년 또는 2년 (2024.05 ~ 2025.05)"
+                              className="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                              남은 기간
+                            </label>
+                            <input
+                              type="text"
+                              value={monthlyRemainingPeriod}
+                              onChange={(e) => setMonthlyRemainingPeriod(e.target.value)}
+                              placeholder="예: 약 3개월 남음 / 2026년 8월 만기"
+                              className="w-full text-xs font-semibold px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>임차갱신권 행사여부</span>
+                            <span className="text-[10px] text-slate-400">선택 또는 직접입력</span>
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                            {['미행사 (행사 가능)', '행사 완료 (소진)', '미행사 (불행사 합의)'].map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setMonthlyRenewalClaimUsed(opt)}
+                                className={`py-1 px-1.5 text-[10px] font-bold rounded border transition-colors truncate ${
+                                  monthlyRenewalClaimUsed === opt
+                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                }`}
+                                title={opt}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            type="text"
+                            value={monthlyRenewalClaimUsed}
+                            onChange={(e) => setMonthlyRenewalClaimUsed(e.target.value)}
+                            placeholder="직접입력: 예: 1회 행사 완료 후 이번에 만기 퇴거"
+                            className="w-full text-xs font-medium px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-900"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 매매나 월세일 경우 대출여부 */}
+                    <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+                          <span>💰 대출 여부 (매매 담보대출 / 전월세 보증금 대출)</span>
+                          {(targetTransactionType === '매매' || targetTransactionType === '월세') && (
+                            <span className="px-1.5 py-0.5 bg-purple-200 text-purple-900 text-[10px] font-extrabold rounded">
+                              {targetTransactionType} 필수확인
+                            </span>
+                          )}
+                        </label>
+                        <span className="text-[10px] text-purple-700 font-semibold">직접 입력 가능</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-1">
+                        {[
+                          '대출 필요 (약 40~50%)',
+                          '대출 필요 (최대한도)',
+                          '대출 불필요 (자부담)',
+                          '대출 기승인/상담중',
+                        ].map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setLoanRequirement(opt)}
+                            className={`py-1 px-1.5 text-[10px] font-bold rounded border transition-colors truncate ${
+                              loanRequirement === opt
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100'
+                            }`}
+                            title={opt}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={loanRequirement}
+                        onChange={(e) => setLoanRequirement(e.target.value)}
+                        placeholder="직접입력: 예: 주택담보대출 3억원 필요 / 버팀목 대출 가능여부 확인 요망 등"
+                        className="w-full text-xs font-bold px-3 py-2 bg-white border border-purple-300 rounded-lg text-purple-950 focus:ring-2 focus:ring-purple-500"
+                      />
                     </div>
                   </div>
 

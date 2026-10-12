@@ -585,6 +585,16 @@ export interface CustomerDemandItem {
   parkingRequirement?: string;
   moveInTiming?: string;
   moveInReason?: string;
+  // 매수인 / 임차인 현재 거주형태 및 대출 계획
+  residenceType?: string;
+  moveOutPlanDate?: string;
+  jeonseContractPeriod?: string;
+  jeonseRemainingPeriod?: string;
+  jeonseRenewalClaimUsed?: string;
+  monthlyContractPeriod?: string;
+  monthlyRemainingPeriod?: string;
+  monthlyRenewalClaimUsed?: string;
+  loanRequirement?: string;
   nonNegotiableCondition?: string;
   negotiableCondition?: string;
   premiumLimit?: number;

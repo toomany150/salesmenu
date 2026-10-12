@@ -161,6 +161,18 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
     script += `2. 희망 스펙: 층수 [${floor}], 실면적 [${area}], 주차 [${demand.parkingRequirement || '협의'}]\n`;
     script += `3. 예산 및 일정: [${budget}], 입주/오픈 [${demand.moveInTiming || '협의'}${demand.moveInReason ? ` (사유: ${demand.moveInReason})` : ''}]\n`;
 
+    if (demand.residenceType) {
+      let resDesc = `현재 [${demand.residenceType}] 거주 중`;
+      if (demand.residenceType === '자가' && demand.moveOutPlanDate) resDesc += ` (이사 예정: ${demand.moveOutPlanDate})`;
+      else if (demand.residenceType === '전세' && (demand.jeonseContractPeriod || demand.jeonseRemainingPeriod)) resDesc += ` (계약: ${demand.jeonseContractPeriod || ''}, 잔여: ${demand.jeonseRemainingPeriod || ''})`;
+      else if (demand.residenceType === '보증금,월세' && (demand.monthlyContractPeriod || demand.monthlyRemainingPeriod)) resDesc += ` (계약: ${demand.monthlyContractPeriod || ''}, 잔여: ${demand.monthlyRemainingPeriod || ''})`;
+      script += `4. 현재 거주 형태: [${resDesc}]`;
+      if (demand.loanRequirement) script += `, 자금 대출: [${demand.loanRequirement}]\n`;
+      else script += `\n`;
+    } else if (demand.loanRequirement) {
+      script += `4. 자금 대출 계획: [${demand.loanRequirement}]\n`;
+    }
+
     if (demand.targetPropertyType === 'STORE') {
       if (demand.premiumLimit !== undefined && demand.premiumLimit !== null) {
         script += `4. 권리금 상한선: [최대 ${formatKoreanMoney(demand.premiumLimit)}]${demand.premiumReason ? ` (${demand.premiumReason})` : ''}\n`;
@@ -666,12 +678,16 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                       {/* 희망 지역 & 이유 */}
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-700">희망 지역/상권:</span>
+                          <span className="font-bold text-slate-700">
+                            {demand.targetPropertyType === 'APARTMENT' || demand.targetPropertyType === 'HOUSE' ? '희망 지역:' : '희망 지역/상권:'}
+                          </span>
                           <span className="font-extrabold text-blue-700">{demand.targetRegion || '지역 무관'}</span>
                         </div>
                         {demand.regionReason && (
                           <div className="text-slate-600 text-[11px] pl-4 border-l-2 border-blue-400 mt-1">
-                            <span className="font-semibold text-slate-700">선정 이유: </span>
+                            <span className="font-semibold text-slate-700">
+                              {demand.targetPropertyType === 'APARTMENT' || demand.targetPropertyType === 'HOUSE' ? '희망지역 선정이유: ' : '선정 이유: '}
+                            </span>
                             {demand.regionReason}
                           </div>
                         )}
@@ -735,6 +751,78 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                           ) : null}
                         </div>
                       </div>
+
+                      {/* 매수인/임차인 거주형태 및 대출 정보 */}
+                      {(demand.residenceType || demand.loanRequirement) && (
+                        <div className="p-3 bg-indigo-50/40 rounded-xl border border-indigo-200 text-xs space-y-2">
+                          <div className="flex items-center justify-between font-bold text-indigo-950">
+                            <span className="flex items-center gap-1.5">
+                              <span>🏠 매수인 · 임차인 현재 거주 및 대출 현황</span>
+                            </span>
+                            {demand.residenceType && (
+                              <span className="px-2 py-0.5 bg-indigo-600 text-white rounded text-[10px] font-bold">
+                                {demand.residenceType}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                            {demand.residenceType === '자가' && demand.moveOutPlanDate && (
+                              <div className="p-2 bg-white rounded border border-indigo-100 sm:col-span-2">
+                                <span className="text-slate-500 font-semibold block">이사 예정일:</span>
+                                <span className="font-bold text-slate-900">{demand.moveOutPlanDate}</span>
+                              </div>
+                            )}
+
+                            {demand.residenceType === '전세' && (
+                              <>
+                                {(demand.jeonseContractPeriod || demand.jeonseRemainingPeriod) && (
+                                  <div className="p-2 bg-white rounded border border-indigo-100">
+                                    <span className="text-slate-500 font-semibold block">계약기간 / 남은기간:</span>
+                                    <span className="font-bold text-slate-900">
+                                      {demand.jeonseContractPeriod || '미기재'}
+                                      {demand.jeonseRemainingPeriod ? ` (잔여: ${demand.jeonseRemainingPeriod})` : ''}
+                                    </span>
+                                  </div>
+                                )}
+                                {demand.jeonseRenewalClaimUsed && (
+                                  <div className="p-2 bg-white rounded border border-indigo-100">
+                                    <span className="text-slate-500 font-semibold block">임차갱신권 행사여부:</span>
+                                    <span className="font-bold text-slate-900">{demand.jeonseRenewalClaimUsed}</span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {demand.residenceType === '보증금,월세' && (
+                              <>
+                                {(demand.monthlyContractPeriod || demand.monthlyRemainingPeriod) && (
+                                  <div className="p-2 bg-white rounded border border-indigo-100">
+                                    <span className="text-slate-500 font-semibold block">계약기간 / 남은기간:</span>
+                                    <span className="font-bold text-slate-900">
+                                      {demand.monthlyContractPeriod || '미기재'}
+                                      {demand.monthlyRemainingPeriod ? ` (잔여: ${demand.monthlyRemainingPeriod})` : ''}
+                                    </span>
+                                  </div>
+                                )}
+                                {demand.monthlyRenewalClaimUsed && (
+                                  <div className="p-2 bg-white rounded border border-indigo-100">
+                                    <span className="text-slate-500 font-semibold block">임차갱신권 행사여부:</span>
+                                    <span className="font-bold text-slate-900">{demand.monthlyRenewalClaimUsed}</span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {demand.loanRequirement && (
+                              <div className="p-2 bg-white rounded border border-purple-200 sm:col-span-2">
+                                <span className="text-purple-700 font-semibold block">대출 계획 / 여부:</span>
+                                <span className="font-bold text-purple-950">{demand.loanRequirement}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {/* 상가 전용 스펙 (권리금 상한, 최소면적, 이전 둘러본 매물) */}
                       {demand.targetPropertyType === 'STORE' && (

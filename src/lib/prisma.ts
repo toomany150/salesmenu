@@ -208,6 +208,20 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingStoreCols.has('previousTenantLicenseRevoked')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "previousTenantLicenseRevoked" TEXT;`);
         if (!existingStoreCols.has('previousTenantBizRegRevoked')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "previousTenantBizRegRevoked" TEXT;`);
       } catch (colErr) {}
+
+      try {
+        const demandCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("CustomerDemand");`).catch(() => []);
+        const existingDemandCols = new Set(demandCols ? demandCols.map((c: any) => c.name) : []);
+        if (!existingDemandCols.has('residenceType')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "residenceType" TEXT;`);
+        if (!existingDemandCols.has('moveOutPlanDate')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "moveOutPlanDate" TEXT;`);
+        if (!existingDemandCols.has('jeonseContractPeriod')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "jeonseContractPeriod" TEXT;`);
+        if (!existingDemandCols.has('jeonseRemainingPeriod')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "jeonseRemainingPeriod" TEXT;`);
+        if (!existingDemandCols.has('jeonseRenewalClaimUsed')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "jeonseRenewalClaimUsed" TEXT;`);
+        if (!existingDemandCols.has('monthlyContractPeriod')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "monthlyContractPeriod" TEXT;`);
+        if (!existingDemandCols.has('monthlyRemainingPeriod')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "monthlyRemainingPeriod" TEXT;`);
+        if (!existingDemandCols.has('monthlyRenewalClaimUsed')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "monthlyRenewalClaimUsed" TEXT;`);
+        if (!existingDemandCols.has('loanRequirement')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "loanRequirement" TEXT;`);
+      } catch (colErr) {}
     }
 
     globalForPrisma.dbInitialized = true;

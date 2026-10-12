@@ -138,6 +138,17 @@ model CustomerDemand {
   moveInTiming          String?   // 희망 입주/오픈 시기 (예: 즉시가능, 2개월 이내, 협의 등)
   moveInReason          String?   // 희망 입주/오픈 시기 이유 (예: 현 임대차만료일, 개업 인테리어 등)
   
+  // <매수인 / 임차인 현재 거주형태 및 대출 계획>
+  residenceType            String?   // 고객 거주형태 (자가, 전세, 보증금,월세)
+  moveOutPlanDate          String?   // 자가일 경우 이사 예정일
+  jeonseContractPeriod     String?   // 전세일 경우 최초계약기간
+  jeonseRemainingPeriod    String?   // 전세일 경우 남은 기간
+  jeonseRenewalClaimUsed   String?   // 전세일 경우 임차갱신권 행사여부
+  monthlyContractPeriod    String?   // 보증금,월세 최초계약기간
+  monthlyRemainingPeriod   String?   // 보증금,월세 남은 기간
+  monthlyRenewalClaimUsed  String?   // 보증금,월세 임차갱신권 행사여부
+  loanRequirement          String?   // 매매나 월세일 경우 대출여부
+  
   // <공통 심층 상담 체크포인트>
   nonNegotiableCondition String? // 절대로 양보할 수 없는 최우선 조건 하나 (1순위 타협불가)
   negotiableCondition    String? // 매물이 정말 좋을 경우 가장 포기하기 쉬운 조건 (양보가능 조건)
