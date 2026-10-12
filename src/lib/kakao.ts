@@ -196,6 +196,137 @@ export function formatAddressByMode(
   };
 }
 
+/**
+ * 카카오톡/문자 공유 링크에 포함할 고객 브리핑용 경량 데이터 생성
+ * - 소유주, 고객 개인정보, 비밀 중개메모를 철저히 제거
+ * - 핵심 매물 정보만 슬림하게 담아 URL 글자 수 제한 내에 안전하게 인코딩
+ */
+export function createSlimBriefingPayload(
+  propTarget: any,
+  addrMode: AddressShareMode = 'dong',
+  isHideName: boolean = true
+): string {
+  try {
+    if (!propTarget) return '';
+
+    const cleanImages = Array.isArray(propTarget.images)
+      ? propTarget.images.filter((img: string) => typeof img === 'string' && img.startsWith('http')).slice(0, 3)
+      : [];
+
+    let displayAddr = propTarget.address || '';
+    let displayDetail = propTarget.detailAddress || '';
+    if (addrMode === 'hidden') {
+      displayAddr = '소재지 유선 상담 시 안내';
+      displayDetail = '';
+    } else if (addrMode === 'dong') {
+      displayAddr = getDongLevelAddress(propTarget.address);
+      displayDetail = '(상세주소는 상담 시 안내)';
+    }
+
+    const slim: any = {
+      id: propTarget.id || propTarget.propertyNumber,
+      propertyNumber: propTarget.propertyNumber || propTarget.id,
+      propertyType: propTarget.propertyType,
+      transactionType: propTarget.transactionType || '월세',
+      status: propTarget.status || 'AVAILABLE',
+      price: propTarget.price,
+      deposit: propTarget.deposit,
+      monthlyRent: propTarget.monthlyRent,
+      monthlyRentVat: propTarget.monthlyRentVat,
+      premium: propTarget.premium,
+      negotiablePremium: propTarget.negotiablePremium,
+      maintenanceFee: propTarget.maintenanceFee,
+      isNoMaintenanceFee: propTarget.isNoMaintenanceFee,
+      maintenanceFeeVat: propTarget.maintenanceFeeVat,
+      maintenanceFeeDetails: propTarget.maintenanceFeeDetails,
+      address: displayAddr,
+      detailAddress: displayDetail,
+      pyung: propTarget.pyung,
+      exclusiveArea: propTarget.exclusiveArea,
+      supplyArea: propTarget.supplyArea,
+      landArea: propTarget.landArea,
+      totalFloorArea: propTarget.totalFloorArea,
+      floor: propTarget.floor,
+      totalFloor: propTarget.totalFloor,
+      roomCount: propTarget.roomCount,
+      bathroomCount: propTarget.bathroomCount,
+      parking: propTarget.parking,
+      direction: propTarget.direction,
+      availableDate: propTarget.availableDate,
+      approvalDate: propTarget.approvalDate,
+      buildingRegisterUse: propTarget.buildingRegisterUse,
+      images: cleanImages,
+      isCustomerBriefing: true,
+      addressMode: addrMode,
+      hidePropertyName: isHideName,
+    };
+
+    if (propTarget.storeDetail) {
+      slim.storeDetail = {
+        storeName: propTarget.storeDetail.storeName,
+        currentBusiness: propTarget.storeDetail.currentBusiness,
+        recommendedBusiness: propTarget.storeDetail.recommendedBusiness,
+        premium: propTarget.storeDetail.premium,
+        isNoPremium: propTarget.storeDetail.isNoPremium,
+        maintenanceFee: propTarget.storeDetail.maintenanceFee,
+        isNoMaintenanceFee: propTarget.storeDetail.isNoMaintenanceFee,
+        managementFeeDetails: propTarget.storeDetail.managementFeeDetails,
+        restrictedBusinessTypes: propTarget.storeDetail.restrictedBusinessTypes,
+      };
+    }
+    if (propTarget.apartmentDetail) {
+      slim.apartmentDetail = {
+        complexName: propTarget.apartmentDetail.complexName,
+        dong: propTarget.apartmentDetail.dong,
+        floor: propTarget.apartmentDetail.floor,
+        totalFloor: propTarget.apartmentDetail.totalFloor,
+        exclusiveArea: propTarget.apartmentDetail.exclusiveArea,
+        supplyArea: propTarget.apartmentDetail.supplyArea,
+        roomCount: propTarget.apartmentDetail.roomCount,
+        bathroomCount: propTarget.apartmentDetail.bathroomCount,
+        maintenanceFee: propTarget.apartmentDetail.maintenanceFee,
+      };
+    }
+    if (propTarget.officeDetail) {
+      slim.officeDetail = {
+        officeName: propTarget.officeDetail.officeName,
+        maintenanceFee: propTarget.officeDetail.maintenanceFee,
+        isNoMaintenanceFee: propTarget.officeDetail.isNoMaintenanceFee,
+        parking: propTarget.officeDetail.parking,
+      };
+    }
+    if (propTarget.houseDetail) {
+      slim.houseDetail = {
+        houseType: propTarget.houseDetail.houseType,
+        roomCount: propTarget.houseDetail.roomCount,
+        bathroomCount: propTarget.houseDetail.bathroomCount,
+      };
+    }
+    if (propTarget.factoryWarehouseDetail) {
+      slim.factoryWarehouseDetail = {
+        companyName: propTarget.factoryWarehouseDetail.companyName,
+        powerCapacity: propTarget.factoryWarehouseDetail.powerCapacity,
+        crane: propTarget.factoryWarehouseDetail.crane,
+      };
+    }
+    if (propTarget.landDetail) {
+      slim.landDetail = {
+        companyName: propTarget.landDetail.companyName,
+        zoningDistrict: propTarget.landDetail.zoningDistrict,
+      };
+    }
+
+    const jsonStr = JSON.stringify(slim);
+    const b64 = toUtf8Base64(jsonStr);
+    if (b64 && b64.length < 2400) {
+      return `&pData=${encodeURIComponent(b64)}`;
+    }
+    return '';
+  } catch (e) {
+    return '';
+  }
+}
+
 export interface SharePropertyParams {
   id?: string;
   title: string;
@@ -220,9 +351,6 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
 
   const { displayAddress } = formatAddressByMode(params.address, params.detailAddress, addrMode);
 
-  // 수신자 스마트폰에서 Vercel 서버리스 DB 동기화 여부와 무관하게 100% 즉시 고객용 브리핑 모달이 열리도록
-  // 보안 가공(소유자 정보, 중개사 비밀 메모 제거 및 주소 마스킹)된 pData를 URL 파라미터에 안전하게 인코딩합니다.
-  let pDataQuery = '';
   const propTarget = params.property || {
     id: params.id,
     propertyNumber: params.propertyNumber,
@@ -233,51 +361,7 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
     detailAddress: params.detailAddress,
   };
 
-  try {
-    const cleanImages = Array.isArray(propTarget.images)
-      ? propTarget.images.filter((img: string) => typeof img === 'string' && img.startsWith('http')).slice(0, 3)
-      : [];
-
-    const payload = {
-      ...propTarget,
-      images: cleanImages,
-      isCustomerBriefing: true,
-      addressMode: addrMode,
-      hidePropertyName: isHideName,
-    };
-
-    // 보안 강화: 외부 고객에게 절대 노출되면 안 되는 소유주/임대인 및 내부 중개 메모 철저 제거
-    delete payload.customer;
-    delete payload.customerId;
-    delete payload.ownerRegNo;
-    delete payload.consultationNotes;
-    delete payload.managerName;
-    delete payload.assignedAgents;
-    delete payload.negotiablePrice;
-    delete payload.negotiableDeposit;
-    delete payload.negotiableMonthlyRent;
-
-    // 주소 모드에 따른 주소 데이터 가공
-    if (addrMode === 'hidden') {
-      payload.address = '소재지 유선 상담 시 안내';
-      payload.detailAddress = '';
-      payload.roadAddress = '';
-      payload.jibunAddress = '';
-    } else if (addrMode === 'dong') {
-      payload.address = getDongLevelAddress(propTarget.address);
-      payload.detailAddress = '(상세주소는 상담 시 안내)';
-      payload.roadAddress = '';
-      payload.jibunAddress = '';
-    }
-
-    const jsonStr = JSON.stringify(payload);
-    const b64 = toUtf8Base64(jsonStr);
-    if (b64 && b64.length < 1400) {
-      pDataQuery = `&pData=${encodeURIComponent(b64)}`;
-    }
-  } catch (err) {
-    console.warn('pData encoding notice:', err);
-  }
+  const pDataQuery = createSlimBriefingPayload(propTarget, addrMode, isHideName);
 
   const shareUrl = propIdentifier
     ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}&addrMode=${addrMode}&hideName=${isHideName ? '1' : '0'}${pDataQuery}`
@@ -380,49 +464,7 @@ export async function copyPropertyShareLink(
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
   const propId = property.propertyNumber || property.id || '';
-  
-  // URL에 pData도 포함하여 DB 상태와 무관하게 100% 동일하게 열리도록 구성
-  let pDataQuery = '';
-  try {
-    const cleanImages = Array.isArray(property.images)
-      ? property.images.filter((img: string) => typeof img === 'string' && img.startsWith('http')).slice(0, 3)
-      : [];
-    const payload = {
-      ...property,
-      images: cleanImages,
-      isCustomerBriefing: true,
-      addressMode,
-      hidePropertyName,
-    };
-    delete payload.customer;
-    delete payload.customerId;
-    delete payload.ownerRegNo;
-    delete payload.consultationNotes;
-    delete payload.managerName;
-    delete payload.assignedAgents;
-    delete payload.negotiablePrice;
-    delete payload.negotiableDeposit;
-    delete payload.negotiableMonthlyRent;
-
-    if (addressMode === 'hidden') {
-      payload.address = '소재지 유선 상담 시 안내';
-      payload.detailAddress = '';
-      payload.roadAddress = '';
-      payload.jibunAddress = '';
-    } else if (addressMode === 'dong') {
-      payload.address = getDongLevelAddress(property.address);
-      payload.detailAddress = '(상세주소는 상담 시 안내)';
-      payload.roadAddress = '';
-      payload.jibunAddress = '';
-    }
-
-    const jsonStr = JSON.stringify(payload);
-    const b64 = toUtf8Base64(jsonStr);
-    if (b64 && b64.length < 1400) {
-      pDataQuery = `&pData=${encodeURIComponent(b64)}`;
-    }
-  } catch {}
-
+  const pDataQuery = createSlimBriefingPayload(property, addressMode, hidePropertyName);
   const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}${pDataQuery}`;
   
   let priceStr = '';
@@ -490,7 +532,8 @@ export function generateSmsLink(
   hidePropertyName: boolean = true
 ): string {
   const baseUrl = getAppBaseUrl();
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}`;
+  const pDataQuery = createSlimBriefingPayload(property, addressMode, hidePropertyName);
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}${pDataQuery}`;
 
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -567,7 +610,8 @@ export function getSmsText(
 ): string {
   const baseUrl = getAppBaseUrl();
   const propId = property.propertyNumber || property.id || '';
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}`;
+  const pDataQuery = createSlimBriefingPayload(property, addressMode, hidePropertyName);
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}${pDataQuery}`;
 
   let priceStr = '';
   if (property.transactionType === '매매') {

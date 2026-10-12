@@ -95,8 +95,23 @@ export async function GET(request: NextRequest) {
     const transactionType = searchParams.get('transactionType');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const propertyIdParam = searchParams.get('propertyId') || searchParams.get('id');
 
     const whereClause: any = {};
+    if (propertyIdParam) {
+      whereClause.OR = [
+        { id: propertyIdParam },
+        { propertyNumber: propertyIdParam },
+      ];
+    } else if (search) {
+      whereClause.OR = [
+        { propertyNumber: { contains: search } },
+        { address: { contains: search } },
+        { detailAddress: { contains: search } },
+        { consultationNotes: { contains: search } },
+        { customer: { name: { contains: search } } },
+      ];
+    }
     if (propertyType && propertyType !== 'ALL') {
       whereClause.propertyType = propertyType;
     }
@@ -105,15 +120,6 @@ export async function GET(request: NextRequest) {
     }
     if (status && status !== 'ALL') {
       whereClause.status = status;
-    }
-    if (search) {
-      whereClause.OR = [
-        { propertyNumber: { contains: search } },
-        { address: { contains: search } },
-        { detailAddress: { contains: search } },
-        { consultationNotes: { contains: search } },
-        { customer: { name: { contains: search } } },
-      ];
     }
 
     let properties = await prisma.property.findMany({
@@ -241,6 +247,32 @@ export async function GET(request: NextRequest) {
           };
         }
         return p;
+      });
+    }
+
+    // 비로그인 사용자(카카오톡 매물 공유 링크로 접근한 외부 고객 등)인 경우:
+    // 소유주/고객 개인정보 및 내부 비밀 상담메모 등 비공개 항목을 철저히 마스킹/제거하여 정보 유출 방지
+    if (!userRole) {
+      formattedProperties = formattedProperties.map((p: any) => {
+        const { 
+          customer, 
+          customerId,
+          consultationNotes, 
+          ownerRegNo, 
+          managerName, 
+          assignedAgents, 
+          negotiablePrice, 
+          negotiableDeposit, 
+          negotiableMonthlyRent, 
+          ...safeProps 
+        } = p;
+        return {
+          ...safeProps,
+          customer: null,
+          customerId: null,
+          consultationNotes: '',
+          isCustomerBriefing: true,
+        };
       });
     }
 

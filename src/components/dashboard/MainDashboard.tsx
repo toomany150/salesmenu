@@ -60,6 +60,7 @@ const DashboardContent: React.FC = () => {
   const [sharedBriefingProperty, setSharedBriefingProperty] = useState<PropertyItem | null>(null);
   const [sharedAddressMode, setSharedAddressMode] = useState<AddressShareMode>('dong');
   const [sharedHideName, setSharedHideName] = useState<boolean | undefined>(undefined);
+  const [isBriefingLoading, setIsBriefingLoading] = useState(false);
 
   // Auth, Admin & Sync Modals
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -186,9 +187,19 @@ const DashboardContent: React.FC = () => {
         setSharedHideName(hideNameParam === '1' || hideNameParam === 'true');
       }
 
+      // 공유 링크 접속이 아닌 일반 접속인 경우 즉시 종료
+      if (!propId && !pDataRaw) {
+        setIsBriefingLoading(false);
+        return;
+      }
+
+      setIsBriefingLoading(true);
+
+      // 1. pData가 있는 경우 디코딩 시도 (DB 동기화 여부와 무관하게 100% 즉시 표시)
       if (pDataRaw) {
         try {
-          const binaryStr = atob(pDataRaw);
+          const sanitizedB64 = pDataRaw.replace(/ /g, '+');
+          const binaryStr = atob(sanitizedB64);
           const bytes = new Uint8Array(binaryStr.length);
           for (let i = 0; i < binaryStr.length; i++) {
             bytes[i] = binaryStr.charCodeAt(i);
@@ -197,39 +208,72 @@ const DashboardContent: React.FC = () => {
           const decoded = JSON.parse(decoder.decode(bytes));
           if (decoded && (decoded.id || decoded.propertyNumber)) {
             setSharedBriefingProperty(decoded);
+            setIsBriefingLoading(false);
             return;
           }
         } catch (e) {
           try {
-            const fallback = JSON.parse(decodeURIComponent(escape(atob(pDataRaw))));
+            const sanitizedB64 = pDataRaw.replace(/ /g, '+');
+            const fallback = JSON.parse(decodeURIComponent(escape(atob(sanitizedB64))));
             if (fallback && (fallback.id || fallback.propertyNumber)) {
               setSharedBriefingProperty(fallback);
+              setIsBriefingLoading(false);
               return;
             }
           } catch (err) {}
         }
       }
 
+      // 2. propertyId로 매물 검색 (현재 메모리 -> 로컬 스토리지 캐시 -> 서버 API)
       if (propId) {
-        // 1. 현재 로드된 매물 목록에서 검색
+        // 2-1. 현재 로드된 매물 목록에서 검색
         const found = properties.find((p) => p.id === propId || p.propertyNumber === propId);
         if (found) {
           setSharedBriefingProperty(found);
-        } else {
-          // 2. 비로그인 고객을 위해 서버 API 조회
-          fetch('/api/properties')
-            .then((res) => res.json())
-            .then((data) => {
-              const list: PropertyItem[] = data.properties || [];
-              const match = list.find((p) => p.id === propId || p.propertyNumber === propId);
-              if (match) {
-                setSharedBriefingProperty(match);
-              }
-            })
-            .catch(() => {});
+          setIsBriefingLoading(false);
+          return;
         }
+
+        // 2-2. 로컬 브라우저 등록 매물 목록에서 검색
+        const localProps = getCustomProperties();
+        const localFound = localProps.find((p) => p.id === propId || p.propertyNumber === propId);
+        if (localFound) {
+          setSharedBriefingProperty(localFound);
+          setIsBriefingLoading(false);
+          return;
+        }
+
+        // 2-3. 비로그인 고객을 위해 서버 API 단일/전체 매물 조회
+        fetch(`/api/properties?propertyId=${encodeURIComponent(propId)}`)
+          .then((res) => res.json())
+          .then((data) => {
+            let match: PropertyItem | undefined = undefined;
+            if (Array.isArray(data)) {
+              match = data.find((p) => p.id === propId || p.propertyNumber === propId) || data[0];
+            } else if (data && typeof data === 'object') {
+              if (data.id === propId || data.propertyNumber === propId) {
+                match = data;
+              } else if (Array.isArray(data.properties)) {
+                match = data.properties.find((p: any) => p.id === propId || p.propertyNumber === propId);
+              }
+            }
+
+            if (match) {
+              setSharedBriefingProperty(match);
+            }
+          })
+          .catch((err) => {
+            console.warn('Failed to load shared property by ID:', err);
+          })
+          .finally(() => {
+            setIsBriefingLoading(false);
+          });
+      } else {
+        setIsBriefingLoading(false);
       }
-    } catch (e) {}
+    } catch (e) {
+      setIsBriefingLoading(false);
+    }
   }, [properties]);
 
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
@@ -763,6 +807,27 @@ const DashboardContent: React.FC = () => {
         onSuccess={handleCustomerSaved}
         defaultGroup={activeTab === 'SEARCHING_GROUP' ? 'SEARCHING' : 'RECEIVED'}
       />
+
+      {/* 2.4) 카카오톡/문자 매물 안내장 로딩 화면 */}
+      {isBriefingLoading && (
+        <div className="fixed inset-0 z-[130] bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center p-4 text-white">
+          <div className="bg-white text-slate-900 rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 animate-pulse">
+              <Building2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900 mb-1">
+              매물 브리핑 안내장 로딩 중
+            </h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              고객님께 전달된 매물 정보 및 사진을 안전하게 불러오고 있습니다. 잠시만 기다려주세요.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-blue-600">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+              <span>안내장 준비 중...</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2.5) 카카오톡/문자 공유 링크 접속 시 고객 전용 공식 매물 브리핑 안내장 화면 */}
       {sharedBriefingProperty && (

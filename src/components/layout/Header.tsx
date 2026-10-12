@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDataSync,
   onGoHome,
 }) => {
-  const { currentUser, login, logout, loginAsDefaultAdmin } = useAuth();
+  const { currentUser, login, logout } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN';
 
   // Inline Agent Login form state
@@ -173,16 +173,6 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                   )}
                 </form>
-
-                {/* 원클릭 대표(기본값) 접속 버튼 */}
-                <button
-                  type="button"
-                  onClick={loginAsDefaultAdmin}
-                  title="개업공인중개사(대표) 기본 세션으로 바로 접속"
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-purple-900 hover:text-white hover:bg-purple-700 bg-purple-100/90 border border-purple-300 rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
-                >
-                  <span>👑 대표 기본 접속</span>
-                </button>
               </div>
             ) : (
               /* 로그인 완료된 상태 */

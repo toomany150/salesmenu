@@ -269,18 +269,6 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
               <span className="whitespace-nowrap">📞 전화 상담</span>
             </a>
 
-            {!currentUser && onOpenLogin && (
-              <button
-                type="button"
-                onClick={onOpenLogin}
-                title="중개사 전용 로그인"
-                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition-colors"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">중개사 로그인</span>
-              </button>
-            )}
-
             {onClose && (
               <button
                 type="button"
@@ -729,6 +717,17 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
           <p className="text-[11px] text-slate-400">
             본 안내장은 의뢰 고객의 확인을 위해 발급된 공인중개사 매물 브리핑 문서입니다.
           </p>
+          {!currentUser && onOpenLogin && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onOpenLogin}
+                className="text-[11px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
+              >
+                관리자(중개사) 로그인
+              </button>
+            </div>
+          )}
         </div>
 
       </main>
