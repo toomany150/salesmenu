@@ -200,6 +200,14 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingPropCols.has('negotiableDeposit')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiableDeposit" REAL;`);
         if (!existingPropCols.has('negotiableMonthlyRent')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiableMonthlyRent" REAL;`);
       } catch (colErr) {}
+
+      try {
+        const storeCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("StoreDetail");`).catch(() => []);
+        const existingStoreCols = new Set(storeCols ? storeCols.map((c: any) => c.name) : []);
+        if (!existingStoreCols.has('isVacantStore')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "isVacantStore" BOOLEAN DEFAULT false;`);
+        if (!existingStoreCols.has('previousTenantLicenseRevoked')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "previousTenantLicenseRevoked" TEXT;`);
+        if (!existingStoreCols.has('previousTenantBizRegRevoked')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "previousTenantBizRegRevoked" TEXT;`);
+      } catch (colErr) {}
     }
 
     globalForPrisma.dbInitialized = true;

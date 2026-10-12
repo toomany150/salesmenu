@@ -1201,6 +1201,35 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {/* 상가 공실 시 전세입자 인허가/사업자 말소 점검 표시 */}
+                  {(store.isVacantStore || store.previousTenantLicenseRevoked || store.previousTenantBizRegRevoked) && (
+                    <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-xs space-y-1.5">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                        <span>🚨 상가 공실 점검 (전세입자 말소 확인)</span>
+                        {store.isVacantStore && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded font-bold">
+                            현재 공실
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        <div className="bg-white p-2 rounded border border-amber-100">
+                          <span className="text-slate-500 block">전세입자 영업허가증 말소 여부:</span>
+                          <span className="font-bold text-slate-800">
+                            {store.previousTenantLicenseRevoked || '미확인'}
+                          </span>
+                        </div>
+                        <div className="bg-white p-2 rounded border border-amber-100">
+                          <span className="text-slate-500 block">전세입자 사업자등록증 말소 여부:</span>
+                          <span className="font-bold text-slate-800">
+                            {store.previousTenantBizRegRevoked || '미확인'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {(store.equipmentList || store.rentalList) && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-xs">
                       {store.equipmentList && (

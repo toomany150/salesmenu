@@ -1157,7 +1157,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                 섹터 5. 법적 인허가 및 계약·명의 리스크 점검
               </h4>
               <span className="text-xs text-rose-700">
-                위반건축물 여부, 계약년도/갱신요구권 잔여, 사업자등록 및 실운영자 명의 일치
+                위반건축물, 계약년도/갱신권, 사업자·명의 일치, 공실 시 전세입자 인허가·사업자 말소 점검
               </span>
             </div>
           </div>
@@ -1299,6 +1299,181 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                 />
               </div>
             </div>
+          </div>
+
+          {/* 상가가 공실일 경우: 전세입자 영업허가증 및 사업자등록증 말소 여부 점검 (임차/월세 필수) */}
+          <div className="p-3.5 bg-amber-50/80 rounded-xl border-2 border-amber-300/90 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <label className="text-sm font-bold text-amber-950 flex items-center gap-1.5">
+                  <span className="p-1 rounded-md bg-amber-500 text-white text-xs font-black shadow-2xs">공실점검</span>
+                  <span>상가 공실 시 전세입자 인허가·사업자 말소 확인 *</span>
+                </label>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  상가가 공실인 경우, 전세입자의 영업허가 및 사업자가 말소되지 않으면 신규 임차인의 인허가 및 사업자등록이 불가할 수 있습니다.
+                </p>
+              </div>
+
+              {/* 공실 여부 선택 버튼 */}
+              <div className="inline-flex rounded-lg border border-amber-300 p-0.5 bg-white shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => updateField('isVacantStore', false)}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
+                    !data.isVacantStore
+                      ? 'bg-slate-700 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  영업중 (기존 임차인)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateField('isVacantStore', true);
+                    if (!data.previousTenantLicenseRevoked) {
+                      updateField('previousTenantLicenseRevoked', '말소 완료 (신규 인허가 정상 발급 가능)');
+                    }
+                    if (!data.previousTenantBizRegRevoked) {
+                      updateField('previousTenantBizRegRevoked', '말소(폐업) 완료 (정상 사업자등록 가능)');
+                    }
+                  }}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-colors flex items-center gap-1 ${
+                    data.isVacantStore
+                      ? 'bg-rose-600 text-white shadow-2xs font-extrabold'
+                      : 'text-rose-700 hover:bg-rose-50 font-bold'
+                  }`}
+                >
+                  <span>🚨 현재 공실 (말소 점검)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 상가가 공실일 경우 점검 폼 */}
+            {data.isVacantStore ? (
+              <div className="pt-2.5 border-t border-amber-200/90 space-y-3 animate-in fade-in duration-150">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  
+                  {/* 1) 전세입자가 영업허가증 말소 여부 */}
+                  <div className="p-3 bg-white rounded-xl border-2 border-amber-300 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black text-slate-900 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                        전세입자 영업허가증 말소 여부 *
+                      </label>
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                        신규 인허가 승계/발급
+                      </span>
+                    </div>
+                    <select
+                      value={
+                        data.previousTenantLicenseRevoked?.includes('미말소')
+                          ? '미말소'
+                          : data.previousTenantLicenseRevoked?.includes('해당없음')
+                            ? '해당없음'
+                            : data.previousTenantLicenseRevoked?.includes('확인중')
+                              ? '확인중'
+                              : '말소완료'
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '말소완료') {
+                          updateField('previousTenantLicenseRevoked', '말소 완료 (신규 인허가 정상 발급 가능)');
+                        } else if (val === '미말소') {
+                          updateField('previousTenantLicenseRevoked', '미말소 (주의: 신규 인허가 불가 리스크 / 직권말소 필요)');
+                        } else if (val === '확인중') {
+                          updateField('previousTenantLicenseRevoked', '확인 필요 (구청 위생과 폐업 조회 요망)');
+                        } else {
+                          updateField('previousTenantLicenseRevoked', '해당없음 (자유업종 / 인허가 불필요)');
+                        }
+                      }}
+                      className="w-full text-xs px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-900 focus:bg-white"
+                    >
+                      <option value="말소완료">🟢 말소 완료 (신규 인허가 정상 발급 가능)</option>
+                      <option value="미말소">🔴 미말소 (주의: 인허가 불가 리스크 / 직권말소 필요)</option>
+                      <option value="확인중">🟡 확인 필요 (구청 위생과 조회 요망)</option>
+                      <option value="해당없음">⚪ 해당없음 (자유업종 / 인허가 불필요)</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={data.previousTenantLicenseRevoked || ''}
+                      onChange={(e) => updateField('previousTenantLicenseRevoked', e.target.value)}
+                      placeholder="예: 말소 완료 (신규 인허가 정상 발급 가능) / 직권말소 신청 완료"
+                      className="w-full text-xs px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  {/* 2) 전세입자가 사업자등록증 말소 여부 */}
+                  <div className="p-3 bg-white rounded-xl border-2 border-amber-300 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-black text-slate-900 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                        전세입자 사업자등록증 말소 여부 *
+                      </label>
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                        사업자 중복 방지
+                      </span>
+                    </div>
+                    <select
+                      value={
+                        data.previousTenantBizRegRevoked?.includes('미말소')
+                          ? '미말소'
+                          : data.previousTenantBizRegRevoked?.includes('확인중')
+                            ? '확인중'
+                            : data.previousTenantBizRegRevoked?.includes('해당없음')
+                              ? '해당없음'
+                              : '말소완료'
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '말소완료') {
+                          updateField('previousTenantBizRegRevoked', '말소(폐업) 완료 (정상 사업자등록 가능)');
+                        } else if (val === '미말소') {
+                          updateField('previousTenantBizRegRevoked', '미말소 (주의: 사업자등록 중복 불가 리스크)');
+                        } else if (val === '확인중') {
+                          updateField('previousTenantBizRegRevoked', '확인 필요 (세무서/홈택스 폐업사실 확인 요망)');
+                        } else {
+                          updateField('previousTenantBizRegRevoked', '해당없음 (신규 첫 입점 건물)');
+                        }
+                      }}
+                      className="w-full text-xs px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-900 focus:bg-white"
+                    >
+                      <option value="말소완료">🟢 말소(폐업) 완료 (정상 사업자등록 가능)</option>
+                      <option value="미말소">🔴 미말소 (주의: 사업자등록 중복 불가 리스크)</option>
+                      <option value="확인중">🟡 확인 필요 (세무서 폐업조회 요망)</option>
+                      <option value="해당없음">⚪ 해당없음 (신규 첫 입점 건물)</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={data.previousTenantBizRegRevoked || ''}
+                      onChange={(e) => updateField('previousTenantBizRegRevoked', e.target.value)}
+                      placeholder="예: 말소(폐업) 완료 (정상 사업자등록 가능) / 세무서 확인 완료"
+                      className="w-full text-xs px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+
+                </div>
+              </div>
+            ) : (
+              <div className="p-2.5 bg-white/70 rounded-lg border border-amber-200 text-xs text-slate-600 flex items-center justify-between">
+                <span>현재 기존 임차인이 영업 중인 점포입니다. (상가가 공실인 경우 우측 상단의 <strong className="text-rose-700">🚨 현재 공실</strong> 버튼을 클릭하여 말소 여부를 점검하세요)</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateField('isVacantStore', true);
+                    if (!data.previousTenantLicenseRevoked) {
+                      updateField('previousTenantLicenseRevoked', '말소 완료 (신규 인허가 정상 발급 가능)');
+                    }
+                    if (!data.previousTenantBizRegRevoked) {
+                      updateField('previousTenantBizRegRevoked', '말소(폐업) 완료 (정상 사업자등록 가능)');
+                    }
+                  }}
+                  className="text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-2 py-1 rounded border border-amber-300 shrink-0 cursor-pointer"
+                >
+                  공실 점검 열기 →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

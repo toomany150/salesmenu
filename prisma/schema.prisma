@@ -375,6 +375,10 @@ model StoreDetail {
   businessRegistrationStatus String?  // 사업자등록여부
   operatorContractorMatch    String?  // 운영자/계약자/사업자 명의 일치 여부
   liquorLoan                 String?  // 주류대출여부 및 금액/승계조건
+  // 공실 시 전세입자 인허가 및 사업자등록 말소 리스크 점검 (임대차/월세)
+  isVacantStore              Boolean  @default(false) // 상가 공실 여부
+  previousTenantLicenseRevoked String? // 전세입자 영업허가증 말소 여부
+  previousTenantBizRegRevoked String?  // 전세입자 사업자등록증 말소 여부
   rentIncreaseCondition      String?  // 임대료 인상조건 및 인상액/비율
   storeAdStatus              String?  // 점포 자체 광고 여부 (공개광고/비공개)
   otherAgencyAdStatus        String?  // 타부동산 광고 여부 (없음/진행중)

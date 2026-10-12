@@ -360,6 +360,10 @@ export interface StoreData {
   operatorContractorMatch?: string; // 실제운영자/임대차계약자/사업자명의 일치 여부
   liquorLoan?: string; // 주류대출여부
   administrativeDisposition?: string; // 행정처분이력 (영업정지/과징금 등)
+  // 공실 시 전세입자 인허가 및 사업자등록 말소 리스크 점검 (임대차/월세)
+  isVacantStore?: boolean; // 상가 공실 여부
+  previousTenantLicenseRevoked?: string; // 전세입자 영업허가증 말소 여부
+  previousTenantBizRegRevoked?: string; // 전세입자 사업자등록증 말소 여부
   rentIncreaseCondition?: string; // 임대료 인상조건 및 인상액/비율
   storeAdStatus?: string; // 점포 자체 광고 여부 (광고진행, 비공개)
   otherAgencyAdStatus?: string; // 타부동산 광고 여부
