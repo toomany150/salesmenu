@@ -375,6 +375,7 @@ export interface StoreData {
   rentIncreaseStatus?: string;
   advertisementStatus?: string;
   dailyRevenue?: number;
+  monthlyRevenue?: number;
   equipmentStatus?: string;
   fireInspectionCert?: string;
   // 상가 임대 시 인허가 및 비품/렌탈 승계

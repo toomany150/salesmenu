@@ -402,6 +402,7 @@ model StoreDetail {
   rentIncreaseStatus         String?  // 임대료 인상여부 및 조건
   advertisementStatus        String?  // 점포광고여부 (온라인/포털/비공개)
   dailyRevenue               Float?   // 일매출 (만원)
+  monthlyRevenue             Float?   // 월매출 (만원)
   equipmentStatus            String?  // 비품체크 (인수불가/렌탈 품목 목록)
   fireInspectionCert         String?  // 소방필증 (완비증명서 구비 여부)
 }

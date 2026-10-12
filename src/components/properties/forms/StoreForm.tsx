@@ -1505,6 +1505,52 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
         </div>
 
         <div className="p-4 sm:p-5 space-y-4">
+          {/* 일매출 & 월매출 (직접 입력 지원) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-bold text-slate-800">
+                  일매출 (만원)
+                </label>
+                <span className="text-[11px] font-medium text-slate-400">
+                  일 평균 매출액 직접 입력
+                </span>
+              </div>
+              <input
+                type="number"
+                value={data.dailyRevenue !== undefined && data.dailyRevenue !== null ? data.dailyRevenue : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const parsed = val !== '' ? parseFloat(val) : undefined;
+                  updateField('dailyRevenue', parsed);
+                }}
+                placeholder="예: 150 (직접 입력, 만원 단위)"
+                className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-bold text-slate-800">
+                  월매출 (만원)
+                </label>
+                <span className="text-[11px] font-medium text-slate-400">
+                  월 평균 매출액 직접 입력
+                </span>
+              </div>
+              <input
+                type="number"
+                value={data.monthlyRevenue !== undefined && data.monthlyRevenue !== null ? data.monthlyRevenue : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const parsed = val !== '' ? parseFloat(val) : undefined;
+                  updateField('monthlyRevenue', parsed);
+                }}
+                placeholder="예: 4500 (직접 입력, 만원 단위)"
+                className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+              />
+            </div>
+          </div>
           
           {/* 권리금 & 조정가능한 권리금 (직접 입력 지원) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

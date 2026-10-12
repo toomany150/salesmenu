@@ -1257,6 +1257,22 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">계약조건</span>
                   </div>
+                  {(store.dailyRevenue || store.monthlyRevenue) && (
+                    <div className="grid grid-cols-2 gap-2.5 text-xs">
+                      <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                        <span className="text-[11px] text-emerald-800 block font-semibold">일매출</span>
+                        <span className="font-extrabold text-emerald-950 text-sm">
+                          {store.dailyRevenue ? `${store.dailyRevenue.toLocaleString()}만원` : '-'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-teal-50 border border-teal-200">
+                        <span className="text-[11px] text-teal-800 block font-semibold">월매출</span>
+                        <span className="font-extrabold text-teal-950 text-sm">
+                          {store.monthlyRevenue ? `${store.monthlyRevenue.toLocaleString()}만원` : '-'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
                     <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200">
                       <span className="text-[11px] text-amber-900 block font-semibold">권리금</span>
