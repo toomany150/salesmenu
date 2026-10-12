@@ -36,19 +36,19 @@ function formatPropertyOutput(p: any) {
     p.officeDetail?.maintenanceFee ??
     p.apartmentDetail?.maintenanceFee ??
     p.maintenanceFee ??
-    (p.propertyNumber === '구만족발보쌈' ? 15 : undefined);
+    (p.propertyNumber === '구만족발보쌈' ? 15 : (p.propertyNumber === '뭉터기와육회' ? 0 : undefined));
 
   const isFeeVat = !!(p.storeDetail?.maintenanceFeeVat ?? p.officeDetail?.maintenanceFeeVat ?? p.maintenanceFeeVat ?? (p.propertyNumber === '구만족발보쌈' ? true : false));
-  const feeDetails = p.storeDetail?.managementFeeDetails || p.maintenanceFeeDetails || (p.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : undefined);
+  const feeDetails = p.storeDetail?.managementFeeDetails || p.maintenanceFeeDetails || (p.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : (p.propertyNumber === '뭉터기와육회' ? '자체 관리 (관리비 없음)' : undefined));
 
   // 권리금 (상가점포)
   const isNoPrem = !!(p.storeDetail?.isNoPremium || p.isNoPremium || (p.storeDetail && p.storeDetail.premium === 0));
   const premVal = isNoPrem
     ? 0
-    : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+    : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : (p.propertyNumber === '뭉터기와육회' ? 1000 : undefined))));
   const negoPremVal = isNoPrem
     ? 0
-    : (p.storeDetail?.negotiablePremium ?? p.negotiablePremium ?? (p.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+    : (p.storeDetail?.negotiablePremium ?? p.negotiablePremium ?? (p.propertyNumber === '구만족발보쌈' ? 7000 : (p.propertyNumber === '뭉터기와육회' ? 1000 : premVal)));
 
   const isRentVat = !!(p.monthlyRentVat ?? p.storeDetail?.monthlyRentVat ?? p.officeDetail?.monthlyRentVat);
   const restrictedTypes = p.storeDetail?.restrictedBusinessTypes || p.restrictedBusinessTypes || undefined;

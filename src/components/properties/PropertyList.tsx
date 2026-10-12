@@ -71,7 +71,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
         const isNoPrem = !!(p.storeDetail?.isNoPremium || p.isNoPremium || (p.storeDetail && p.storeDetail.premium === 0));
         const premVal = isNoPrem
           ? 0
-          : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+          : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : (p.propertyNumber === '뭉터기와육회' ? 1000 : undefined))));
         if (isNoPrem) {
           display += ' · 무권리';
         } else if (premVal !== undefined && premVal !== null) {
@@ -273,10 +273,10 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
                                 const premVal = isNoPrem
                                   ? 0
-                                  : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+                                  : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : undefined))));
                                 const negoPremVal = isNoPrem
                                   ? 0
-                                  : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+                                  : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : premVal)));
                                 const premStr = premVal ? (premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만원`) : null;
                                 const negoStr = negoPremVal && negoPremVal !== premVal ? (negoPremVal >= 10000 ? `${(negoPremVal / 10000).toFixed(negoPremVal % 10000 === 0 ? 0 : 1)}억` : `${negoPremVal.toLocaleString()}만원`) : null;
 
@@ -504,10 +504,10 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
                               const premVal = isNoPrem
                                 ? 0
-                                : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+                                : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : undefined))));
                               const negoPremVal = isNoPrem
                                 ? 0
-                                : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+                                : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : premVal)));
                               const premStr = premVal ? (premVal >= 10000 ? `${(premVal / 10000).toFixed(premVal % 10000 === 0 ? 0 : 1)}억` : `${premVal.toLocaleString()}만원`) : null;
                               const negoStr = negoPremVal && negoPremVal !== premVal ? (negoPremVal >= 10000 ? `${(negoPremVal / 10000).toFixed(negoPremVal % 10000 === 0 ? 0 : 1)}억` : `${negoPremVal.toLocaleString()}만원`) : null;
 

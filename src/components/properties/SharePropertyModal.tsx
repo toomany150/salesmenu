@@ -91,7 +91,7 @@ export const SharePropertyModal: React.FC<SharePropertyModalProps> = ({
       const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
       const premVal = isNoPrem
         ? 0
-        : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+        : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : undefined))));
       if (isNoPrem) {
         priceStr += ' · 무권리';
       } else if (premVal !== undefined && premVal !== null) {

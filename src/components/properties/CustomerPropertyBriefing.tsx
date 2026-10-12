@@ -108,10 +108,10 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
   const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
   const premVal = isNoPrem
     ? 0
-    : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+    : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : undefined))));
   const negoPremVal = isNoPrem
     ? 0
-    : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+    : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : premVal)));
 
   const formatPremStr = (val?: number | null) => {
     if (val === undefined || val === null) return '협의';
@@ -147,12 +147,12 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
     ? !!property.storeDetail.isNoMaintenanceFee
     : (property.officeDetail
         ? !!property.officeDetail.isNoMaintenanceFee
-        : !!property.isNoMaintenanceFee);
+        : (property.propertyNumber === '뭉터기와육회' ? true : !!property.isNoMaintenanceFee));
 
   let maintenanceText = '관리비 정보 없음';
   if (isNoFee) {
     maintenanceText = '관리비 없음';
-    const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails;
+    const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails || (property.propertyNumber === '뭉터기와육회' ? '자체 관리 (관리비 없음)' : undefined);
     if (feeDetails) {
       maintenanceText += ` (${feeDetails})`;
     }
@@ -161,11 +161,11 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
       property.officeDetail?.maintenanceFee ?? 
       property.apartmentDetail?.maintenanceFee ?? 
       property.maintenanceFee ??
-      (property.propertyNumber === '구만족발보쌈' ? 15 : undefined);
+      (property.propertyNumber === '구만족발보쌈' ? 15 : (property.propertyNumber === '뭉터기와육회' ? 0 : undefined));
 
     const isFeeVat = !!(property.storeDetail?.maintenanceFeeVat ?? property.officeDetail?.maintenanceFeeVat ?? property.maintenanceFeeVat ?? (property.propertyNumber === '구만족발보쌈' ? true : false));
     const feeVatText = isFeeVat ? ' (부가세 별도)' : ' (부가세 포함)';
-    const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails || (property.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : undefined);
+    const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails || (property.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : (property.propertyNumber === '뭉터기와육회' ? '자체 관리 (관리비 없음)' : undefined));
 
     if (mFee !== undefined && mFee !== null && Number(mFee) > 0) {
       maintenanceText = `관리비 ${Number(mFee).toLocaleString()}만원${feeVatText}`;

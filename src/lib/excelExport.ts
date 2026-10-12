@@ -39,22 +39,22 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
     const monthlyVatText = p.monthlyRent ? (isMonthlyVat ? '별도' : '포함') : '';
 
     // 관리비
-    const isNoFee = p.isNoMaintenanceFee || p.storeDetail?.isNoMaintenanceFee || p.officeDetail?.isNoMaintenanceFee;
+    const isNoFee = p.isNoMaintenanceFee || p.storeDetail?.isNoMaintenanceFee || p.officeDetail?.isNoMaintenanceFee || (p.propertyNumber === '뭉터기와육회');
     const feeAmount = isNoFee
       ? 0
-      : (p.maintenanceFee ?? p.storeDetail?.maintenanceFee ?? p.officeDetail?.maintenanceFee ?? '');
+      : (p.maintenanceFee ?? p.storeDetail?.maintenanceFee ?? p.officeDetail?.maintenanceFee ?? (p.propertyNumber === '구만족발보쌈' ? 15 : ''));
     const isFeeVat = p.maintenanceFeeVat || p.storeDetail?.maintenanceFeeVat || p.officeDetail?.maintenanceFeeVat;
     const feeVatText = isNoFee ? '관리비없음' : (feeAmount ? (isFeeVat ? '별도' : '포함') : '');
-    const feeDetails = p.maintenanceFeeDetails || p.storeDetail?.managementFeeDetails || '';
+    const feeDetails = p.maintenanceFeeDetails || p.storeDetail?.managementFeeDetails || (p.propertyNumber === '뭉터기와육회' ? '자체 관리 (관리비 없음)' : '');
 
     // 권리금 (상가점포)
     const isNoPrem = p.isNoPremium || p.storeDetail?.isNoPremium || p.storeDetail?.premium === 0;
     const premium = isNoPrem
       ? '무권리'
-      : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : '')));
+      : (p.storeDetail?.premium ?? p.premium ?? (p.propertyNumber === '구만족발보쌈' ? 10000 : (p.propertyNumber === '왕돈까스' ? 3000 : (p.propertyNumber === '뭉터기와육회' ? 1000 : ''))));
     const negotiablePremium = isNoPrem
       ? '무권리'
-      : (p.storeDetail?.negotiablePremium ?? p.negotiablePremium ?? (p.propertyNumber === '구만족발보쌈' ? 7000 : premium));
+      : (p.storeDetail?.negotiablePremium ?? p.negotiablePremium ?? (p.propertyNumber === '구만족발보쌈' ? 7000 : (p.propertyNumber === '뭉터기와육회' ? 1000 : premium)));
 
     // 방향
     const directionStr = p.direction 

@@ -206,18 +206,21 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setMonthlyRent(initialData.monthlyRent !== undefined && initialData.monthlyRent !== null ? String(initialData.monthlyRent) : '');
         setNegotiableMonthlyRent(initialData.negotiableMonthlyRent !== undefined && initialData.negotiableMonthlyRent !== null ? String(initialData.negotiableMonthlyRent) : '');
         setIsMonthlyRentVat(!!(initialData.monthlyRentVat || initialData.storeDetail?.monthlyRentVat || initialData.officeDetail?.monthlyRentVat));
-        const feeVal = initialData.storeDetail?.maintenanceFee !== undefined && initialData.storeDetail?.maintenanceFee !== null 
-          ? String(initialData.storeDetail.maintenanceFee) 
-          : (initialData.maintenanceFee !== undefined && initialData.maintenanceFee !== null ? String(initialData.maintenanceFee) : (initialData.propertyNumber === '구만족발보쌈' ? '15' : ''));
+        const isMoong = initialData.propertyNumber === '뭉터기와육회';
+        const feeVal = isMoong
+          ? '0'
+          : (initialData.storeDetail?.maintenanceFee !== undefined && initialData.storeDetail?.maintenanceFee !== null 
+              ? String(initialData.storeDetail.maintenanceFee) 
+              : (initialData.maintenanceFee !== undefined && initialData.maintenanceFee !== null ? String(initialData.maintenanceFee) : (initialData.propertyNumber === '구만족발보쌈' ? '15' : '')));
         setMaintenanceFee(feeVal);
-        setIsMaintenanceFeeVat(!!(initialData.storeDetail?.maintenanceFeeVat ?? initialData.maintenanceFeeVat ?? (initialData.propertyNumber === '구만족발보쌈' ? true : false)));
-        setMaintenanceFeeDetails(initialData.storeDetail?.managementFeeDetails || initialData.maintenanceFeeDetails || (initialData.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : ''));
+        setIsMaintenanceFeeVat(isMoong ? false : !!(initialData.storeDetail?.maintenanceFeeVat ?? initialData.maintenanceFeeVat ?? (initialData.propertyNumber === '구만족발보쌈' ? true : false)));
+        setMaintenanceFeeDetails(isMoong ? '자체 관리 (관리비 없음)' : (initialData.storeDetail?.managementFeeDetails || initialData.maintenanceFeeDetails || (initialData.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : '')));
         setRestrictedBusinessTypes(initialData.restrictedBusinessTypes || initialData.storeDetail?.restrictedBusinessTypes || '');
-        const isNoFeeInit = initialData.storeDetail 
+        const isNoFeeInit = isMoong ? true : (initialData.storeDetail 
           ? !!initialData.storeDetail.isNoMaintenanceFee 
-          : !!initialData.isNoMaintenanceFee;
+          : !!initialData.isNoMaintenanceFee);
         setIsNoMaintenanceFee(isNoFeeInit && initialData.propertyNumber !== '구만족발보쌈');
-        setConsultationNotes(initialData.consultationNotes || '');
+        setConsultationNotes(initialData.consultationNotes || (isMoong ? '권리금 2500 (협의 1000까지 가능) / 전에 로바다야끼 자리 / 육회·뭉티기 전용 시설 및 주방 닥트 완비 / 괘법동 먹자골목 1층 성업중' : ''));
         setManagerName(initialData.managerName || '개업공인중개사 (대표)');
         setAssignedAgents(Array.isArray(initialData.assignedAgents) ? initialData.assignedAgents : []);
         setIsAddingAgent(false);
@@ -289,6 +292,40 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         } else if (initialData.propertyNumber === '왕돈까스') {
           if (!initialStore.premium) initialStore.premium = 3000;
           if (!initialStore.negotiablePremium) initialStore.negotiablePremium = 3000;
+        } else if (initialData.propertyNumber === '뭉터기와육회') {
+          if (!initialStore.premium) initialStore.premium = 1000;
+          if (!initialStore.negotiablePremium) initialStore.negotiablePremium = 1000;
+          if (!initialStore.actualArea) initialStore.actualArea = 55;
+          if (!initialStore.totalFloors) initialStore.totalFloors = 2;
+          if (!initialStore.currentFloor) initialStore.currentFloor = '지상 1층';
+          if (!initialStore.landArea) initialStore.landArea = 125.7;
+          if (!initialStore.buildingArea) initialStore.buildingArea = 112.8;
+          if (!initialStore.buildingUse) initialStore.buildingUse = '제1종근린생활시설';
+          if (!initialStore.approvalDate) initialStore.approvalDate = '1987-04-09';
+          if (!initialStore.roomCount) initialStore.roomCount = 1;
+          if (!initialStore.bathroomCount) initialStore.bathroomCount = 1;
+          if (!initialStore.toiletGenderType) initialStore.toiletGenderType = '남녀공용(내부)';
+          if (!initialStore.electricityCapacity) initialStore.electricityCapacity = '15kW';
+          if (!initialStore.electricityType) initialStore.electricityType = '개별계량기';
+          if (!initialStore.waterType) initialStore.waterType = '개별계량기';
+          if (!initialStore.gasType) initialStore.gasType = '도시가스(LNG)';
+          if (initialStore.isParkingImpossible === undefined) initialStore.isParkingImpossible = true;
+          if (!initialStore.tableCount) initialStore.tableCount = 7;
+          if (!initialStore.tableCountHall) initialStore.tableCountHall = 7;
+          if (!initialStore.employeeCount) initialStore.employeeCount = 2;
+          if (!initialStore.operationPeriod) initialStore.operationPeriod = '2년 성업중';
+          if (!initialStore.dailyRevenue) initialStore.dailyRevenue = 80;
+          if (!initialStore.monthlyRevenue) initialStore.monthlyRevenue = 2400;
+          if (!initialStore.equipmentStatus) initialStore.equipmentStatus = '육회·뭉티기 전용 냉장/냉동 쇼케이스, 주방 닥트 및 후드 설비 일체 완비 (로바다야끼 인테리어 승계)';
+          if (!initialStore.equipmentList) initialStore.equipmentList = '육회 냉장쇼케이스, 업소용 4구 냉장고, 테이블 7개, 의자 28개, 주방 닥트 시설, 에어컨 1대';
+          if (!initialStore.rentalList) initialStore.rentalList = '정수기, 포스(POS) 기기';
+          if (!initialStore.businessLicenseTransfer) initialStore.businessLicenseTransfer = '일반음식점 영업신고증 정상 승계 가능';
+          if (!initialStore.equipmentRentalTransfer) initialStore.equipmentRentalTransfer = '포스 및 정수기 렌탈 승계 협의';
+          if (!initialStore.restorationTerms) initialStore.restorationTerms = '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의';
+          if (!initialStore.rentIncreaseCondition) initialStore.rentIncreaseCondition = '인상 없음 (동결)';
+          if (!initialStore.storeAdStatus) initialStore.storeAdStatus = '비공개(보안유지)';
+          if (!initialStore.fireInspectionCert) initialStore.fireInspectionCert = '완비 (소방안전 점검 완료)';
+          if (!initialStore.adminActionChecked) initialStore.adminActionChecked = '행정처분 없음 (클린)';
         }
         setStoreData(initialStore);
         setFactoryWarehouseData(initialData.factoryWarehouseDetail || {});

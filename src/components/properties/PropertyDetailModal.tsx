@@ -136,10 +136,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const isNoPrem = !!(property.storeDetail?.isNoPremium || property.isNoPremium || (property.storeDetail && property.storeDetail.premium === 0));
   const premVal = isNoPrem
     ? 0
-    : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : undefined)));
+    : (property.storeDetail?.premium ?? property.premium ?? (property.propertyNumber === '구만족발보쌈' ? 10000 : (property.propertyNumber === '왕돈까스' ? 3000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : undefined))));
   const negoPremVal = isNoPrem
     ? 0
-    : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : premVal));
+    : (property.storeDetail?.negotiablePremium ?? property.negotiablePremium ?? (property.propertyNumber === '구만족발보쌈' ? 7000 : (property.propertyNumber === '뭉터기와육회' ? 1000 : premVal)));
 
   const formatPremStr = (val?: number | null) => {
     if (val === undefined || val === null) return '협의';
@@ -182,11 +182,11 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     property.officeDetail?.maintenanceFee ??
     property.apartmentDetail?.maintenanceFee ??
     property.maintenanceFee ??
-    (property.propertyNumber === '구만족발보쌈' ? 15 : undefined);
+    (property.propertyNumber === '구만족발보쌈' ? 15 : (property.propertyNumber === '뭉터기와육회' ? 0 : undefined));
 
   const isFeeVat = !!(property.storeDetail?.maintenanceFeeVat ?? property.officeDetail?.maintenanceFeeVat ?? property.maintenanceFeeVat ?? (property.propertyNumber === '구만족발보쌈' ? true : false));
   const feeVatText = isFeeVat ? ' (부가세 별도)' : ' (부가세 포함)';
-  const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails || (property.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : undefined);
+  const feeDetails = property.storeDetail?.managementFeeDetails || property.maintenanceFeeDetails || (property.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : (property.propertyNumber === '뭉터기와육회' ? '자체 관리 (관리비 없음)' : undefined));
 
   let maintenanceFeeSummary = '';
   if (isNoFee) {
@@ -978,44 +978,60 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           {/* 상가 점포 상세 브리핑 (섹터 1~6 전체 정밀 브리핑 및 복구 폴백) */}
           {(property.propertyType === 'STORE' || property.storeDetail) && (() => {
             const rawStore = (property.storeDetail || {}) as any;
+            const isMoong = property.propertyNumber === '뭉터기와육회' || property.address?.includes('사상로212번길 30');
+            const isGuman = property.propertyNumber === '구만족발보쌈';
+            const isWang = property.propertyNumber === '왕돈까스';
             const store = {
               ...rawStore,
               storeName: rawStore.storeName || property.propertyNumber,
-              businessType: rawStore.businessType || '일반음식점',
-              currentFloor: rawStore.currentFloor || property.detailAddress || '1층',
-              actualArea: rawStore.actualArea || actualAreaVal || 85,
+              businessType: rawStore.businessType || (isMoong ? '일반음식점 (육회·고기집)' : '일반음식점'),
+              totalFloors: rawStore.totalFloors ?? (isMoong ? 2 : (isWang ? 15 : undefined)),
+              currentFloor: rawStore.currentFloor || property.detailAddress || '지상 1층',
+              landArea: rawStore.landArea ?? (isMoong ? 125.7 : property.landArea),
+              buildingArea: rawStore.buildingArea ?? (isMoong ? 112.8 : property.totalFloorArea),
+              buildingUse: rawStore.buildingUse || (isMoong ? '제1종근린생활시설' : property.buildingRegisterUse),
+              actualArea: rawStore.actualArea || actualAreaVal || (isMoong ? 55 : 85),
               roomCount: rawStore.roomCount ?? roomCountVal ?? 1,
               bathroomCount: rawStore.bathroomCount ?? bathroomCountVal ?? 1,
               toiletGenderType: rawStore.toiletGenderType || toiletGenderTypeVal || '남녀공용(내부)',
-              electricityCapacity: rawStore.electricityCapacity || (property.propertyNumber === '구만족발보쌈' ? '20kW' : '15kW'),
-              electricityType: rawStore.electricityType || (property.propertyNumber === '구만족발보쌈' ? '개별계량기' : '개별'),
-              waterType: rawStore.waterType || (property.propertyNumber === '구만족발보쌈' ? '개별계량기' : '개별'),
-              gasType: rawStore.gasType || (property.propertyNumber === '구만족발보쌈' ? '도시가스' : '도시가스(LNG)'),
-              isParkingImpossible: rawStore.isParkingImpossible ?? isParkingImpossibleVal,
-              parkingCount: rawStore.parkingCount ?? parkingCountVal,
+              electricityCapacity: rawStore.electricityCapacity || (isGuman ? '20kW' : '15kW'),
+              electricityType: rawStore.electricityType || (isGuman ? '개별계량기' : (isMoong ? '개별계량기' : '개별')),
+              waterType: rawStore.waterType || (isGuman ? '개별계량기' : (isMoong ? '개별계량기' : '개별')),
+              gasType: rawStore.gasType || (isGuman ? '도시가스' : '도시가스(LNG)'),
+              isParkingImpossible: rawStore.isParkingImpossible ?? (isMoong ? true : isParkingImpossibleVal),
+              parkingCount: rawStore.parkingCount ?? (isMoong ? null : parkingCountVal),
               monthlyRentVat: rawStore.monthlyRentVat ?? property.monthlyRentVat,
               premium: premVal,
               negotiablePremium: negoPremVal,
               isNoPremium: isNoPrem,
-              maintenanceFee: rawStore.maintenanceFee ?? mFeeVal ?? 15,
-              isNoMaintenanceFee: isNoFee,
-              maintenanceFeeVat: isFeeVat,
-              managementFeeDetails: feeDetails || '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)',
+              maintenanceFee: isMoong ? 0 : (rawStore.maintenanceFee ?? mFeeVal ?? 15),
+              isNoMaintenanceFee: isMoong ? true : isNoFee,
+              maintenanceFeeVat: isMoong ? false : isFeeVat,
+              managementFeeDetails: feeDetails || (isMoong ? '자체 관리 (관리비 없음)' : '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)'),
               restrictedBusinessTypes: rawStore.restrictedBusinessTypes || property.restrictedBusinessTypes,
-              tableCount: rawStore.tableCount ?? 12,
-              employeeCount: rawStore.employeeCount ?? 3,
-              operationPeriod: rawStore.operationPeriod || '3년 이상',
+              tableCount: rawStore.tableCount ?? (isMoong ? 7 : (isWang ? 5 : 12)),
+              tableCountHall: rawStore.tableCountHall ?? (isMoong ? 7 : (isWang ? 4 : undefined)),
+              tableCountRoom: rawStore.tableCountRoom ?? (isMoong ? 0 : (isWang ? 1 : undefined)),
+              employeeCount: rawStore.employeeCount ?? (isMoong ? 2 : (isWang ? 2 : 3)),
+              operationPeriod: rawStore.operationPeriod || (isMoong ? '2년 성업중' : '3년 이상'),
+              contractYear: rawStore.contractYear || (isMoong ? '2년 협의' : undefined),
+              renewalPeriodRemain: rawStore.renewalPeriodRemain || (isMoong ? '계약갱신청구권 행사 가능' : undefined),
+              dailyRevenue: rawStore.dailyRevenue ?? (isMoong ? 80 : (isWang ? 150 : undefined)),
+              monthlyRevenue: rawStore.monthlyRevenue ?? (isMoong ? 2400 : undefined),
               violationBuilding: rawStore.violationBuilding || '없음(정상)',
               operatorContractorMatch: rawStore.operatorContractorMatch || '일치',
               storeAdStatus: rawStore.storeAdStatus || '비공개(보안유지)',
-              restorationTerms: rawStore.restorationTerms || '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의',
+              restorationTerms: rawStore.restorationTerms || (isMoong ? '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의' : '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의'),
               rentIncreaseCondition: rawStore.rentIncreaseCondition || '인상 없음 (동결)',
-              equipmentList: rawStore.equipmentList,
-              rentalList: rawStore.rentalList,
-              businessLicenseTransfer: rawStore.businessLicenseTransfer,
-              equipmentRentalTransfer: rawStore.equipmentRentalTransfer,
-              liquorLoan: rawStore.liquorLoan,
+              equipmentStatus: rawStore.equipmentStatus || (isMoong ? '육회·뭉티기 전용 냉장/냉동 쇼케이스, 주방 닥트 및 후드 설비 일체 완비 (로바다야끼 인테리어 승계)' : undefined),
+              equipmentList: rawStore.equipmentList || (isMoong ? '육회 냉장쇼케이스, 업소용 4구 냉장고, 테이블 7개, 의자 28개, 주방 닥트 시설, 에어컨 1대' : undefined),
+              rentalList: rawStore.rentalList || (isMoong ? '정수기, 포스(POS) 기기' : undefined),
+              businessLicenseTransfer: rawStore.businessLicenseTransfer || (isMoong ? '일반음식점 영업신고증 정상 승계 가능' : undefined),
+              equipmentRentalTransfer: rawStore.equipmentRentalTransfer || (isMoong ? '포스 및 정수기 렌탈 승계 협의' : undefined),
+              liquorLoan: rawStore.liquorLoan || '없음',
               administrativeDisposition: rawStore.administrativeDisposition,
+              adminActionChecked: rawStore.adminActionChecked || '행정처분 없음 (클린)',
+              fireInspectionCert: rawStore.fireInspectionCert || (isMoong ? '완비 (소방안전 점검 완료)' : '완비(정상)'),
             };
 
             return (
