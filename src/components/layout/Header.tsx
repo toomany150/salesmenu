@@ -97,16 +97,18 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </button>
             
-            {/* admin 란 (관리자 접속 및 관리) */}
-            <button
-              type="button"
-              onClick={onOpenAdminLogs}
-              title="관리자(Admin) 접속 및 계정·보안로그 관리"
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800 shrink-0"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
-              <span>admin</span>
-            </button>
+            {/* admin 란 (오직 대표 관리자에게만 노출) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={onOpenAdminLogs}
+                title="관리자(Admin) 접속 및 계정·보안로그 관리"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-indigo-600 text-white rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer border border-slate-800 shrink-0"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
+                <span>admin</span>
+              </button>
+            )}
 
             {/* 🔄 기기 동기화 & 백업 버튼 (스마트폰 <-> PC 데이터 연동) */}
             <button

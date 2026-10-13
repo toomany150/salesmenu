@@ -351,11 +351,8 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
             <div className="space-y-2">
               <h4 className="text-xl font-black text-slate-900">관리자(Admin) 전용 접속</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                대표 관리자 계정으로 접속하여 소공 계정 관리, 감사로그 열람 및 관리자 설정을 이용하실 수 있습니다.
+                대표 관리자 계정의 비밀번호를 입력하여 인증을 완료해주세요.
               </p>
-              <div className="inline-block mt-2 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-semibold">
-                🔑 초기 비밀번호: <strong className="font-black text-blue-900">1234</strong> (접속 후 비밀번호 변경 가능)
-              </div>
             </div>
 
             <form onSubmit={handleAdminGateLogin} className="w-full space-y-3">

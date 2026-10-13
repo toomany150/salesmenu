@@ -44,7 +44,7 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
   currentProperties,
   currentCustomers,
 }) => {
-  const { currentUser, loginAsDefaultAdmin } = useAuth();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'EXPORT' | 'IMPORT' | 'GUIDE'>('EXPORT');
   const [propCount, setPropCount] = useState(0);
   const [custCount, setCustCount] = useState(0);
@@ -174,18 +174,9 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
         const result = importDataBundle(data);
         if (result.success) {
           const thisDevice = isMobile ? '스마트폰' : 'PC';
-          // 비로그인 상태인 경우 자동 로그인 활성화하여 화면에 즉시 렌더링되도록 보장
-          if (!currentUser) {
-            loginAsDefaultAdmin();
-            setImportStatus(
-              `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽하게 반영되었습니다.\n` +
-              `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
-            );
-          } else {
-            setImportStatus(
-              `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽하게 반영되었습니다.`
-            );
-          }
+          setImportStatus(
+            `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽하게 반영되었습니다.`
+          );
           if (onSyncSuccess) onSyncSuccess();
         } else {
           setImportStatus(`⚠️ 동기화 실패: ${result.error}`);
@@ -211,15 +202,12 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       const result = importDataBundle(bundle);
       if (result.success) {
         const thisDevice = isMobile ? '스마트폰' : 'PC';
-        loginAsDefaultAdmin();
         setImportStatus(
-          `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.\n` +
-          `✨ (안내: 대표 관리자로 자동 로그인되어 스마트폰 화면에 즉시 나타납니다!)`
+          `🎉 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 복원되었습니다.`
         );
         alert(
           `🎉 동기화 코드 적용 성공!\n\n` +
-          `매물 ${result.importedPropertiesCount}건과 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽히 복원되었습니다.\n` +
-          `대표 관리자로 자동 로그인되어 화면에 즉시 나타납니다.`
+          `매물 ${result.importedPropertiesCount}건과 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽히 복원되었습니다.`
         );
         setSyncCodeInput('');
         if (onSyncSuccess) onSyncSuccess();
@@ -274,14 +262,12 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
       const result = importDataBundle(selectedFileBundle);
       if (result.success) {
         const thisDevice = isMobile ? '스마트폰' : 'PC';
-        loginAsDefaultAdmin();
         setImportStatus(
           `🎉 백업 파일 복원 성공! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 반영되었습니다.`
         );
         alert(
           `🎉 백업 파일 복원 성공!\n\n` +
-          `매물 ${result.importedPropertiesCount}건과 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽히 적용되었습니다.\n` +
-          `대표 관리자로 자동 로그인되어 화면으로 이동합니다.`
+          `매물 ${result.importedPropertiesCount}건과 고객 ${result.importedCustomersCount}명이 ${thisDevice}에 완벽히 적용되었습니다.`
         );
         if (onSyncSuccess) onSyncSuccess();
         onClose();

@@ -370,7 +370,15 @@ const DashboardContent: React.FC = () => {
         onOpenNewProperty={handleOpenNewProperty}
         onOpenNewCustomer={handleOpenNewCustomer}
         onOpenAdminLogs={() => {
-          if (!checkAuthOrAlert()) return;
+          if (!currentUser) {
+            alert('관리자 전용 기능입니다. 대표 관리자(admin) 계정으로 먼저 로그인해 주세요.');
+            setIsLoginOpen(true);
+            return;
+          }
+          if (currentUser.role !== 'ADMIN') {
+            alert('접근 권한이 없습니다. 관리자(admin) 기능은 개업공인중개사(대표) 전용입니다.');
+            return;
+          }
           setIsAdminLogsOpen(true);
         }}
         onOpenDataSync={() => setIsDataSyncOpen(true)}

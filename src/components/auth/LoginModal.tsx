@@ -69,14 +69,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     }
   };
 
-  const handleSelectQuickAccount = (uname: string) => {
-    setUsername(uname);
-    setCpUsername(uname);
-    // 비밀번호는 자동으로 채우지 않고 사용자가 직접 입력하도록 비움
-    setPassword('');
-    setErrorMsg(null);
-    setSuccessMsg(null);
-  };
+
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,50 +279,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 </button>
               </form>
 
-              {/* Quick Demo Switcher Buttons */}
-              <div className="pt-4 border-t border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-slate-500" />
-                    빠른 계정 선택
-                  </span>
-                  <span className="text-[11px] text-slate-400">비밀번호는 직접 입력</span>
-                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {DEFAULT_USERS.map((u) => {
-                    const isAdmin = u.role === 'ADMIN';
-                    const isSelected = username === u.username;
-
-                    return (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => handleSelectQuickAccount(u.username)}
-                        className={`p-2.5 rounded-xl border text-left transition-all ${
-                          isSelected
-                            ? 'border-blue-500 bg-blue-50/80 ring-2 ring-blue-500/20 shadow-2xs'
-                            : 'border-slate-200 bg-slate-50/70 hover:bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
-                            isAdmin 
-                              ? 'bg-purple-100 text-purple-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {isAdmin ? '👑 대표/관리자' : '👤 소공'}
-                          </span>
-                          <span className="font-mono text-[10px] text-slate-400">{u.username}</span>
-                        </div>
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {u.name}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
             </>
           )}
 
