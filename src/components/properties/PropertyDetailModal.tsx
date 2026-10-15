@@ -10,7 +10,8 @@ import {
   MapPin, 
   Calendar, 
   Compass, 
-  Building, 
+  Building,
+  ShieldCheck, 
   User, 
   ExternalLink,
   FileCheck,
@@ -525,6 +526,21 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   🚫 입점제한: {restrictedTypes}
                 </span>
               )}
+              {property.purchasePrice && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold bg-indigo-50 text-indigo-950 border border-indigo-200 shadow-2xs">
+                  🏷️ 매수가: {property.purchasePrice}
+                </span>
+              )}
+              {property.collateral && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold bg-indigo-50 text-indigo-950 border border-indigo-200 shadow-2xs">
+                  🏦 대출금액: {property.collateral}
+                </span>
+              )}
+              {property.currentMarketPrice && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold bg-blue-50 text-blue-950 border border-blue-200 shadow-2xs">
+                  📊 현시세: {property.currentMarketPrice}{property.marketPriceBasis ? " (" + property.marketPriceBasis + ")" : ""}
+                </span>
+              )}
             </div>
           </div>
 
@@ -700,6 +716,48 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               height="h-[420px]"
             />
           </div>
+
+          {/* 전세/월세 시세 및 대출 정보 (매수가, 대출금액, 현시세) */}
+          {(property.purchasePrice || property.collateral || property.currentMarketPrice || property.marketPriceBasis) && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50/90 to-blue-50/70 border border-indigo-200/80 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <span>시세 및 대출 정보 (매수가 · 대출금액 · 현시세)</span>
+                </h4>
+                <span className="text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs">
+                  {property.transactionType} 안전 계약 체크
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 block font-medium mb-0.5">매수가 (취득가)</span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {property.purchasePrice || '정보 없음'}
+                  </span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 block font-medium mb-0.5">대출금액 (근저당/융자)</span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {property.collateral || '정보 없음'}
+                  </span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[11px] text-slate-500 block font-medium">현시세</span>
+                    {property.marketPriceBasis && (
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
+                        {property.marketPriceBasis}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    {property.currentMarketPrice || '정보 없음'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Key Specs Grid (모든 매물 공통: 공간구획/화장실/주차 및 관리비 완벽 복구 반영) */}
           <div>

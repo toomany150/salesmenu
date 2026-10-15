@@ -224,6 +224,10 @@ model Property {
   maintenanceFeeVat     Boolean   @default(false) // 관리비 부가세 별도 여부
   maintenanceFeeDetails String?   // 관리비 내역 직접입력
   restrictedBusinessTypes String? // 입점 안되는 업종 직접입력
+  collateral            String?   // 대출금액 / 근저당 (직접 입력)
+  purchasePrice         String?   // 매수가 (직접 입력)
+  currentMarketPrice    String?   // 현시세 (직접 입력)
+  marketPriceBasis      String?   // 현시세 기준 (탁감금액, 실거래가 등 직접 입력)
   
   consultationNotes   String?   // 상담내용(메모)
 

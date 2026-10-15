@@ -345,6 +345,11 @@ export interface StoreData {
   maintenanceFeeVat?: boolean;
   managementFeeDetails?: string; // 관리비 내역 (직접 입력)
   restrictedBusinessTypes?: string; // 입점 안되는 업종 / 제한 업종 (직접 입력)
+  // 전세/월세 시 아파트/주택/상가/사무실 권리분석 및 시세 정보 (직접 입력)
+  collateral?: string; // 근저당 (직접 입력)
+  purchasePrice?: string; // 매수가액 (직접 입력)
+  currentMarketPrice?: string; // 현시세 (직접 입력)
+  marketPriceBasis?: string; // 현시세 기준 (주변 매도 가격, 탁감 가격 등 직접 입력)
   // 매매 시 층별 호수별 임대차 현황 (보증금/월세/명도/공실)
   leaseStatusList?: StoreLeaseUnitItem[];
   // 운영 및 계약 조건
@@ -525,6 +530,11 @@ export interface PropertyItem {
   maintenanceFeeVat?: boolean; // 관리비 부가세 별도 여부
   maintenanceFeeDetails?: string; // 관리비 내역 (직접 입력)
   restrictedBusinessTypes?: string; // 입점 안되는 업종 / 제한 업종 (직접 입력)
+  // 전세/월세 시 아파트/주택/상가/사무실 시세 및 대출 정보 (직접 입력)
+  collateral?: string; // 대출금액 / 근저당 (직접 입력)
+  purchasePrice?: string; // 매수가 (직접 입력)
+  currentMarketPrice?: string; // 현시세 (직접 입력)
+  marketPriceBasis?: string; // 현시세 기준 (탁감금액, 주위 실거래가, 계산 내용 등 직접 입력)
   consultationNotes?: string;
   landArea?: number;
   totalFloorArea?: number;

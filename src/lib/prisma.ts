@@ -199,6 +199,10 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingPropCols.has('negotiablePrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiablePrice" REAL;`);
         if (!existingPropCols.has('negotiableDeposit')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiableDeposit" REAL;`);
         if (!existingPropCols.has('negotiableMonthlyRent')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiableMonthlyRent" REAL;`);
+        if (!existingPropCols.has('collateral')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "collateral" TEXT;`);
+        if (!existingPropCols.has('purchasePrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "purchasePrice" TEXT;`);
+        if (!existingPropCols.has('currentMarketPrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "currentMarketPrice" TEXT;`);
+        if (!existingPropCols.has('marketPriceBasis')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "marketPriceBasis" TEXT;`);
       } catch (colErr) {}
 
       try {
@@ -239,6 +243,10 @@ export async function ensureDatabaseSchema(): Promise<void> {
         await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRemainingPeriod" TEXT;`);
         await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRenewalClaimUsed" TEXT;`);
         await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "loanRequirement" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "collateral" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "purchasePrice" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "currentMarketPrice" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "marketPriceBasis" TEXT;`);
       } catch (pgColErr) {}
     }
 

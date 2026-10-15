@@ -76,6 +76,10 @@ function formatPropertyOutput(p: any) {
     maintenanceFeeVat: isFeeVat,
     maintenanceFeeDetails: feeDetails,
     restrictedBusinessTypes: restrictedTypes,
+    collateral: p.collateral || undefined,
+    purchasePrice: p.purchasePrice || undefined,
+    currentMarketPrice: p.currentMarketPrice || undefined,
+    marketPriceBasis: p.marketPriceBasis || undefined,
     images: parsedImages,
     assignedAgents: parsedAssignedAgents,
   };
@@ -326,6 +330,10 @@ export async function POST(request: NextRequest) {
       createdById,
       creatorName,
       currentUser,
+      collateral,
+      purchasePrice,
+      currentMarketPrice,
+      marketPriceBasis,
     } = body;
 
     if (!propertyNumber || !propertyType || !transactionType || !address) {
@@ -504,6 +512,10 @@ export async function POST(request: NextRequest) {
         maintenanceFeeVat: !!(body.isMaintenanceFeeVat || body.maintenanceFeeVat || storeDetail?.maintenanceFeeVat),
         maintenanceFeeDetails: body.maintenanceFeeDetails || storeDetail?.managementFeeDetails || null,
         restrictedBusinessTypes: body.restrictedBusinessTypes || storeDetail?.restrictedBusinessTypes || null,
+        collateral: (body.collateral !== undefined && body.collateral !== null) ? String(body.collateral).trim() : null,
+        purchasePrice: (body.purchasePrice !== undefined && body.purchasePrice !== null) ? String(body.purchasePrice).trim() : null,
+        currentMarketPrice: (body.currentMarketPrice !== undefined && body.currentMarketPrice !== null) ? String(body.currentMarketPrice).trim() : null,
+        marketPriceBasis: (body.marketPriceBasis !== undefined && body.marketPriceBasis !== null) ? String(body.marketPriceBasis).trim() : null,
         consultationNotes,
         landArea: landArea ? parseFloat(landArea) : null,
         totalFloorArea: totalFloorArea ? parseFloat(totalFloorArea) : null,
@@ -823,6 +835,10 @@ export async function PUT(request: NextRequest) {
       managerName,
       assignedAgents,
       currentUser,
+      collateral,
+      purchasePrice,
+      currentMarketPrice,
+      marketPriceBasis,
     } = body;
 
     if (!id && !propertyNumber) {
@@ -1016,6 +1032,10 @@ export async function PUT(request: NextRequest) {
         maintenanceFeeVat: body.isMaintenanceFeeVat !== undefined ? !!body.isMaintenanceFeeVat : (body.maintenanceFeeVat !== undefined ? !!body.maintenanceFeeVat : undefined),
         maintenanceFeeDetails: body.maintenanceFeeDetails !== undefined ? body.maintenanceFeeDetails : undefined,
         restrictedBusinessTypes: body.restrictedBusinessTypes !== undefined ? body.restrictedBusinessTypes : undefined,
+        collateral: body.collateral !== undefined ? (body.collateral ? String(body.collateral).trim() : null) : undefined,
+        purchasePrice: body.purchasePrice !== undefined ? (body.purchasePrice ? String(body.purchasePrice).trim() : null) : undefined,
+        currentMarketPrice: body.currentMarketPrice !== undefined ? (body.currentMarketPrice ? String(body.currentMarketPrice).trim() : null) : undefined,
+        marketPriceBasis: body.marketPriceBasis !== undefined ? (body.marketPriceBasis ? String(body.marketPriceBasis).trim() : null) : undefined,
         consultationNotes: consultationNotes !== undefined ? consultationNotes : undefined,
         landArea: landArea !== undefined ? (landArea ? parseFloat(landArea) : null) : undefined,
         totalFloorArea: totalFloorArea !== undefined ? (totalFloorArea ? parseFloat(totalFloorArea) : null) : undefined,

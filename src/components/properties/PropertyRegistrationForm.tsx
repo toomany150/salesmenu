@@ -12,6 +12,7 @@ import {
   Copy,
   Edit3,
   Building,
+  ShieldCheck,
   Sparkles,
   Search,
   UserCheck,
@@ -109,6 +110,11 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [isMaintenanceFeeVat, setIsMaintenanceFeeVat] = useState<boolean>(false); // 관리비 부가세 별도 여부
   const [maintenanceFeeDetails, setMaintenanceFeeDetails] = useState<string>(''); // 관리비 내역 직접 입력
   const [restrictedBusinessTypes, setRestrictedBusinessTypes] = useState<string>(''); // 입점 불가 업종 직접 입력
+  // 전세/월세 시 아파트/주택/상가/사무실 권리분석 및 시세 정보 (직접 입력)
+  const [collateral, setCollateral] = useState<string>(''); // 근저당 (직접 입력)
+  const [purchasePrice, setPurchasePrice] = useState<string>(''); // 매수가액 (직접 입력)
+  const [currentMarketPrice, setCurrentMarketPrice] = useState<string>(''); // 현시세 (직접 입력)
+  const [marketPriceBasis, setMarketPriceBasis] = useState<string>(''); // 현시세 기준 (주변 매도 가격, 탁감 가격 등 직접 입력)
   const [consultationNotes, setConsultationNotes] = useState('');
 
   // 기타 특이 옵션 직접 추가 상태 (사진등록 상단 위치)
@@ -216,6 +222,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setIsMaintenanceFeeVat(isMoong ? false : !!(initialData.storeDetail?.maintenanceFeeVat ?? initialData.maintenanceFeeVat ?? (initialData.propertyNumber === '구만족발보쌈' ? true : false)));
         setMaintenanceFeeDetails(isMoong ? '자체 관리 (관리비 없음)' : (initialData.storeDetail?.managementFeeDetails || initialData.maintenanceFeeDetails || (initialData.propertyNumber === '구만족발보쌈' ? '공용관리비, 청소비, 수도료 포함 (전기·가스 실비 별도)' : '')));
         setRestrictedBusinessTypes(initialData.restrictedBusinessTypes || initialData.storeDetail?.restrictedBusinessTypes || '');
+        setCollateral(initialData.collateral || '');
+        setPurchasePrice(initialData.purchasePrice || '');
+        setCurrentMarketPrice(initialData.currentMarketPrice || '');
+        setMarketPriceBasis(initialData.marketPriceBasis || '');
         const isNoFeeInit = isMoong ? true : (initialData.storeDetail 
           ? !!initialData.storeDetail.isNoMaintenanceFee 
           : !!initialData.isNoMaintenanceFee);
@@ -368,6 +378,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setIsMaintenanceFeeVat(false);
         setMaintenanceFeeDetails('');
         setRestrictedBusinessTypes('');
+        setCollateral('');
+        setPurchasePrice('');
+        setCurrentMarketPrice('');
+        setMarketPriceBasis('');
         setExtraCustomOption('');
         setIsNoMaintenanceFee(false);
         setConsultationNotes('');
@@ -1016,6 +1030,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       maintenanceFeeVat: isMaintenanceFeeVat,
       maintenanceFeeDetails: maintenanceFeeDetails.trim() || undefined,
       restrictedBusinessTypes: restrictedBusinessTypes.trim() || undefined,
+      collateral: collateral.trim() || undefined,
+      purchasePrice: purchasePrice.trim() || undefined,
+      currentMarketPrice: currentMarketPrice.trim() || undefined,
+      marketPriceBasis: marketPriceBasis.trim() || undefined,
       isNoMaintenanceFee,
       consultationNotes: consultationNotes.trim() || undefined,
       landArea,
@@ -1090,6 +1108,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       maintenanceFeeVat: payload.maintenanceFeeVat,
       maintenanceFeeDetails: payload.maintenanceFeeDetails,
       restrictedBusinessTypes: payload.restrictedBusinessTypes,
+      collateral: payload.collateral,
+      purchasePrice: payload.purchasePrice,
+      currentMarketPrice: payload.currentMarketPrice,
+      marketPriceBasis: payload.marketPriceBasis,
       isNoMaintenanceFee: payload.isNoMaintenanceFee,
       consultationNotes: payload.consultationNotes,
       landArea: payload.landArea,
@@ -2003,6 +2025,95 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         </div>
                       </>
                     )}
+
+                    {/* 아파트/주택/상가점포/사무실에 전세나 월세일 경우: 조정가능한 보증금 바로 밑에 매수가, 대출금액, 현시세 및 보충 내용 직접 입력 */}
+                    {(transactionType === '전세' || transactionType === '월세') &&
+                      ['APARTMENT', 'HOUSE', 'STORE', 'OFFICE'].includes(propertyType) && (
+                        <div className="sm:col-span-2 pt-3 border-t border-slate-200 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                              <span>시세 및 대출 정보 (매수가 · 대출금액 · 현시세)</span>
+                            </label>
+                            <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                              {PROPERTY_TYPE_LABELS[propertyType]} {transactionType} 전용
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {/* 매수가 */}
+                            <div>
+                              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                                매수가 (직접 입력)
+                              </label>
+                              <input
+                                type="text"
+                                value={purchasePrice}
+                                onChange={(e) => setPurchasePrice(e.target.value)}
+                                placeholder="예: 3억 5,000만원 등 직접 입력"
+                                className="w-full text-base px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                              />
+                            </div>
+
+                            {/* 대출금액 */}
+                            <div>
+                              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                                대출금액 (직접 입력)
+                              </label>
+                              <input
+                                type="text"
+                                value={collateral}
+                                onChange={(e) => setCollateral(e.target.value)}
+                                placeholder="예: 대출 없음, 1억 2,000만원 등 직접 입력"
+                                className="w-full text-base px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                              />
+                            </div>
+
+                            {/* 현시세 */}
+                            <div>
+                              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                                현시세 (직접 입력)
+                              </label>
+                              <input
+                                type="text"
+                                value={currentMarketPrice}
+                                onChange={(e) => setCurrentMarketPrice(e.target.value)}
+                                placeholder="예: 4억 2,000만원 등 직접 입력"
+                                className="w-full text-base px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                              />
+                            </div>
+                          </div>
+
+                          {/* 현시세 기준 / 보충 내용: 탁감금액, 주위 실거래가, 계산 내용 등 직접 입력 */}
+                          <div>
+                            <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                              <label className="block text-sm font-bold text-slate-800">
+                                현시세 기준 / 보충 내용 (탁감금액, 주위 실거래가, 계산 내용 등 직접 입력)
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-slate-500 font-medium mr-0.5">빠른 선택:</span>
+                                {['탁감금액 기준', '주위 실거래가 기준', '계산 내용', '국토부 실거래가', 'KB부동산 시세'].map((basis) => (
+                                  <button
+                                    key={basis}
+                                    type="button"
+                                    onClick={() => setMarketPriceBasis(basis)}
+                                    className={'px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ' + (marketPriceBasis === basis ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300')}
+                                  >
+                                    {basis}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={marketPriceBasis}
+                              onChange={(e) => setMarketPriceBasis(e.target.value)}
+                              placeholder="예: 탁감금액 기준, 주위 실거래가 기준 또는 계산한 내용 등 직접 입력"
+                              className="w-full text-base px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                            />
+                          </div>
+                        </div>
+                      )}
 
                     {/* 임대차 시: 보증금란 밑 관리비/부가세/관리비 내역 및 입점제한업종 추가 */}
                     {transactionType !== '매매' && (
