@@ -370,6 +370,7 @@ export interface StoreData {
   previousTenantLicenseRevoked?: string; // 전세입자 영업허가증 말소 여부
   previousTenantBizRegRevoked?: string; // 전세입자 사업자등록증 말소 여부
   rentIncreaseCondition?: string; // 임대료 인상조건 및 인상액/비율
+  rentArrearsStatus?: string; // 월세 3기(3개월분) 이상 연체 여부 (직접기입)
   storeAdStatus?: string; // 점포 자체 광고 여부 (광고진행, 비공개)
   otherAgencyAdStatus?: string; // 타부동산 광고 여부
   restorationTerms?: string; // 원상복구특약
@@ -431,6 +432,7 @@ export interface OfficeData {
   storeAdStatus?: string; // 광고 노출 여부
   otherAgencyAdStatus?: string; // 타부동산 광고 여부
   rentIncreaseCondition?: string; // 임대료 인상조건 및 인상액/비율
+  rentArrearsStatus?: string; // 월세 3기(3개월분) 이상 연체 여부 (직접기입)
   restorationTerms?: string; // 원상복구특약
   // 체크리스트
   parkingAndFee?: string;

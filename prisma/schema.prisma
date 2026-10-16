@@ -395,6 +395,7 @@ model StoreDetail {
   previousTenantLicenseRevoked String? // 전세입자 영업허가증 말소 여부
   previousTenantBizRegRevoked String?  // 전세입자 사업자등록증 말소 여부
   rentIncreaseCondition      String?  // 임대료 인상조건 및 인상액/비율
+  rentArrearsStatus          String?  // 월세 3기(3개월분) 이상 연체 여부 (직접기입)
   storeAdStatus              String?  // 점포 자체 광고 여부 (공개광고/비공개)
   otherAgencyAdStatus        String?  // 타부동산 광고 여부 (없음/진행중)
   restorationTerms           String?  // 원상복구특약

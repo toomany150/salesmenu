@@ -1674,6 +1674,51 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
             </div>
           </div>
 
+          {/* 월세를 3기(3개월분) 이상 연체여부 (직접기입 가능) */}
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-slate-800">
+                월세를 3기(3개월분) 이상 연체여부 <span className="text-xs font-normal text-slate-500">(계약갱신 및 권리금 보호 핵심요건)</span>
+              </label>
+              <span className="text-xs font-semibold text-blue-600">직접기입 가능</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-1">
+                <select
+                  value={
+                    ['연체 없음 (정상 납부)', '3기(3개월분) 이상 연체 이력 있음', '현재 3기 이상 연체 진행 중', '단기 연체 이력 있음 (현재 완납)'].includes(data.rentArrearsStatus || '')
+                      ? (data.rentArrearsStatus || '연체 없음 (정상 납부)')
+                      : (data.rentArrearsStatus ? '직접 입력' : '연체 없음 (정상 납부)')
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '직접 입력') {
+                      updateField('rentArrearsStatus', '');
+                    } else {
+                      updateField('rentArrearsStatus', val);
+                    }
+                  }}
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
+                >
+                  <option value="연체 없음 (정상 납부)">🟢 연체 없음 (정상 납부)</option>
+                  <option value="3기(3개월분) 이상 연체 이력 있음">🔴 3기(3개월분) 이상 연체 이력 있음</option>
+                  <option value="현재 3기 이상 연체 진행 중">⚠️ 현재 3기 이상 연체 진행 중</option>
+                  <option value="단기 연체 이력 있음 (현재 완납)">🟡 단기 연체 이력 있음 (현재 완납)</option>
+                  <option value="직접 입력">✍️ 직접 입력</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <input
+                  type="text"
+                  value={data.rentArrearsStatus || ''}
+                  onChange={(e) => updateField('rentArrearsStatus', e.target.value)}
+                  placeholder="연체 여부 직접 기입 (예: 연체 없음 / 3개월분 연체 중 등)"
+                  className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* 점포 광고 여부 및 타부동산 광고 여부 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             

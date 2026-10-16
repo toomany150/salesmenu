@@ -1081,6 +1081,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               storeAdStatus: rawStore.storeAdStatus || '비공개(보안유지)',
               restorationTerms: rawStore.restorationTerms || (isMoong ? '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의' : '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의'),
               rentIncreaseCondition: rawStore.rentIncreaseCondition || '인상 없음 (동결)',
+              rentArrearsStatus: rawStore.rentArrearsStatus || '연체 없음 (정상 납부)',
               equipmentStatus: rawStore.equipmentStatus || (isMoong ? '육회·뭉티기 전용 냉장/냉동 쇼케이스, 주방 닥트 및 후드 설비 일체 완비 (로바다야끼 인테리어 승계)' : undefined),
               equipmentList: rawStore.equipmentList || (isMoong ? '육회 냉장쇼케이스, 업소용 4구 냉장고, 테이블 7개, 의자 28개, 주방 닥트 시설, 에어컨 1대' : undefined),
               rentalList: rawStore.rentalList || (isMoong ? '정수기, 포스(POS) 기기' : undefined),
@@ -1378,6 +1379,25 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       )}
                     </div>
                   </div>
+                  {store.rentArrearsStatus && (
+                    <div className={`p-2.5 rounded-lg border text-xs flex items-center justify-between ${
+                      store.rentArrearsStatus.includes('연체 이력 있음') || store.rentArrearsStatus.includes('연체 진행 중')
+                        ? 'bg-rose-50 border-rose-300 text-rose-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}>
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <span>⚖️ 월세 3기 연체 여부:</span>
+                        <span className={`font-extrabold ${
+                          store.rentArrearsStatus.includes('연체 이력 있음') || store.rentArrearsStatus.includes('연체 진행 중')
+                            ? 'text-rose-700'
+                            : 'text-emerald-700'
+                        }`}>{store.rentArrearsStatus}</span>
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-500">
+                        {store.rentArrearsStatus.includes('연체 없음') ? '계약갱신·권리금보호 적용 가능' : '계약갱신·권리금보호 사전 검토 필요'}
+                      </span>
+                    </div>
+                  )}
                   {store.restorationTerms && (
                     <div className="p-2.5 bg-amber-50/70 rounded-lg border border-amber-200 text-xs">
                       <span className="font-bold text-amber-950 block">✨ 원상복구특약:</span>

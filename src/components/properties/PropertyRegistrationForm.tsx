@@ -333,6 +333,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           if (!initialStore.equipmentRentalTransfer) initialStore.equipmentRentalTransfer = '포스 및 정수기 렌탈 승계 협의';
           if (!initialStore.restorationTerms) initialStore.restorationTerms = '현 시설 상태(인테리어 및 닥트/기본설비) 인수 및 원상복구 합의';
           if (!initialStore.rentIncreaseCondition) initialStore.rentIncreaseCondition = '인상 없음 (동결)';
+          if (!initialStore.rentArrearsStatus) initialStore.rentArrearsStatus = '연체 없음 (정상 납부)';
           if (!initialStore.storeAdStatus) initialStore.storeAdStatus = '비공개(보안유지)';
           if (!initialStore.fireInspectionCert) initialStore.fireInspectionCert = '완비 (소방안전 점검 완료)';
           if (!initialStore.adminActionChecked) initialStore.adminActionChecked = '행정처분 없음 (클린)';
@@ -2568,6 +2569,47 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             value={storeData.rentIncreaseCondition || ''}
                             onChange={(e) => setStoreData({ ...storeData, rentIncreaseCondition: e.target.value })}
                             placeholder="인상폭 직접 입력 (예: 보증금 1000/월세 10 인상 등)"
+                            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl font-medium text-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 월세를 3기(3개월분) 이상 연체여부 (직접기입 가능) */}
+                      <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-bold text-slate-800">
+                            월세를 3기(3개월분) 이상 연체여부 <span className="text-[11px] font-normal text-slate-500">(계약갱신 및 권리금 보호 핵심요건)</span>
+                          </label>
+                          <span className="text-[11px] font-semibold text-blue-600">직접기입 가능</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <select
+                            value={
+                              ['연체 없음 (정상 납부)', '3기(3개월분) 이상 연체 이력 있음', '현재 3기 이상 연체 진행 중', '단기 연체 이력 있음 (현재 완납)'].includes(storeData.rentArrearsStatus || '')
+                                ? (storeData.rentArrearsStatus || '연체 없음 (정상 납부)')
+                                : (storeData.rentArrearsStatus ? '직접 입력' : '연체 없음 (정상 납부)')
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '직접 입력') {
+                                setStoreData({ ...storeData, rentArrearsStatus: '' });
+                              } else {
+                                setStoreData({ ...storeData, rentArrearsStatus: val });
+                              }
+                            }}
+                            className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl font-semibold text-slate-900"
+                          >
+                            <option value="연체 없음 (정상 납부)">🟢 연체 없음 (정상 납부)</option>
+                            <option value="3기(3개월분) 이상 연체 이력 있음">🔴 3기(3개월분) 이상 연체 이력 있음</option>
+                            <option value="현재 3기 이상 연체 진행 중">⚠️ 현재 3기 이상 연체 진행 중</option>
+                            <option value="단기 연체 이력 있음 (현재 완납)">🟡 단기 연체 이력 있음 (현재 완납)</option>
+                            <option value="직접 입력">✍️ 직접 입력</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={storeData.rentArrearsStatus || ''}
+                            onChange={(e) => setStoreData({ ...storeData, rentArrearsStatus: e.target.value })}
+                            placeholder="연체 여부 직접 기입 (예: 연체 없음 / 3개월분 연체 중 등)"
                             className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl font-medium text-slate-900"
                           />
                         </div>
