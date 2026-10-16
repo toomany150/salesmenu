@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         properties: true,
         demands: true,
       },
-      orderBy: [{ isPinned: 'desc' }, { receiptDate: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }, { receiptDate: 'desc' }],
     });
 
     // 만약 DB가 비어있으면 초기 목데이터 자동 시딩

@@ -356,12 +356,12 @@ const DashboardContent: React.FC = () => {
     setCustomers((prev) => {
       const filtered = prev.filter((c) => c.id !== savedCust.id);
       const next = [savedCust, ...filtered];
-      // [기능 4 & 5] 최근 등록일 기준 맨처음 배치 + 중요 고객 최상단(맨처음) 고정
+      // [기능 4 & 5] 최근 등록된 일시(createdAt) 기준 맨처음 배치 + 중요 고객 최상단 고정
       return next.sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
-        const timeA = new Date(a.receiptDate || a.createdAt || 0).getTime();
-        const timeB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+        const timeA = new Date(a.createdAt || a.receiptDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.receiptDate || 0).getTime();
         return timeB - timeA;
       });
     });

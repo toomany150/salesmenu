@@ -53,11 +53,11 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | undefined>();
   const [sharingProperty, setSharingProperty] = useState<PropertyItem | null>(null);
 
-  // 접수일자(receiptDate 또는 createdAt) 기준 최신순 내림차순 정렬 (최신이 맨 앞)
+  // 최근 등록된 일시(createdAt 또는 receiptDate) 기준 최신순 내림차순 정렬 (최신 등록 매물이 맨 처음)
   const sortedFiltered = React.useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
-      const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+      const tA = new Date(a.createdAt || a.receiptDate || 0).getTime();
+      const tB = new Date(b.createdAt || b.receiptDate || 0).getTime();
       return tB - tA;
     });
   }, [filtered]);

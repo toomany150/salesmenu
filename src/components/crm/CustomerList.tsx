@@ -147,9 +147,9 @@ export const CustomerList: React.FC<CustomerListProps> = ({
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
 
-      // 2순위: 최근 등록일/접수일 최신순 (맨 처음으로 배치)
-      const timeA = new Date(a.receiptDate || a.createdAt || 0).getTime();
-      const timeB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+      // 2순위: 실제 최근 등록된 일시(createdAt) 최신순으로 맨 처음 배치
+      const timeA = new Date(a.createdAt || a.receiptDate || 0).getTime();
+      const timeB = new Date(b.createdAt || b.receiptDate || 0).getTime();
       return timeB - timeA;
     });
   }, [baseGroupCustomers, showFilterPanel, filteredFromPanel, currentUser, managerFilter, searchQuery]);
