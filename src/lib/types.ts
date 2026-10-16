@@ -61,9 +61,17 @@ export type PropertyStatus = 'AVAILABLE' | 'CONTRACTED' | 'HOLD' | 'CANCELLED';
 
 export const STATUS_LABELS: Record<PropertyStatus, { label: string; color: string }> = {
   AVAILABLE: { label: '접수/진행중', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-  CONTRACTED: { label: '계약완료', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  CONTRACTED: { label: '계약완료', color: 'bg-rose-100 text-rose-800 border-rose-300' },
   HOLD: { label: '보류', color: 'bg-amber-100 text-amber-800 border-amber-300' },
-  CANCELLED: { label: '취소', color: 'bg-rose-100 text-rose-800 border-rose-300' },
+  CANCELLED: { label: '취소', color: 'bg-slate-100 text-slate-800 border-slate-300' },
+};
+
+export type CustomerStatus = 'ACTIVE' | 'COMPLETED' | 'HOLD';
+
+export const CUSTOMER_STATUS_LABELS: Record<CustomerStatus, { label: string; color: string }> = {
+  ACTIVE: { label: '상담진행중', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  COMPLETED: { label: '상담·계약완료', color: 'bg-rose-100 text-rose-800 border-rose-300' },
+  HOLD: { label: '보류', color: 'bg-amber-100 text-amber-800 border-amber-300' },
 };
 
 // 8방위 방향 목록 및 기준 옵션 정의
@@ -670,6 +678,8 @@ export interface CustomerItem {
   type: CustomerType;
   subType?: string; // '매도인' | '임대인' | '임차인(권리금)' | '매수인' | '임차인' | '임차인(권리금가능)'
   group: CustomerGroup;
+  status?: CustomerStatus;
+  receiptDate?: string;
   memo?: string;
   // [물건 접수] 상세 정보 및 가격 연계
   price?: number; // 희망 매매가액

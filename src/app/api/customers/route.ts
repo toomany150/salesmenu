@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         properties: true,
         demands: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
     });
 
     // 만약 DB가 비어있으면 초기 목데이터 자동 시딩
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
           properties: true,
           demands: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
       });
     }
 
@@ -201,6 +201,8 @@ export async function POST(request: NextRequest) {
         type,
         subType: finalSubType,
         group: finalGroup,
+          status: body.status || 'ACTIVE',
+          receiptDate: body.receiptDate ? new Date(body.receiptDate) : (body.createdAt ? new Date(body.createdAt) : new Date()),
         memo,
         price: finalPrice,
         negotiablePrice: finalNegoPrice,
@@ -370,6 +372,8 @@ export async function PUT(request: NextRequest) {
         type: type || undefined,
         subType: subType !== undefined ? subType : undefined,
         group: group || undefined,
+          status: body.status !== undefined ? body.status : undefined,
+          receiptDate: body.receiptDate !== undefined ? (body.receiptDate ? new Date(body.receiptDate) : null) : undefined,
         memo: memo !== undefined ? memo : undefined,
         price: price !== undefined ? (price !== null ? parseFloat(price) : null) : undefined,
         negotiablePrice: negotiablePrice !== undefined ? (negotiablePrice !== null ? parseFloat(negotiablePrice) : null) : undefined,

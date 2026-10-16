@@ -53,6 +53,15 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | undefined>();
   const [sharingProperty, setSharingProperty] = useState<PropertyItem | null>(null);
 
+  // 접수일자(receiptDate 또는 createdAt) 기준 최신순 내림차순 정렬 (최신이 맨 앞)
+  const sortedFiltered = React.useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+      const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+  }, [filtered]);
+
   // Sync when properties changes externally
   useEffect(() => {
     setFiltered(properties);
@@ -240,6 +249,11 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               <span className="px-1.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-800">
                                 {property.transactionType}
                               </span>
+                              {property.status === 'CONTRACTED' && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-rose-600 text-white shadow-2xs">
+                                  ✓ 계약완료
+                                </span>
+                              )}
                             </div>
                             <span className="text-sm font-black text-blue-900 truncate">
                               {getPriceDisplay(property)}
@@ -381,11 +395,12 @@ export const PropertyList: React.FC<PropertyListProps> = ({
       {/* 3) GRID ONLY VIEW */}
       {viewMode === 'GRID' && (
         <>
-          {filtered.length > 0 ? (
+          {sortedFiltered.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((property) => {
+              {sortedFiltered.map((property) => {
                 const statusInfo = STATUS_LABELS[property.status] || { label: property.status, color: 'bg-slate-100 text-slate-800' };
                 const hasImages = property.images && property.images.length > 0;
+                const isContracted = property.status === 'CONTRACTED';
 
                 const smsLink = generateSmsLink({
                   propertyNumber: property.propertyNumber,

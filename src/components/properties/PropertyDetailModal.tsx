@@ -5,7 +5,8 @@ import {
   X, 
   Phone, 
   MessageSquare, 
-  Share2, 
+  Share2,
+  CheckCircle2, 
   Printer, 
   MapPin, 
   Calendar, 
@@ -382,11 +383,18 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   <span className="text-xs text-slate-300 font-mono bg-black/20 px-2 py-0.5 rounded">
                     #{property.propertyNumber}
                   </span>
-                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
-                    property.status === 'AVAILABLE' ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300'
-                  }`}>
-                    {STATUS_LABELS[property.status]?.label || property.status}
-                  </span>
+                  {property.status === 'CONTRACTED' ? (
+                    <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-rose-600 text-white border border-rose-300 shadow-xs flex items-center gap-1 animate-pulse">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      ✓ 계약완료
+                    </span>
+                  ) : (
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                      property.status === 'AVAILABLE' ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300'
+                    }`}>
+                      {STATUS_LABELS[property.status]?.label || property.status}
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight break-keep">
                   {titleName}
@@ -632,6 +640,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   onClick={() => setIsPhotoLightboxOpen(true)}
                 />
                 
+                {/* 계약완료 워터마크 이미지 스탬프 오버레이 */}
+                {property.status === 'CONTRACTED' && (
+                  <div className="absolute inset-0 bg-black/45 flex items-center justify-center pointer-events-none z-10">
+                    <div className="border-4 border-dashed border-red-500 bg-red-950/85 text-white font-black px-6 py-2.5 rounded-2xl text-2xl sm:text-3xl tracking-widest transform -rotate-12 shadow-2xl backdrop-blur-xs flex items-center gap-3">
+                      <span className="w-3.5 h-3.5 rounded-full bg-red-500 animate-ping"></span>
+                      <span>[ 계 약 완 료 ]</span>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-bold">
                   <Camera className="w-3.5 h-3.5 text-blue-400" />
                   <span>{currentPhotoIndex + 1} / {images.length}장</span>
@@ -693,9 +711,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               )}
             </div>
           ) : (
-            <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-              <ImageIcon className="w-4 h-4 text-slate-400" />
-              <span>등록된 매물 사진이 없습니다. [수정] 버튼을 눌러 사진(최대 20장)을 등록할 수 있습니다.</span>
+            <div className={`p-4 rounded-xl border text-center text-xs flex flex-col sm:flex-row items-center justify-between gap-3 ${
+              property.status === 'CONTRACTED'
+                ? 'bg-rose-50 border-rose-300 text-rose-900'
+                : 'bg-slate-50 border-dashed border-slate-300 text-slate-500'
+            }`}>
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-slate-400" />
+                <span>등록된 매물 사진이 없습니다. [수정] 버튼을 눌러 사진(최대 20장)을 등록할 수 있습니다.</span>
+              </div>
+              {property.status === 'CONTRACTED' && (
+                <div className="border-2 border-dashed border-rose-600 bg-rose-100 text-rose-800 font-black px-4 py-1.5 rounded-lg text-sm tracking-wider shadow-xs transform rotate-[-2deg]">
+                  [ 계 약 완 료 ]
+                </div>
+              )}
             </div>
           )}
 

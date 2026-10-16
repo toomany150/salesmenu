@@ -35,6 +35,8 @@ import {
   PROPERTY_TYPE_LABELS,
   PROPERTY_TYPE_ORDER,
   CustomerItem,
+  CustomerStatus,
+  CUSTOMER_STATUS_LABELS,
   PublicBuildingLedgerResult,
   PublicBuildingUnitInfo
 } from '@/lib/types';
@@ -82,6 +84,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const { currentUser, availableAgents, addCustomAgent } = useAuth();
   
   // 1. 고객 기본 정보
+  const [status, setStatus] = useState<CustomerStatus>('ACTIVE');
+  const [receiptDate, setReceiptDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [name, setName] = useState('');
   const [carrier, setCarrier] = useState<MobileCarrier>('SK');
   const [phone, setPhone] = useState('');
@@ -352,6 +356,14 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     if (!isOpen) return;
 
     if (mode === 'EDIT' && initialData) {
+      setStatus(initialData.status || 'ACTIVE');
+      setReceiptDate(
+        initialData.receiptDate
+          ? new Date(initialData.receiptDate).toISOString().split('T')[0]
+          : initialData.createdAt
+          ? new Date(initialData.createdAt).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0]
+      );
       setName(initialData.name || '');
       setPhone(initialData.phone || '');
       setCarrier((initialData.carrier as MobileCarrier) || 'SK');
@@ -427,6 +439,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       const effectiveNegoPremium = initialData.negotiablePremium !== undefined && initialData.negotiablePremium !== null ? initialData.negotiablePremium : undefined;
       if (effectiveNegoPremium !== undefined && effectiveNegoPremium !== null) setRecvNegoPremium(String(effectiveNegoPremium));
     } else {
+      setStatus('ACTIVE');
+      setReceiptDate(new Date().toISOString().split('T')[0]);
       setName('');
       setPhone('');
       setCarrier('SK');
@@ -663,6 +677,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       type,
       subType,
       group,
+      status,
+      receiptDate,
       memo: memo.trim() || undefined,
       managerName: managerName || '개업공인중개사 (대표)',
       assignedAgents,
@@ -780,6 +796,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       type: payload.type,
       subType: payload.subType,
       group: payload.group,
+      status: payload.status,
+      receiptDate: payload.receiptDate,
       memo: payload.memo,
       price: payload.price,
       negotiablePrice: payload.negotiablePrice,
@@ -1010,8 +1028,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 </div>
               </div>
 
-              {/* 고객 기본 인적사항 */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* 고객 기본 인적사항 & 접수일자 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">고객명 *</label>
                   <input
@@ -1037,6 +1055,20 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 </div>
 
                 <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    <span>접수일자 *</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={receiptDate}
+                    onChange={(e) => setReceiptDate(e.target.value)}
+                    required
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800"
+                  />
+                </div>
+
+                <div>
                   {!isSearching ? (
                     <>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1052,7 +1084,63 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         ))}
                       </select>
                     </>
-                  ) : null}
+                  ) : (
+                    <>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        상담 구분
+                      </label>
+                      <div className="text-xs px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 truncate">
+                        {subType === 'LESSEE_PREMIUM_OK' ? '임차인 권리금가능' : (type === 'BUYER' ? '매수인' : '임차인')}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* 진행상태 선택 (상담/계약 완료 처리) */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                  <span>상담 및 고객 진행상태 선택</span>
+                  <span className="text-[11px] font-normal text-slate-500">(완료 선택 시 목록 및 상세에서 완료 표시 및 스탬프 표시)</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStatus('ACTIVE')}
+                    className={`py-2 px-3 text-xs font-bold rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
+                      status === 'ACTIVE'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-300 inline-block"></span>
+                    <span>🟢 진행중 (상담/탐색)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatus('COMPLETED')}
+                    className={`py-2 px-3 text-xs font-black rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
+                      status === 'COMPLETED'
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-md ring-2 ring-rose-500/30'
+                        : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>🔴 상담 및 계약 완료</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatus('HOLD')}
+                    className={`py-2 px-3 text-xs font-bold rounded-lg border transition-all flex items-center justify-center gap-1.5 ${
+                      status === 'HOLD'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm ring-2 ring-amber-500/20'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-amber-300 inline-block"></span>
+                    <span>🟡 보류 / 대기</span>
+                  </button>
                 </div>
               </div>
 

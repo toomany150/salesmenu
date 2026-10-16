@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
           factoryWarehouseDetail: true,
           landDetail: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
       });
     }
 

@@ -306,6 +306,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCustomers.map((customer) => {
             const isReceived = customer.group === 'RECEIVED';
+            const isCompleted = customer.status === 'COMPLETED';
             const typeLabel = 
               customer.type === 'SELLER' ? '매도인' :
               customer.type === 'LESSOR' ? '임대인' :
@@ -315,13 +316,27 @@ export const CustomerList: React.FC<CustomerListProps> = ({
             const canViewContact = canViewCustomerContact(currentUser, customer);
             const displayPhone = canViewContact ? customer.phone : maskPhoneNumber(customer.phone);
             const managerName = customer.managerName || '사무실';
+            const receiptDateStr = (customer.receiptDate || (customer.properties && customer.properties[0]?.receiptDate) || customer.createdAt || '').substring(0, 10);
 
             return (
               <div
                 key={customer.id}
-                className="bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all p-4.5 flex flex-col justify-between group cursor-pointer"
+                className={`rounded-2xl border-2 transition-all p-4.5 flex flex-col justify-between group cursor-pointer relative overflow-hidden ${
+                  isCompleted
+                    ? 'bg-slate-50/90 border-slate-300 opacity-95'
+                    : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-md'
+                }`}
                 onClick={() => onSelectCustomer(customer)}
               >
+                {/* 완료(상담·계약완료) 시 도장/스티커 이미지 형태의 완료 워터마크 */}
+                {isCompleted && (
+                  <div className="absolute right-3 top-2.5 transform rotate-12 select-none pointer-events-none z-10 animate-in zoom-in-95 duration-200">
+                    <div className="px-2.5 py-1 rounded-xl border-2 border-rose-500 bg-rose-950/85 text-rose-100 shadow-lg ring-1 ring-white/70 flex flex-col items-center justify-center">
+                      <span className="text-[11px] font-black tracking-widest drop-shadow-xs">상담완료</span>
+                      <span className="text-[8px] font-bold text-rose-300 tracking-wider">COMPLETED</span>
+                    </div>
+                  </div>
+                )}
                 <div>
                   {/* Top: Name, Carrier badge, Group Badge, Manager Badge, Type badge */}
                   <div className="flex items-start justify-between gap-2 mb-2.5">

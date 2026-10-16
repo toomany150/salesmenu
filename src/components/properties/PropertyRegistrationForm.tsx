@@ -22,6 +22,8 @@ import {
 import { 
   PropertyType, 
   TransactionType, 
+  PropertyStatus,
+  STATUS_LABELS,
   CustomerItem, 
   PropertyItem,
   MobileCarrier,
@@ -81,6 +83,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [newAgentInput, setNewAgentInput] = useState('');
   const [transactionType, setTransactionType] = useState<TransactionType>('매매');
+  const [status, setStatus] = useState<PropertyStatus>('AVAILABLE');
   const [roadAddress, setRoadAddress] = useState('');
   const [jibunAddress, setJibunAddress] = useState('');
   const [address, setAddress] = useState('');

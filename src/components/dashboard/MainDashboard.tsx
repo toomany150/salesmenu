@@ -128,10 +128,24 @@ const DashboardContent: React.FC = () => {
       if (custRes.ok) {
         const cData = await custRes.json();
         if (Array.isArray(cData)) {
+          cData.sort((a: any, b: any) => {
+            const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
+            const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
+            const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
+            const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
+            return tB - tA;
+          });
           setCustomers(cData);
           setCustomCustomers(cData);
         }
       } else if (localCustomCusts.length > 0) {
+        localCustomCusts.sort((a: any, b: any) => {
+          const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
+          const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
+          const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
+          const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
+          return tB - tA;
+        });
         setCustomers(localCustomCusts);
       }
 
@@ -279,6 +293,12 @@ const DashboardContent: React.FC = () => {
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
 
+  // 완료 및 진행중 요약 건수 계산
+  const contractedPropertiesCount = properties.filter((p) => p.status === 'CONTRACTED').length;
+  const availablePropertiesCount = properties.filter((p) => p.status !== 'CONTRACTED' && p.status !== 'CANCELLED').length;
+  const completedCustomersCount = customers.filter((c) => c.status === 'COMPLETED').length;
+  const activeCustomersCount = customers.filter((c) => c.status !== 'COMPLETED').length;
+
   const handleOpenNewProperty = () => {
     if (!checkAuthOrAlert('새 매물 등록은 중개사 로그인 후 이용 가능합니다.')) return;
     setEditingProperty(null);
@@ -423,9 +443,21 @@ const DashboardContent: React.FC = () => {
               </div>
               <div className="flex items-baseline justify-between mt-2">
                 {currentUser ? (
-                  <span className="text-2xl sm:text-3xl font-black text-emerald-900">
-                    {properties.length}<span className="text-sm font-normal text-emerald-700 ml-1">건</span>
-                  </span>
+                  <div>
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-900">
+                      {properties.length}<span className="text-sm font-normal text-emerald-700 ml-1">건</span>
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.2 rounded">
+                        진행 {availablePropertiesCount}
+                      </span>
+                      {contractedPropertiesCount > 0 && (
+                        <span className="text-[11px] font-extrabold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded border border-rose-300">
+                          ✓ 계약완료 {contractedPropertiesCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <span className="text-base sm:text-lg font-bold text-slate-400 flex items-center gap-1">
                     🔒 로그인 필요

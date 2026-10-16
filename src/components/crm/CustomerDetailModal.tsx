@@ -217,6 +217,22 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                   {isReceived ? '[물건 접수] ' : '[물건 찾음] '} {typeKorean}
                 </span>
 
+                {/* 고객 진행상태 뱃지 */}
+                {customer.status === 'COMPLETED' ? (
+                  <span className="px-2.5 py-0.5 text-xs font-black rounded-full bg-rose-100 text-rose-800 border-2 border-rose-400 flex items-center gap-1 shadow-xs animate-pulse">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-rose-600" />
+                    ✓ 상담·계약완료
+                  </span>
+                ) : customer.status === 'HOLD' ? (
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                    보류
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    ● 진행중
+                  </span>
+                )}
+
                 {/* 담당 권한자 뱃지 */}
                 <span className={`px-2.5 py-0.5 text-xs font-bold rounded-md ${
                   managerName.includes('개업공인중개사')
@@ -239,7 +255,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                등록일: {customer.createdAt ? customer.createdAt.substring(0, 10) : '-'}
+                접수일: {customer.receiptDate ? customer.receiptDate.substring(0, 10) : (customer.createdAt ? customer.createdAt.substring(0, 10) : '-')} | 등록: {customer.createdAt ? customer.createdAt.substring(0, 10) : '-'}
               </p>
             </div>
           </div>
@@ -293,6 +309,28 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+          
+          {/* 완료 상태일 때 상단 완료 도장/배너 이미지 스탬프 */}
+          {customer.status === 'COMPLETED' && (
+            <div className="relative overflow-hidden p-4 rounded-xl bg-gradient-to-r from-rose-50 via-red-50 to-orange-50 border-2 border-rose-300 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3 z-10">
+                <div className="w-12 h-12 rounded-full bg-rose-600 text-white flex items-center justify-center font-black text-sm shadow-md ring-4 ring-rose-200">
+                  완료
+                </div>
+                <div>
+                  <div className="text-sm font-black text-rose-950 flex items-center gap-2">
+                    <span>상담 및 계약 진행이 완료된 고객입니다.</span>
+                  </div>
+                  <p className="text-xs text-rose-700 mt-0.5">
+                    접수일: {customer.receiptDate ? customer.receiptDate.substring(0, 10) : (customer.createdAt ? customer.createdAt.substring(0, 10) : '-')} | 고객분류: {typeKorean}
+                  </p>
+                </div>
+              </div>
+              <div className="z-10 px-3.5 py-1.5 rounded-lg border-2 border-dashed border-rose-600 bg-white/90 text-rose-700 font-black text-xs sm:text-sm tracking-widest transform rotate-[-4deg] shadow-xs">
+                [ 상 담 완 료 / COMPLETED ]
+              </div>
+            </div>
+          )}
           
           {/* Unauthorized Contact Security Notice */}
           {!canViewContact && (
