@@ -70,6 +70,7 @@ model Customer {
   subType   String?  // 세부 구분: 매도인, 임대인, 임차인(권리금) 등
   status    String   @default("ACTIVE") // 진행상태: ACTIVE(상담진행중), COMPLETED(상담/계약완료), HOLD(보류)
   receiptDate DateTime? @default(now()) // 접수일자
+  isPinned  Boolean   @default(false)    // 중요 고객 여부 (맨 처음/최상단 고정)
   memo      String?  // 특이사항 및 상담 메모
 
   // [물건 접수] 매도/임대/임차(권리금) 가격 정보 연계

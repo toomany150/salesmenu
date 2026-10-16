@@ -25,12 +25,14 @@ import {
   Volume2,
   Copy,
   Check,
-  Edit3
+  Edit3,
+  Star
 } from 'lucide-react';
 import { CustomerItem, PropertyItem, PROPERTY_TYPE_LABELS, CustomerDemandItem } from '@/lib/types';
 import { useAuth } from '../auth/AuthContext';
 import { maskPhoneNumber, canViewCustomerContact, canDeleteItem, canEditItem } from '@/lib/auth';
 import { formatKoreanMoney } from './CustomerFormModal';
+import { saveCustomCustomer } from '@/lib/storage';
 
 interface CustomerDetailModalProps {
   customer: CustomerItem | null;
@@ -39,6 +41,7 @@ interface CustomerDetailModalProps {
   onEditCustomer?: (customer: CustomerItem) => void;
   onSelectProperty?: (property: PropertyItem) => void;
   onCustomerDeleted?: (customerId: string) => void;
+  onCustomerUpdated?: (customer: CustomerItem) => void;
 }
 
 export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
@@ -48,10 +51,199 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   onEditCustomer,
   onSelectProperty,
   onCustomerDeleted,
+  onCustomerUpdated,
 }) => {
   const { currentUser } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedDemandId, setCopiedDemandId] = useState<string | null>(null);
+  const [currentCustomer, setCurrentCustomer] = useState<CustomerItem | null>(customer);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isUpdatingPin, setIsUpdatingPin] = useState(false);
+  const [copiedKakao, setCopiedKakao] = useState(false);
+  const [showKakaoModal, setShowKakaoModal] = useState(false);
+  const [kakaoText, setKakaoText] = useState('');
+
+  React.useEffect(() => {
+    setCurrentCustomer(customer);
+  }, [customer]);
+
+  // [기능 1] 고객등록완료 설정 및 상태 변경 핸들러
+  const handleToggleStatus = async (targetStatus?: 'ACTIVE' | 'COMPLETED' | 'HOLD') => {
+    if (!currentCustomer) return;
+    const nextStatus = targetStatus || (currentCustomer.status === 'COMPLETED' ? 'ACTIVE' : 'COMPLETED');
+    setIsUpdatingStatus(true);
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: currentCustomer.id,
+          status: nextStatus,
+          currentUser,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '상태 변경 중 오류가 발생했습니다.');
+
+      const updated: CustomerItem = { ...currentCustomer, status: nextStatus };
+      setCurrentCustomer(updated);
+      saveCustomCustomer(updated);
+      if (onCustomerUpdated) onCustomerUpdated(updated);
+
+      if (nextStatus === 'COMPLETED') {
+        alert(`"${currentCustomer.name}" 고객이 [고객등록완료]로 설정되었습니다! ✓`);
+      } else {
+        alert(`"${currentCustomer.name}" 고객이 [상담 진행중]으로 변경되었습니다.`);
+      }
+    } catch (err: any) {
+      alert(err.message || '상태 변경 중 오류가 발생했습니다.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // [기능 5] 중요 고객 설정 및 맨 처음으로 이동 핸들러
+  const handleTogglePin = async () => {
+    if (!currentCustomer) return;
+    const nextPinned = !currentCustomer.isPinned;
+    setIsUpdatingPin(true);
+    try {
+      // 중요 고객 지정 시 최신 접수일시를 부여하여 리스트 맨 처음으로 즉시 이동 보장
+      const nowIso = new Date().toISOString();
+      const res = await fetch('/api/customers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: currentCustomer.id,
+          isPinned: nextPinned,
+          receiptDate: nextPinned ? nowIso : currentCustomer.receiptDate,
+          currentUser,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '중요 고객 설정 중 오류가 발생했습니다.');
+
+      const updated: CustomerItem = {
+        ...currentCustomer,
+        isPinned: nextPinned,
+        receiptDate: nextPinned ? nowIso : currentCustomer.receiptDate,
+      };
+      setCurrentCustomer(updated);
+      saveCustomCustomer(updated);
+      if (onCustomerUpdated) onCustomerUpdated(updated);
+
+      if (nextPinned) {
+        alert(`⭐ "${currentCustomer.name}" 고객이 [중요 고객]으로 지정되어 목록 맨 처음으로 이동되었습니다!`);
+      } else {
+        alert(`"${currentCustomer.name}" 고객의 중요 고객 설정이 해제되었습니다.`);
+      }
+    } catch (err: any) {
+      alert(err.message || '중요 고객 설정 중 오류가 발생했습니다.');
+    } finally {
+      setIsUpdatingPin(false);
+    }
+  };
+
+  // [기능 3] 카톡 공동중개 공유 대본 생성 (고객 이름과 연락처는 완전 제외!)
+  const generateKakaoBrokerShareText = (cust: CustomerItem) => {
+    const isRecv = cust.group === 'RECEIVED';
+    const typeLabel = 
+      cust.type === 'SELLER' ? '매도인' :
+      cust.type === 'LESSOR' ? '임대인' :
+      cust.type === 'BUYER' ? '매수인' : '임차인';
+
+    let text = `[공동중개 매물 의뢰]\n`;
+    text += `소장님, 아래 조건에 맞는 매물 있으시면 공동중개 부탁드립니다! 🤝\n\n`;
+
+    if (!isRecv) {
+      // [물건 찾음] 매수/임차 의뢰
+      const demand = cust.demands && cust.demands[0];
+      const propLabel = demand ? (PROPERTY_TYPE_LABELS[demand.targetPropertyType] || '부동산') : '부동산';
+      const txType = demand?.targetTransactionType || '매매/임대';
+
+      text += `📋 의뢰 구분: [물건 찾음] ${typeLabel} (${propLabel} · ${txType})\n`;
+      if (demand) {
+        text += `📍 희망 지역: ${demand.targetRegion || '지역 무관'}\n`;
+        if (demand.regionReason) {
+          text += `   └ 선정이유: ${demand.regionReason}\n`;
+        }
+
+        const areaStr = demand.preferredAreaPy
+          ? `${demand.preferredAreaPy}평 (${demand.preferredArea}㎡)`
+          : (demand.preferredArea ? `${demand.preferredArea}㎡` : '협의');
+        text += `📐 희망 면적: ${areaStr}\n`;
+        text += `🏢 희망 층수: ${demand.preferredFloor || '층수 무관'}\n`;
+        text += `🚗 주차 요건: ${demand.parkingRequirement || '주차 조건 협의'}\n`;
+
+        let budgetStr = '예산 협의';
+        if (txType === '매매') {
+          budgetStr = demand.targetPrice ? `매매 ${formatKoreanMoney(demand.targetPrice)}` : '매매가 협의';
+        } else if (txType === '전세') {
+          budgetStr = demand.targetJeonse ? `전세 ${formatKoreanMoney(demand.targetJeonse)}` : '전세가 협의';
+        } else {
+          const dep = demand.targetDeposit ? `보증금 ${formatKoreanMoney(demand.targetDeposit)}` : '보증금 협의';
+          const rent = demand.targetMonthlyRent ? `월세 ${formatKoreanMoney(demand.targetMonthlyRent)}` : '월세 협의';
+          budgetStr = `${dep} / ${rent}`;
+        }
+        text += `💰 희망 예산: ${budgetStr}\n`;
+        text += `📅 입주/오픈: ${demand.moveInTiming || '즉시가능'}${demand.moveInReason ? ` (사유: ${demand.moveInReason})` : ''}\n`;
+
+        if (demand.loanRequirement) {
+          text += `🏦 대출 여부: ${demand.loanRequirement}\n`;
+        }
+
+        // 2번째 파일: 1순위 조건 & 조율 조건
+        if (demand.nonNegotiableCondition) {
+          text += `\n🚨 [1순위 타협불가] 절대 양보할 수 없는 최우선 조건:\n👉 ${demand.nonNegotiableCondition}\n`;
+        }
+        if (demand.negotiableCondition) {
+          text += `\n🤝 [조율가능] 매물이 정말 좋을 경우 가장 포기하기 쉬운 조건:\n👉 ${demand.negotiableCondition}\n`;
+        }
+      }
+    } else {
+      // [물건 접수] 매도/임대 의뢰
+      text += `📋 의뢰 구분: [물건 접수] ${typeLabel}\n`;
+      if (cust.transactionType) text += `🏷️ 거래 유형: ${cust.transactionType}\n`;
+      if (cust.price) text += `💰 희망 매매가: ${formatKoreanMoney(cust.price)}\n`;
+      if (cust.negotiablePrice) text += `   └ 조정선: ${formatKoreanMoney(cust.negotiablePrice)}\n`;
+      if (cust.deposit) text += `💵 보증금/전세: ${formatKoreanMoney(cust.deposit)}\n`;
+      if (cust.monthlyRent) text += `💶 희망 월세: ${formatKoreanMoney(cust.monthlyRent)}\n`;
+      if (cust.premium) text += `🏪 권리금: ${formatKoreanMoney(cust.premium)}\n`;
+      if (cust.receivedDetail?.roadAddress || cust.receivedDetail?.jibunAddress) {
+        text += `📍 물건 소재지: ${cust.receivedDetail.roadAddress || cust.receivedDetail.jibunAddress}\n`;
+      }
+    }
+
+    if (cust.memo) {
+      text += `\n📝 상세 상담 메모:\n"${cust.memo}"\n`;
+    }
+
+    text += `\n────────────────────────\n`;
+    text += `※ 본 의뢰서는 고객 개인정보(이름·연락처)를 안전하게 보호한 공동중개 의뢰문입니다.\n`;
+    const myName = currentUser?.name || cust.managerName || '개업공인중개사 (대표)';
+    text += `🏢 의뢰 중개사: ${myName}\n`;
+    if (currentUser?.phone) {
+      text += `📞 연락처: ${currentUser.phone}\n`;
+    }
+
+    return text;
+  };
+
+  const handleOpenKakaoShare = () => {
+    if (!currentCustomer) return;
+    const txt = generateKakaoBrokerShareText(currentCustomer);
+    setKakaoText(txt);
+    setShowKakaoModal(true);
+
+    // 자동 클립보드 복사
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(txt).then(() => {
+        setCopiedKakao(true);
+        setTimeout(() => setCopiedKakao(false), 3000);
+      }).catch(() => {});
+    }
+  };
+
   const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
 
   const handleCopyText = (text: string, key: string) => {
@@ -85,18 +277,19 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   };
 
   if (!isOpen || !customer) return null;
+  const activeCust = currentCustomer || customer;
 
-  const isReceived = customer.group === 'RECEIVED';
+  const isReceived = activeCust.group === 'RECEIVED';
   const typeKorean = 
-    customer.type === 'SELLER' ? '매도인' :
+    activeCust.type === 'SELLER' ? '매도인' :
     customer.type === 'LESSOR' ? '임대인' :
     customer.type === 'BUYER' ? '매수인' : '임차인';
 
-  const canViewContact = canViewCustomerContact(currentUser, customer);
-  const displayPhone = canViewContact ? customer.phone : maskPhoneNumber(customer.phone);
+  const canViewContact = canViewCustomerContact(currentUser, activeCust);
+  const displayPhone = canViewContact ? activeCust.phone : maskPhoneNumber(activeCust.phone);
   const canDelete = canDeleteItem(currentUser);
-  const canEdit = canEditItem(currentUser, customer);
-  const managerName = customer.managerName || '사무실';
+  const canEdit = canEditItem(currentUser, activeCust);
+  const managerName = activeCust.managerName || '사무실';
 
   const handleDelete = async () => {
     if (!canDelete) {
@@ -217,18 +410,26 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                   {isReceived ? '[물건 접수] ' : '[물건 찾음] '} {typeKorean}
                 </span>
 
-                {/* 고객 진행상태 뱃지 */}
-                {customer.status === 'COMPLETED' ? (
-                  <span className="px-2.5 py-0.5 text-xs font-black rounded-full bg-rose-100 text-rose-800 border-2 border-rose-400 flex items-center gap-1 shadow-xs animate-pulse">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-rose-600" />
-                    ✓ 상담·계약완료
+                {/* [기능 5] 중요 고객 뱃지 */}
+                {activeCust.isPinned && (
+                  <span className="px-2.5 py-0.5 text-xs font-black rounded-full bg-amber-100 text-amber-950 border-2 border-amber-400 flex items-center gap-1 shadow-2xs">
+                    <Star className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                    ⭐ 중요 고객 (맨처음 고정)
                   </span>
-                ) : customer.status === 'HOLD' ? (
+                )}
+
+                {/* [기능 1] 고객등록완료 설정 상태 뱃지 */}
+                {activeCust.status === 'COMPLETED' ? (
+                  <span className="px-3 py-0.5 text-xs font-black rounded-full bg-emerald-100 text-emerald-900 border-2 border-emerald-500 flex items-center gap-1.5 shadow-xs ring-2 ring-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    ✓ 고객등록완료
+                  </span>
+                ) : activeCust.status === 'HOLD' ? (
                   <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300">
                     보류
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-800 border border-blue-300">
                     ● 진행중
                   </span>
                 )}
@@ -260,15 +461,58 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {/* [기능 5] 중요 고객일 경우 맨처음으로 이동하게 하는 버튼 */}
+            <button
+              type="button"
+              onClick={handleTogglePin}
+              disabled={isUpdatingPin}
+              title={activeCust.isPinned ? "중요 고객 해제 (클릭 시 일반 정렬로 복귀)" : "중요 고객으로 지정하여 목록 맨 처음(최상단)으로 이동합니다"}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-black rounded-lg transition-all shadow-xs cursor-pointer active:scale-95 border ${
+                activeCust.isPinned
+                  ? 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-950 border-amber-400 hover:from-amber-200 hover:to-yellow-200'
+                  : 'bg-white text-slate-700 hover:text-amber-700 border-slate-300 hover:border-amber-400 hover:bg-amber-50/50'
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${activeCust.isPinned ? 'text-amber-600 fill-amber-500' : 'text-slate-400'}`} />
+              <span>{activeCust.isPinned ? '⭐ 중요 고객 (맨처음 고정)' : '⭐ 중요 고객 (맨처음 이동)'}</span>
+            </button>
+
+            {/* [기능 1] 고객등록완료 설정할 수 있는 칸 (원클릭 완료/진행중 전환) */}
+            <button
+              type="button"
+              onClick={() => handleToggleStatus()}
+              disabled={isUpdatingStatus}
+              title={activeCust.status === 'COMPLETED' ? "클릭 시 [상담 진행중] 상태로 전환합니다" : "클릭 시 [고객등록완료] 상태로 설정합니다"}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-black rounded-lg transition-all shadow-xs cursor-pointer active:scale-95 border ${
+                activeCust.status === 'COMPLETED'
+                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400 hover:bg-emerald-200'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+              }`}
+            >
+              <CheckCircle2 className={`w-3.5 h-3.5 ${activeCust.status === 'COMPLETED' ? 'text-emerald-700' : 'text-white'}`} />
+              <span>{activeCust.status === 'COMPLETED' ? '✓ 등록완료 (진행중 전환)' : '✓ 고객등록완료 설정'}</span>
+            </button>
+
+            {/* [기능 3] 첫번째 파일을 고객정보(이름 연락처)만 빼고 카톡 공유 버튼 */}
+            <button
+              type="button"
+              onClick={handleOpenKakaoShare}
+              title="상대방 중개소장에게 보낼 수 있도록 이름/연락처를 제외한 정돈된 상담내용을 카카오톡으로 공유합니다"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-[#191919] bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 rounded-lg shadow-xs transition-all cursor-pointer border border-[#E5CE00]"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-[#191919] fill-[#191919]" />
+              <span>💬 소장님 카톡공유</span>
+            </button>
+
             {/* 고객 수정 버튼 */}
             {onEditCustomer && (
               canEdit ? (
                 <button
                   type="button"
-                  onClick={() => onEditCustomer(customer)}
+                  onClick={() => onEditCustomer(activeCust)}
                   title="고객 정보 수정"
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition-colors shadow-2xs cursor-pointer"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
                   <span>수정</span>
@@ -908,27 +1152,102 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                         </div>
                       )}
 
-                      {/* 양보 불가 조건 & 포기 가능 조건 (공통 체크포인트) */}
-                      {(demand.nonNegotiableCondition || demand.negotiableCondition) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          {demand.nonNegotiableCondition && (
-                            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200">
-                              <span className="font-black text-rose-900 block mb-0.5">
-                                🚨 절대 양보 불가 1순위 조건:
-                              </span>
-                              <span className="font-bold text-rose-800">{demand.nonNegotiableCondition}</span>
+                      {/* [기능 2] 2번째 첨부 파일 내용을 첫번째 파일에 넣기 (절대양보불가 최우선 조건 & 매물 좋을경우 포기가능 조건) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2">
+                        {/* 1순위: 절대로 양보할 수 없는 최우선 조건 하나 */}
+                        <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/50 p-4 shadow-2xs space-y-2.5 transition-all">
+                          <div className="flex items-start gap-2.5">
+                            <span className="px-2.5 py-1 text-xs font-black rounded-md bg-rose-600 text-white shrink-0 shadow-2xs">
+                              1순위
+                            </span>
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-black text-rose-950 flex items-center gap-1">
+                                절대로 양보할 수 없는 최우선 조건 하나 <span className="text-rose-500">*</span>
+                              </h5>
+                              <p className="text-[11px] text-rose-700/80 mt-0.5 leading-snug">
+                                "나열한 여러 조건 중 어떤 것이 절대 포기 못할 1순위인가요?" 질문 (음성 마이크 지원)
+                              </p>
                             </div>
-                          )}
-                          {demand.negotiableCondition && (
-                            <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
-                              <span className="font-black text-emerald-900 block mb-0.5">
-                                🤝 가장 포기하기 쉬운 조건 (양보가능):
-                              </span>
-                              <span className="font-bold text-emerald-800">{demand.negotiableCondition}</span>
-                            </div>
-                          )}
+                          </div>
+
+                          {/* 2번째 이미지 인풋창 스타일 재현 */}
+                          <div className="p-3 bg-white rounded-xl border border-rose-200 shadow-2xs min-h-[44px] flex items-center">
+                            <p className="text-xs sm:text-sm font-extrabold text-slate-900 break-words leading-relaxed">
+                              {demand.nonNegotiableCondition?.trim() || (
+                                <span className="text-slate-400 font-normal italic">
+                                  예: 1층 전면 노출 필수 / 주차 최소 2대 / 예산 3천 초과 절대불가 (미입력 상태)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                          {/* 추천 칩들 (선택된 항목은 채워진 스타일) */}
+                          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                            {['1층 전면 노출', '주차 2대 필수', '예산 초과 절대불가', '역세권 도보 5분', '즉시 입주'].map((chip) => {
+                              const isIncluded = Boolean(demand.nonNegotiableCondition && demand.nonNegotiableCondition.includes(chip));
+                              return (
+                                <span
+                                  key={chip}
+                                  className={`px-2 py-0.8 text-[11px] font-bold rounded-md border transition-all ${
+                                    isIncluded
+                                      ? 'bg-rose-600 text-white border-rose-600 shadow-2xs ring-2 ring-rose-200'
+                                      : 'bg-white text-rose-800 border-rose-200 hover:bg-rose-50'
+                                  }`}
+                                >
+                                  {chip}
+                                </span>
+                              );
+                            })}
+                          </div>
                         </div>
-                      )}
+
+                        {/* 조율: 매물이 정말 좋을 경우 가장 포기하기 쉬운 조건 */}
+                        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50/50 p-4 shadow-2xs space-y-2.5 transition-all">
+                          <div className="flex items-start gap-2.5">
+                            <span className="px-2.5 py-1 text-xs font-black rounded-md bg-emerald-600 text-white shrink-0 shadow-2xs">
+                              조율
+                            </span>
+                            <div>
+                              <h5 className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-1">
+                                매물이 정말 좋을 경우 가장 포기하기 쉬운 조건 <span className="text-emerald-500">*</span>
+                              </h5>
+                              <p className="text-[11px] text-emerald-700/80 mt-0.5 leading-snug">
+                                "원하는 입지나 조건이 완벽하다면 어떤 조건을 가장 먼저 양보할 수 있나요?" (음성 마이크 지원)
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* 2번째 이미지 인풋창 스타일 재현 */}
+                          <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs min-h-[44px] flex items-center">
+                            <p className="text-xs sm:text-sm font-extrabold text-slate-900 break-words leading-relaxed">
+                              {demand.negotiableCondition?.trim() || (
+                                <span className="text-slate-400 font-normal italic">
+                                  예: 인테리어 좋다면 월세 30만 상향 가능 / 2층도 검토 (미입력 상태)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+
+                          {/* 추천 칩들 (선택된 항목은 채워진 스타일) */}
+                          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                            {['월세 20~30만 상향 가능', '2층/지하도 검토', '면적 약간 작아도 무방', '주차 인근 공영 활용', '입주시점 조율'].map((chip) => {
+                              const isIncluded = Boolean(demand.negotiableCondition && demand.negotiableCondition.includes(chip));
+                              return (
+                                <span
+                                  key={chip}
+                                  className={`px-2 py-0.8 text-[11px] font-bold rounded-md border transition-all ${
+                                    isIncluded
+                                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs ring-2 ring-emerald-200'
+                                      : 'bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  {chip}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
 
                       {/* 기타 희망사항 */}
                       {demand.requirements && (
@@ -956,12 +1275,22 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             개업공인중개사 스마트 고객관리 CRM
           </span>
           <div className="flex items-center gap-2">
+            {/* 하단에도 빠른 소장님 카톡공유 버튼 배치 */}
+            <button
+              type="button"
+              onClick={handleOpenKakaoShare}
+              className="px-3.5 py-2 text-xs font-black text-[#191919] bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 rounded-lg shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer border border-[#E5CE00]"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-[#191919] fill-[#191919]" />
+              <span>💬 소장님 카톡공유</span>
+            </button>
+
             {onEditCustomer && (
               canEdit ? (
                 <button
                   type="button"
-                  onClick={() => onEditCustomer(customer)}
-                  className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs flex items-center gap-1.5 transition-colors"
+                  onClick={() => onEditCustomer(activeCust)}
+                  className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>고객 수정하기</span>
@@ -979,7 +1308,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100"
+              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer"
             >
               닫기
             </button>
@@ -987,6 +1316,82 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
         </div>
 
       </div>
+
+      {/* [기능 3] 카카오톡 공동중개 공유 모달 팝업 */}
+      {showKakaoModal && (
+        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-[#FEE500] border-b border-[#E5CE00] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-[#191919] text-[#FEE500] rounded-lg">
+                  <MessageSquare className="w-4 h-4 fill-[#FEE500]" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-[#191919]">
+                    소장님 카톡 공동중개 의뢰문
+                  </h4>
+                  <p className="text-[11px] text-[#191919]/70 font-semibold">
+                    🔒 고객 성함 및 연락처 완전 제외 (개인정보 보호 안심 공유)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowKakaoModal(false)}
+                className="p-1.5 text-black/60 hover:text-black hover:bg-black/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1 text-xs">
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 leading-relaxed">
+                💡 <span className="font-bold">원클릭 복사 완료!</span> 아래 대본이 클립보드에 자동 복사되었습니다.<br />
+                카카오톡 단체방이나 소장님과의 1:1 대화창에 <span className="font-extrabold underline text-blue-700">붙여넣기(Ctrl+V)</span>하세요.
+              </div>
+
+              <div className="relative">
+                <textarea
+                  readOnly
+                  value={kakaoText}
+                  rows={14}
+                  className="w-full p-3.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs text-slate-800 leading-relaxed focus:outline-hidden focus:ring-2 focus:ring-amber-400 select-all"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-500 font-medium">
+                {copiedKakao ? '✓ 클립보드 복사 완료' : '전체 텍스트 선택 가능'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(kakaoText);
+                    setCopiedKakao(true);
+                    setTimeout(() => setCopiedKakao(false), 2500);
+                  }}
+                  className="px-4 py-2 text-xs font-black text-[#191919] bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 rounded-lg shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer border border-[#E5CE00]"
+                >
+                  {copiedKakao ? <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedKakao ? '복사되었습니다!' : '대본 다시 복사하기'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowKakaoModal(false)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg cursor-pointer"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         properties: true,
         demands: true,
       },
-      orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ isPinned: 'desc' }, { receiptDate: 'desc' }, { createdAt: 'desc' }],
     });
 
     // 만약 DB가 비어있으면 초기 목데이터 자동 시딩
@@ -202,6 +202,7 @@ export async function POST(request: NextRequest) {
         subType: finalSubType,
         group: finalGroup,
           status: body.status || 'ACTIVE',
+        isPinned: Boolean(body.isPinned),
           receiptDate: body.receiptDate ? new Date(body.receiptDate) : (body.createdAt ? new Date(body.createdAt) : new Date()),
         memo,
         price: finalPrice,
@@ -373,6 +374,7 @@ export async function PUT(request: NextRequest) {
         subType: subType !== undefined ? subType : undefined,
         group: group || undefined,
           status: body.status !== undefined ? body.status : undefined,
+        isPinned: body.isPinned !== undefined ? Boolean(body.isPinned) : undefined,
           receiptDate: body.receiptDate !== undefined ? (body.receiptDate ? new Date(body.receiptDate) : null) : undefined,
         memo: memo !== undefined ? memo : undefined,
         price: price !== undefined ? (price !== null ? parseFloat(price) : null) : undefined,

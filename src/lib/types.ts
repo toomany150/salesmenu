@@ -680,6 +680,7 @@ export interface CustomerItem {
   group: CustomerGroup;
   status?: CustomerStatus;
   receiptDate?: string;
+  isPinned?: boolean; // 중요 고객 (맨 처음/최상단 고정)
   memo?: string;
   // [물건 접수] 상세 정보 및 가격 연계
   price?: number; // 희망 매매가액

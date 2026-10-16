@@ -190,6 +190,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingCustCols.has('premium')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "premium" REAL;`);
         if (!existingCustCols.has('negotiablePremium')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "negotiablePremium" REAL;`);
         if (!existingCustCols.has('transactionType')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "transactionType" TEXT;`);
+        if (!existingCustCols.has('isPinned')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "isPinned" BOOLEAN DEFAULT false;`);
       } catch (colErr) {}
 
       try {
@@ -234,6 +235,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantLicenseRevoked" TEXT;`);
         await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantBizRegRevoked" TEXT;`);
         await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "monthlyRevenue" DOUBLE PRECISION;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN DEFAULT false;`);
         await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "residenceType" TEXT;`);
         await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "moveOutPlanDate" TEXT;`);
         await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseContractPeriod" TEXT;`);

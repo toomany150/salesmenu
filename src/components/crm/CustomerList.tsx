@@ -16,7 +16,8 @@ import {
   Users,
   Building2,
   Check,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Star
 } from 'lucide-react';
 import { CustomerItem, CustomerGroup, PROPERTY_TYPE_LABELS } from '@/lib/types';
 import { exportCustomersToExcel } from '@/lib/excelExport';
@@ -117,7 +118,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
       list = list.filter((c) => panelIds.has(c.id));
     }
 
-    return list.filter((c) => {
+    const filtered = list.filter((c) => {
       // 0. 보안 접근 제어
       if (!canAccessItem(currentUser, c)) {
         return false;
@@ -138,6 +139,18 @@ export const CustomerList: React.FC<CustomerListProps> = ({
         (c.memo && c.memo.toLowerCase().includes(q)) ||
         (c.managerName && c.managerName.toLowerCase().includes(q))
       );
+    });
+
+    // [기능 4 & 5] 최근 등록일 기준으로 고객을 맨처음으로 배치 + 중요 고객 최상단(맨 처음) 고정
+    return filtered.sort((a, b) => {
+      // 1순위: 중요 고객(isPinned) 최상단 고정
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+
+      // 2순위: 최근 등록일/접수일 최신순 (맨 처음으로 배치)
+      const timeA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+      const timeB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+      return timeB - timeA;
     });
   }, [baseGroupCustomers, showFilterPanel, filteredFromPanel, currentUser, managerFilter, searchQuery]);
 
@@ -322,7 +335,9 @@ export const CustomerList: React.FC<CustomerListProps> = ({
               <div
                 key={customer.id}
                 className={`rounded-2xl border-2 transition-all p-4.5 flex flex-col justify-between group cursor-pointer relative overflow-hidden ${
-                  isCompleted
+                  customer.isPinned
+                    ? 'bg-gradient-to-b from-amber-50/40 via-white to-white border-amber-400 ring-2 ring-amber-300/70 shadow-md'
+                    : isCompleted
                     ? 'bg-slate-50/90 border-slate-300 opacity-95'
                     : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-md'
                 }`}
@@ -354,6 +369,14 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                         <span className="font-black text-base text-slate-900 group-hover:text-blue-600 transition-colors">
                           {customer.name}
                         </span>
+
+                        {/* [기능 5] 중요 고객 뱃지 */}
+                        {customer.isPinned && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1 shadow-2xs">
+                            <Star className="w-3 h-3 text-amber-600 fill-amber-500" />
+                            중요
+                          </span>
+                        )}
 
                         {customer.carrier && (
                           <span className="px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded border border-slate-200">
