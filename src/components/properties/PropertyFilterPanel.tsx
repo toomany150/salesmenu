@@ -241,6 +241,38 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
     }
   };
 
+// Normalization helpers for robust matching
+const normalizePropertyType = (val?: string): string => {
+  if (!val) return '';
+  const s = val.trim().toUpperCase();
+  if (s === 'APARTMENT' || s === '아파트') return 'APARTMENT';
+  if (s === 'HOUSE' || s === '주택' || s === '단독주택' || s === '다세대' || s === '빌라' || s === '다가구') return 'HOUSE';
+  if (s === 'STORE' || s === '상가' || s === '상가점포') return 'STORE';
+  if (s === 'OFFICE' || s === '사무실') return 'OFFICE';
+  if (s === 'FACTORY_WAREHOUSE' || s === '공장' || s === '창고' || s === '공장/창고' || s === '공장창고') return 'FACTORY_WAREHOUSE';
+  if (s === 'LAND' || s === '토지') return 'LAND';
+  return s;
+};
+
+const normalizeStatus = (val?: string): string => {
+  if (!val) return '';
+  const s = val.trim().toUpperCase();
+  if (s === 'AVAILABLE' || s === '거래중' || s === '접수' || s === '대기') return 'AVAILABLE';
+  if (s === 'CONTRACTED' || s === '판매완료' || s === '계약완료' || s === '완료') return 'CONTRACTED';
+  if (s === 'HOLD' || s === '보류') return 'HOLD';
+  if (s === 'CANCELLED' || s === '취소') return 'CANCELLED';
+  return s;
+};
+
+const normalizeTransactionType = (val?: string): string => {
+  if (!val) return '';
+  const s = val.trim();
+  if (s === '매매' || s === 'SALE') return '매매';
+  if (s === '전세' || s === 'JEONSE') return '전세';
+  if (s === '월세' || s === 'RENT' || s === 'MONTHLY') return '월세';
+  return s;
+};
+
   // Execute filtering
   const filtered = useMemo(() => {
     return properties.filter((p) => {
@@ -266,17 +298,19 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
 
       // 2. 거래상태 (전체, 거래중, 판매완료, 보류)
       if (statusFilter !== 'ALL') {
-        if (p.status !== statusFilter) return false;
+        if (normalizeStatus(p.status) !== normalizeStatus(statusFilter)) return false;
       }
 
       // 3. 매물종류 (전체, 아파트, 주택, 상가점포, 사무실, 공장/창고, 토지)
-      if (propertyType !== 'ALL' && p.propertyType !== propertyType) {
-        return false;
+      if (propertyType !== 'ALL') {
+        const normP = normalizePropertyType(p.propertyType);
+        const normFilter = normalizePropertyType(propertyType);
+        if (normP !== normFilter) return false;
       }
 
       // 4. 거래종류 (전체, 매매, 전세, 월세)
-      if (transactionType !== 'ALL' && p.transactionType !== transactionType) {
-        return false;
+      if (transactionType !== 'ALL') {
+        if (normalizeTransactionType(p.transactionType) !== normalizeTransactionType(transactionType)) return false;
       }
 
       // 5. 금액 조건

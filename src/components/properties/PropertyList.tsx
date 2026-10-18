@@ -27,7 +27,7 @@ import {
 import { exportPropertiesToExcel } from '@/lib/excelExport';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
 import { PropertyMapView } from '../map/PropertyMapView';
-import { PropertyFilterPanel } from './PropertyFilterPanel';
+import { PropertyFilterPanel, PropertyFilterCriteria } from './PropertyFilterPanel';
 import { SharePropertyModal } from './SharePropertyModal';
 import { useAuth } from '../auth/AuthContext';
 import { canEditItem } from '@/lib/auth';
@@ -49,6 +49,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const [filtered, setFiltered] = useState<PropertyItem[]>(properties);
+  const [filterCriteria, setFilterCriteria] = useState<PropertyFilterCriteria | null>(null);
   const [viewMode, setViewMode] = useState<'SPLIT' | 'GRID' | 'MAP'>('SPLIT');
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | undefined>();
   const [sharingProperty, setSharingProperty] = useState<PropertyItem | null>(null);
@@ -62,10 +63,35 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     });
   }, [filtered]);
 
-  // Sync when properties changes externally
+  // 필터 조건이 활성화되어 있는지 확인하는 헬퍼 함수
+  const isFilterActive = (c: PropertyFilterCriteria | null): boolean => {
+    if (!c) return false;
+    return !!(
+      (c.searchQuery && c.searchQuery.trim().length > 0) ||
+      (c.status && c.status !== 'ALL') ||
+      (c.propertyType && c.propertyType !== 'ALL') ||
+      (c.transactionType && c.transactionType !== 'ALL') ||
+      (c.targetCity && c.targetCity.trim().length > 0) ||
+      (c.targetGu && c.targetGu.trim().length > 0) ||
+      (c.targetDong && c.targetDong.trim().length > 0) ||
+      (c.floorFilter && c.floorFilter !== 'ALL') ||
+      (c.customFloorInput && c.customFloorInput.trim().length > 0) ||
+      c.minPrice || c.maxPrice ||
+      c.minDeposit || c.maxDeposit ||
+      c.minMonthlyRent || c.maxMonthlyRent ||
+      c.minM2 || c.maxM2 ||
+      (c.direction && c.direction !== 'ALL') ||
+      c.hasParking || c.hasElevator || c.isFullOption ||
+      c.matchedCustomerId
+    );
+  };
+
+  // Sync when properties changes externally: 필터 조건이 활성화되어 있을 때는 전체 목록으로 강제 덮어쓰지 않고 필터 상태 보존
   useEffect(() => {
-    setFiltered(properties);
-  }, [properties]);
+    if (!isFilterActive(filterCriteria)) {
+      setFiltered(properties);
+    }
+  }, [properties, filterCriteria]);
 
   const getPriceDisplay = (p: PropertyItem) => {
     if (p.transactionType === '매매') {
@@ -99,7 +125,10 @@ export const PropertyList: React.FC<PropertyListProps> = ({
       <PropertyFilterPanel
         properties={properties}
         customers={customers}
-        onFilterChange={(newFiltered) => setFiltered(newFiltered)}
+        onFilterChange={(newFiltered, criteria) => {
+          setFilterCriteria(criteria);
+          setFiltered(newFiltered);
+        }}
         onOpenNewProperty={onOpenNewProperty}
       />
 
@@ -107,7 +136,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-800">
-            검색 결과: <span className="text-blue-600 font-extrabold">{filtered.length}</span>건
+            검색 결과: <span className="text-blue-600 font-extrabold">{sortedFiltered.length}</span>건
           </span>
           <span className="text-xs text-slate-300">|</span>
           <span className="text-xs text-slate-500">
@@ -161,7 +190,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
 
           <button
             type="button"
-            onClick={() => exportPropertiesToExcel(filtered)}
+            onClick={() => exportPropertiesToExcel(sortedFiltered)}
             title="현재 검색된 매물 목록을 엑셀(.xlsx) 파일로 다운로드합니다"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
           >
@@ -184,7 +213,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
       {/* 1) MAP ONLY VIEW */}
       {viewMode === 'MAP' && (
         <PropertyMapView
-          properties={filtered}
+          properties={sortedFiltered}
           selectedPropertyId={highlightedPropertyId}
           onSelectProperty={onSelectProperty}
           height="h-[680px]"
@@ -196,8 +225,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
           {/* Left Column: Property Cards with Photo Thumbnails */}
           <div className="lg:col-span-6 space-y-3 max-h-[680px] overflow-y-auto pr-1">
-            {filtered.length > 0 ? (
-              filtered.map((property) => {
+            {sortedFiltered.length > 0 ? (
+              sortedFiltered.map((property) => {
                 const statusInfo = STATUS_LABELS[property.status] || { label: property.status, color: 'bg-slate-100 text-slate-800' };
                 const isSelected = highlightedPropertyId === property.id;
                 const hasImages = property.images && property.images.length > 0;

@@ -45,9 +45,35 @@ const DashboardContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<MainViewTab>('HOME');
   const [customerFilterOpen, setCustomerFilterOpen] = useState(false);
 
-  // Data States (비로그인 상태에서는 매물장 및 고객정보가 절대 조회되지 않도록 빈 배열로 시작)
-  const [customers, setCustomers] = useState<CustomerItem[]>([]);
-  const [properties, setProperties] = useState<PropertyItem[]>([]);
+  // Data States (로그인된 사용자가 있는 경우 로컬 캐시를 0ms 즉각 초기값으로 렌더링, 비로그인 시에는 빈 배열로 보안 유지)
+  const [customers, setCustomers] = useState<CustomerItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('cham_real_estate_user');
+      if (!stored) return [];
+      const user = JSON.parse(stored);
+      if (!user || !user.id) return [];
+      const deletedCustIds = getDeletedCustomerIds();
+      return getCustomCustomers().filter((c) => !deletedCustIds.includes(c.id));
+    } catch {
+      return [];
+    }
+  });
+  const [properties, setProperties] = useState<PropertyItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('cham_real_estate_user');
+      if (!stored) return [];
+      const user = JSON.parse(stored);
+      if (!user || !user.id) return [];
+      const deletedPropIds = getDeletedPropertyIds();
+      return getCustomProperties().filter(
+        (p) => !deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)
+      );
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(false);
 
   // Modal States
@@ -113,6 +139,26 @@ const DashboardContent: React.FC = () => {
     const localCustomCusts = getCustomCustomers().filter(
       (c) => !deletedCustIds.includes(c.id)
     );
+
+    // [성능 개선 - 즉시 렌더링 (SWR 패턴)]: 서버 API 응답을 몇 초간 기다리지 않고, 로컬 캐시를 0.01초 만에 즉시 화면에 띄움
+    if (localCustomProps.length > 0) {
+      localCustomProps.sort((a: any, b: any) => {
+        const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+        const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+        return tB - tA;
+      });
+      setProperties((prev) => (prev.length === 0 ? localCustomProps : prev));
+    }
+    if (localCustomCusts.length > 0) {
+      localCustomCusts.sort((a: any, b: any) => {
+        const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
+        const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
+        const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
+        const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
+        return tB - tA;
+      });
+      setCustomers((prev) => (prev.length === 0 ? localCustomCusts : prev));
+    }
 
     try {
       const headers: HeadersInit = {
