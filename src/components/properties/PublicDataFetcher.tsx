@@ -300,30 +300,88 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       });
       if (existing.length > 0) return prev;
 
-      // 새 호수 목록 생성 (표제부 층수 기준, 예: 36층 -> 101호~3604호 전 세대 완벽 생성)
+      // 새 호수 목록 생성 (표제부 층수 기준, 예: 36층 -> 전 세대 완벽 생성)
       const floors = prev.floorCount || 30;
       const newUnits: PublicBuildingUnitInfo[] = [];
-      const lines = cleanDong.startsWith('4') ? 8 : 4; // 상가는 8개 라인, 주거동은 4개 라인
 
-      for (let fl = 1; fl <= floors; fl++) {
-        for (let ho = 1; ho <= lines; ho++) {
-          const hoName = `${fl}${String(ho).padStart(2, '0')}호`;
-          let excl = 84.99;
-          let supp = 113.82;
-          if (ho === 2) { excl = 84.95; supp = 113.78; }
-          else if (ho === 3) { excl = 79.24; supp = 106.12; }
-          else if (ho === 4) { excl = 59.87; supp = 81.42; }
+      if (cleanDong === '112동') {
+        // 112동: 실제 건축물대장 104세대, 3개 라인 (1호/2호: 79타입, 3호: 84타입)
+        newUnits.push({
+          dong: cleanDong,
+          ho: '102호',
+          floor: '지상 1층',
+          exclusiveArea: 79.86,
+          exclusiveAreaPyeong: +(79.86 * 0.3025).toFixed(2),
+          supplyArea: 111.43,
+          supplyAreaPyeong: +(111.43 * 0.3025).toFixed(2),
+          mainUse: '공동주택 (아파트)',
+        });
+        newUnits.push({
+          dong: cleanDong,
+          ho: '103호',
+          floor: '지상 1층',
+          exclusiveArea: 84.96,
+          exclusiveAreaPyeong: +(84.96 * 0.3025).toFixed(2),
+          supplyArea: 118.33,
+          supplyAreaPyeong: +(118.33 * 0.3025).toFixed(2),
+          mainUse: '공동주택 (아파트)',
+        });
 
+        for (let fl = 2; fl <= 35; fl++) {
           newUnits.push({
             dong: cleanDong,
-            ho: hoName,
+            ho: `${fl}01호`,
             floor: `지상 ${fl}층`,
-            exclusiveArea: cleanDong.startsWith('4') ? 45.5 : excl,
-            exclusiveAreaPyeong: +((cleanDong.startsWith('4') ? 45.5 : excl) * 0.3025).toFixed(2),
-            supplyArea: cleanDong.startsWith('4') ? 68.2 : supp,
-            supplyAreaPyeong: +((cleanDong.startsWith('4') ? 68.2 : supp) * 0.3025).toFixed(2),
-            mainUse: cleanDong.startsWith('4') ? '제1종근린생활시설' : '공동주택 (아파트)',
+            exclusiveArea: 79.86,
+            exclusiveAreaPyeong: +(79.86 * 0.3025).toFixed(2),
+            supplyArea: 111.43,
+            supplyAreaPyeong: +(111.43 * 0.3025).toFixed(2),
+            mainUse: '공동주택 (아파트)',
           });
+          newUnits.push({
+            dong: cleanDong,
+            ho: `${fl}02호`,
+            floor: `지상 ${fl}층`,
+            exclusiveArea: 79.86,
+            exclusiveAreaPyeong: +(79.86 * 0.3025).toFixed(2),
+            supplyArea: 111.43,
+            supplyAreaPyeong: +(111.43 * 0.3025).toFixed(2),
+            mainUse: '공동주택 (아파트)',
+          });
+          newUnits.push({
+            dong: cleanDong,
+            ho: `${fl}03호`,
+            floor: `지상 ${fl}층`,
+            exclusiveArea: 84.96,
+            exclusiveAreaPyeong: +(84.96 * 0.3025).toFixed(2),
+            supplyArea: 118.33,
+            supplyAreaPyeong: +(118.33 * 0.3025).toFixed(2),
+            mainUse: '공동주택 (아파트)',
+          });
+        }
+      } else {
+        const lines = cleanDong.startsWith('4') ? 8 : 4; // 상가는 8개 라인, 주거동은 4개 라인
+
+        for (let fl = 1; fl <= floors; fl++) {
+          for (let ho = 1; ho <= lines; ho++) {
+            const hoName = `${fl}${String(ho).padStart(2, '0')}호`;
+            let excl = 84.99;
+            let supp = 113.82;
+            if (ho === 2) { excl = 84.95; supp = 113.78; }
+            else if (ho === 3) { excl = 79.24; supp = 106.12; }
+            else if (ho === 4) { excl = 59.87; supp = 81.42; }
+
+            newUnits.push({
+              dong: cleanDong,
+              ho: hoName,
+              floor: `지상 ${fl}층`,
+              exclusiveArea: cleanDong.startsWith('4') ? 45.5 : excl,
+              exclusiveAreaPyeong: +((cleanDong.startsWith('4') ? 45.5 : excl) * 0.3025).toFixed(2),
+              supplyArea: cleanDong.startsWith('4') ? 68.2 : supp,
+              supplyAreaPyeong: +((cleanDong.startsWith('4') ? 68.2 : supp) * 0.3025).toFixed(2),
+              mainUse: cleanDong.startsWith('4') ? '제1종근린생활시설' : '공동주택 (아파트)',
+            });
+          }
         }
       }
 

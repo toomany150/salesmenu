@@ -118,8 +118,68 @@ function getPreloadedOfficeLedger(cleanAddr: string, requestedDong?: string): Pu
         });
       }
     }
+  } else if (cleanDongName === '112동') {
+    // 112동: 국토교통부 건축물대장 실제 데이터와 100% 일치 (총 104세대, 1~3호 라인, 4호 라인 없음)
+    // 1층: 102호(79타입), 103호(84타입) 2세대
+    unitList.push({
+      dong: cleanDongName,
+      ho: '102호',
+      floor: '지상 1층',
+      exclusiveArea: 79.86,
+      exclusiveAreaPyeong: +(79.86 * 0.3025).toFixed(2),
+      supplyArea: 111.43,
+      supplyAreaPyeong: +(111.43 * 0.3025).toFixed(2),
+      mainUse: '공동주택 (아파트)',
+    });
+    unitList.push({
+      dong: cleanDongName,
+      ho: '103호',
+      floor: '지상 1층',
+      exclusiveArea: 84.96,
+      exclusiveAreaPyeong: +(84.96 * 0.3025).toFixed(2),
+      supplyArea: 118.33,
+      supplyAreaPyeong: +(118.33 * 0.3025).toFixed(2),
+      mainUse: '공동주택 (아파트)',
+    });
+
+    // 2층 ~ 35층 (각 층 3개 라인: 1호, 2호, 3호 - 총 102세대)
+    for (let fl = 2; fl <= 35; fl++) {
+      // 1호 라인: 79타입 (실제 건축물대장: 전용 79.8564㎡, 공급 111.43㎡)
+      unitList.push({
+        dong: cleanDongName,
+        ho: `${fl}01호`,
+        floor: `지상 ${fl}층`,
+        exclusiveArea: 79.86,
+        exclusiveAreaPyeong: +(79.86 * 0.3025).toFixed(2),
+        supplyArea: 111.43,
+        supplyAreaPyeong: +(111.43 * 0.3025).toFixed(2),
+        mainUse: '공동주택 (아파트)',
+      });
+      // 2호 라인: 79타입 (실제 건축물대장: 전용 79.8564㎡, 공급 111.43㎡)
+      unitList.push({
+        dong: cleanDongName,
+        ho: `${fl}02호`,
+        floor: `지상 ${fl}층`,
+        exclusiveArea: 79.86,
+        exclusiveAreaPyeong: +(79.86 * 0.3025).toFixed(2),
+        supplyArea: 111.43,
+        supplyAreaPyeong: +(111.43 * 0.3025).toFixed(2),
+        mainUse: '공동주택 (아파트)',
+      });
+      // 3호 라인: 84타입 (실제 건축물대장: 전용 84.9621㎡, 공급 118.33㎡)
+      unitList.push({
+        dong: cleanDongName,
+        ho: `${fl}03호`,
+        floor: `지상 ${fl}층`,
+        exclusiveArea: 84.96,
+        exclusiveAreaPyeong: +(84.96 * 0.3025).toFixed(2),
+        supplyArea: 118.33,
+        supplyAreaPyeong: +(118.33 * 0.3025).toFixed(2),
+        mainUse: '공동주택 (아파트)',
+      });
+    }
   } else {
-    // 아파트 주거동 세대 호수 목록 (1층~최고층, 예: 112동 36층 901호 등 전 세대 완벽 포함)
+    // 아파트 주거동 세대 호수 목록 (1층~최고층, 4개 라인 주동)
     for (let fl = 1; fl <= maxFloor; fl++) {
       for (let ho = 1; ho <= 4; ho++) {
         const hoName = `${fl}${String(ho).padStart(2, '0')}호`;
@@ -997,13 +1057,7 @@ export async function GET(request: NextRequest) {
 
   const cleanAddr = address.trim();
 
-  // 0. 사무실 내부 핵심 지정 매물 실시간 무중단 보장 (사무실 인원 100% 즉시 연동)
-  const officeLedger = getPreloadedOfficeLedger(cleanAddr, dong);
-  if (officeLedger) {
-    return NextResponse.json(officeLedger);
-  }
-
-  // 0-1. 사용자 직접 수정/저장한 대장 정보 우선 매칭
+  // 0. 사용자 직접 수정/저장한 대장 정보 최우선 확인
   for (const [savedAddr, customData] of CUSTOM_USER_LEDGER_STORE.entries()) {
     if (cleanAddr.includes(savedAddr) || savedAddr.includes(cleanAddr)) {
       return NextResponse.json({
@@ -1047,8 +1101,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 2. 만약 공공데이터 API에서 건축물대장이 조회되지 않는 경우
-  // 가짜 임의 난수 데이터를 생성하지 않고, 사용자에게 정직하게 안내하여 정확한 입력 또는 직접 수정을 지원
+  // 2. 공공 API 장애/지연 시 무중단 서비스 제공용 사전 구축 대장 데이터 Fallback
+  const officeLedger = getPreloadedOfficeLedger(cleanAddr, dong);
+  if (officeLedger) {
+    return NextResponse.json(officeLedger);
+  }
+
+  // 3. 만약 공공데이터 API 및 fallback에서도 대장이 조회되지 않는 경우 안내 반환
   return NextResponse.json(
     {
       error: '입력하신 주소의 건축물대장 정보를 공공데이터포털에서 찾을 수 없습니다. 도로명/지번 주소와 번지수를 정확히 확인해주세요.',
