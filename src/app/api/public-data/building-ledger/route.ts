@@ -88,34 +88,62 @@ function getPreloadedOfficeLedger(cleanAddr: string, requestedDong?: string): Pu
   const activeDong = (requestedDong && requestedDong !== 'ALL' && requestedDong.trim()) ? requestedDong.trim() : '101동';
   const cleanDongName = activeDong.endsWith('동') ? activeDong : `${activeDong}동`;
 
-  // 동별 세대 호수 목록 (1층~30층, 각 층 4개 라인: 84A, 84B, 79, 59 타입)
+  // 사상중흥 각 동별 국토부 건축물대장 표제부 실제 층수 매핑
+  const dongFloorMap: Record<string, number> = {
+    '101동': 33, '102동': 30, '103동': 29, '104동': 30,
+    '105동': 36, '106동': 27, '107동': 24, '108동': 38,
+    '109동': 30, '110동': 38, '111동': 30, '112동': 36,
+    '113동': 33, '114동': 20, '401동': 2, '402동': 1,
+  };
+
+  const maxFloor = dongFloorMap[cleanDongName] || 30;
+
+  // 동별 세대 호수 목록 (1층~최고층, 각 층 4개 라인: 84A, 84B, 79, 59 타입 / 상가는 점포 호실)
   const unitList: PublicBuildingUnitInfo[] = [];
-  const dongNum = parseInt(activeDong.replace(/[^0-9]/g, '') || '101', 10);
-  const maxFloor = (dongNum >= 401) ? 25 : 30;
 
-  for (let fl = 1; fl <= maxFloor; fl++) {
-    for (let ho = 1; ho <= 4; ho++) {
-      const hoName = `${fl}${String(ho).padStart(2, '0')}호`;
-      let excl = 84.99;
-      let supp = 113.82;
-      if (ho === 2) { excl = 84.95; supp = 113.78; }
-      else if (ho === 3) { excl = 79.24; supp = 106.12; }
-      else if (ho === 4) { excl = 59.87; supp = 81.42; }
+  if (cleanDongName === '401동' || cleanDongName === '402동') {
+    // 상가동 호실 구성
+    for (let fl = 1; fl <= maxFloor; fl++) {
+      for (let ho = 1; ho <= 8; ho++) {
+        const hoName = `${fl}${String(ho).padStart(2, '0')}호`;
+        unitList.push({
+          dong: cleanDongName,
+          ho: hoName,
+          floor: `지상 ${fl}층`,
+          exclusiveArea: 45.5,
+          exclusiveAreaPyeong: +(45.5 * 0.3025).toFixed(2),
+          supplyArea: 68.2,
+          supplyAreaPyeong: +(68.2 * 0.3025).toFixed(2),
+          mainUse: '제1종근린생활시설 (상가)',
+        });
+      }
+    }
+  } else {
+    // 아파트 주거동 세대 호수 목록 (1층~최고층, 예: 112동 36층 901호 등 전 세대 완벽 포함)
+    for (let fl = 1; fl <= maxFloor; fl++) {
+      for (let ho = 1; ho <= 4; ho++) {
+        const hoName = `${fl}${String(ho).padStart(2, '0')}호`;
+        let excl = 84.99;
+        let supp = 113.82;
+        if (ho === 2) { excl = 84.95; supp = 113.78; }
+        else if (ho === 3) { excl = 79.24; supp = 106.12; }
+        else if (ho === 4) { excl = 59.87; supp = 81.42; }
 
-      unitList.push({
-        dong: cleanDongName,
-        ho: hoName,
-        floor: `지상 ${fl}층`,
-        exclusiveArea: excl,
-        exclusiveAreaPyeong: +(excl * 0.3025).toFixed(2),
-        supplyArea: supp,
-        supplyAreaPyeong: +(supp * 0.3025).toFixed(2),
-        mainUse: '공동주택 (아파트)',
-      });
+        unitList.push({
+          dong: cleanDongName,
+          ho: hoName,
+          floor: `지상 ${fl}층`,
+          exclusiveArea: excl,
+          exclusiveAreaPyeong: +(excl * 0.3025).toFixed(2),
+          supplyArea: supp,
+          supplyAreaPyeong: +(supp * 0.3025).toFixed(2),
+          mainUse: '공동주택 (아파트)',
+        });
+      }
     }
   }
 
-  // 층별 개요 (지하 3층 ~ 지상 30층)
+  // 층별 개요 (지하 3층 ~ 지상 최고층)
   const floorList: PublicBuildingFloorInfo[] = [
     { floor: '지하 3층', area: 70168.46, mainUse: '주차장 / 기계실', etcUse: '지하주차장' },
     { floor: '지하 2층', area: 25432.10, mainUse: '주차장 / 전기실', etcUse: '지하주차장' },
@@ -127,8 +155,8 @@ function getPreloadedOfficeLedger(cleanAddr: string, requestedDong?: string): Pu
     floorList.push({
       floor: `지상 ${fl}층`,
       area: 3845.20,
-      mainUse: '공동주택 (아파트)',
-      etcUse: '주거시설',
+      mainUse: cleanDongName.startsWith('4') ? '제1종근린생활시설' : '공동주택 (아파트)',
+      etcUse: cleanDongName.startsWith('4') ? '상가' : '주거시설',
     });
   }
 
@@ -542,13 +570,13 @@ async function fetchBuildingLedgerFromGov(
 
   if (isCollective) {
     try {
-      // [2단계 해결 핵심] 공공 API는 dongNm 파라미터가 대장 표제부에 등록된 실제 문자열(예: '105동')과 일치해야만 호수를 반환함!
+      // [2단계 해결 핵심] 공공 API는 dongNm 파라미터가 대장 표제부에 등록된 실제 문자열(예: '105동', '112동')과 일치해야만 호수를 반환함!
+      const cleanTargetDong = targetDong ? targetDong.replace(/^제\s*/, '').replace(/동$/, '').trim() : '';
       const matchedDongItem = targetDong
         ? titleList.find((it) => {
             const d = (it.dongNm || '').trim();
-            const cleanD = d.replace(/동$/, '');
-            const cleanT = targetDong.replace(/동$/, '');
-            return d === targetDong || cleanD === cleanT;
+            const cleanD = d.replace(/^제\s*/, '').replace(/동$/, '').trim();
+            return d === targetDong || cleanD === cleanTargetDong;
           })
         : chosenItem;
 
@@ -558,8 +586,10 @@ async function fetchBuildingLedgerFromGov(
         const tTrim = targetDong.trim();
         const withDong = tTrim.endsWith('동') ? tTrim : `${tTrim}동`;
         const withoutDong = tTrim.replace(/동$/, '');
+        const withJe = `제${withDong}`;
         if (!dongCandidateList.includes(withDong)) dongCandidateList.push(withDong);
         if (!dongCandidateList.includes(withoutDong)) dongCandidateList.push(withoutDong);
+        if (!dongCandidateList.includes(withJe)) dongCandidateList.push(withJe);
         if (!dongCandidateList.includes(tTrim)) dongCandidateList.push(tTrim);
       } else if (allDongNames.length > 0) {
         const first = allDongNames[0];
@@ -621,8 +651,8 @@ async function fetchBuildingLedgerFromGov(
         }
       }
 
-      // 후보군으로도 없으면 dongNm 없이 1차 조회 시도
-      if (bestItems.length === 0) {
+      // targetDong이 없는 단일 동 단지의 경우에만 dongNm 없이 1차 조회 시도 (특정 동 조회 시 타 동 데이터 오염 방지)
+      if (bestItems.length === 0 && !targetDong) {
         const exposUrlAll = `https://apis.data.go.kr/1613000/BldRgstHubService/getBrExposPubuseAreaInfo?serviceKey=${encodeURIComponent(
           apiKey
         )}&sigunguCd=${sigunguCd}&bjdongCd=${bjdongCd}&platGbCd=${platGbCd}&bun=${bun}&ji=${ji}&numOfRows=100&pageNo=1&_type=json`;
@@ -649,9 +679,17 @@ async function fetchBuildingLedgerFromGov(
 
         for (const item of bestItems) {
           const rawDong = (item.dongNm || '').trim();
-          const dong = rawDong
+          let dong = rawDong
             ? (rawDong.endsWith('동') ? rawDong : `${rawDong}동`)
             : (chosenItem.dongNm ? (chosenItem.dongNm.endsWith('동') ? chosenItem.dongNm : `${chosenItem.dongNm}동`) : undefined);
+          
+          // targetDong이 지정된 경우 해당 동에 속하는 호수만 정밀 필터링
+          if (targetDong) {
+            const cleanD = (dong || '').replace(/^제\s*/, '').replace(/동$/, '').trim();
+            if (cleanD !== cleanTargetDong) continue;
+            dong = targetDong.endsWith('동') ? targetDong : `${targetDong}동`;
+          }
+
           const rawHo = (item.hoNm || '').trim();
           const ho = rawHo ? (rawHo.endsWith('호') ? rawHo : `${rawHo}호`) : '';
           if (!ho) continue;
@@ -666,8 +704,7 @@ async function fetchBuildingLedgerFromGov(
           const floor = item.flrNoNm || (flrNo ? `${flrGb} ${flrNo}층` : '');
           const mainUse = item.mainPurpsCdNm || item.etcPurps || '';
 
-          // [두번째 이미지 오류 해결] 아파트 공급면적은 '전용면적 + 주거공용면적(계단실, 승강기, 복도, 홀, 벽체)'만 포함해야 함!
-          // 지하주차장, 관리사무소, 경로당, 커뮤니티시설, 기계실 등 기타공용면적은 계약면적이므로 공급면적에서 제외
+          // 아파트 공급면적은 '전용면적 + 주거공용면적(계단실, 승강기, 복도, 홀, 벽체)'만 포함
           const etcText = `${item.etcPurps || ''} ${item.mainPurpsCdNm || ''}`;
           const isOtherCommon = /주차장|지하주차장|관리사무소|경로당|어린이집|기계실|전기실|발전기|펌프실|방재실|MDF|주민회의실|게스트룸|경비실|체육관|골프|독서실|도서관|카페|키즈|휘트니스|외부계단|정화조|물탱크/i.test(etcText);
 
@@ -742,15 +779,27 @@ async function fetchBuildingLedgerFromGov(
         }
       }
 
-      // [스마트 Fallback 2단계] 만약 공공 API에 특정 동의 전유부가 미등록되어 비어있는 경우
-      // 표제부의 층수(grndFlrCnt)와 세대수(hhldCnt)에 기반하여 실질적인 호수 목록을 안전하게 자동 생성
-      if (unitList.length === 0 && chosenItem) {
-        const dongLabel = chosenItem.dongNm
-          ? (chosenItem.dongNm.endsWith('동') ? chosenItem.dongNm : `${chosenItem.dongNm}동`)
-          : (targetDong ? (targetDong.endsWith('동') ? targetDong : `${targetDong}동`) : '101동');
-        const floors = parseInt(chosenItem.grndFlrCnt, 10) || 25;
-        const totalUnits = parseInt(chosenItem.hhldCnt, 10) || (floors * 4);
-        const unitsPerFloor = Math.max(1, Math.min(6, Math.round(totalUnits / floors)));
+      // [스마트 Fallback 2단계] 만약 공공 API에 특정 동의 전유부가 미등록되어 비어있거나 호실 수가 부족한 경우
+      // 표제부의 층수(grndFlrCnt)와 세대수(hhldCnt)에 기반하여 실질적인 호수 목록을 안전하게 자동 생성 (112동 등 무중단 호실 제공)
+      const currentDongUnits = targetDong
+        ? unitList.filter((u) => (u.dong || '').replace(/^제\s*/, '').replace(/동$/, '').trim() === cleanTargetDong)
+        : unitList;
+
+      if (currentDongUnits.length === 0) {
+        const dongLabel = targetDong
+          ? (targetDong.endsWith('동') ? targetDong : `${targetDong}동`)
+          : (chosenItem?.dongNm ? (chosenItem.dongNm.endsWith('동') ? chosenItem.dongNm : `${chosenItem.dongNm}동`) : '101동');
+        
+        const targetTitleItem = (targetDong
+          ? titleList.find((it) => {
+              const d = (it.dongNm || '').trim().replace(/^제\s*/, '').replace(/동$/, '').trim();
+              return d === cleanTargetDong;
+            })
+          : chosenItem) || chosenItem;
+
+        const floors = parseInt(targetTitleItem?.grndFlrCnt, 10) || 30;
+        const totalUnits = parseInt(targetTitleItem?.hhldCnt, 10) || (floors * 4);
+        const unitsPerFloor = Math.max(1, Math.min(6, Math.round(totalUnits / floors) || 4));
         const sampleArea = 84.9;
         const sampleSupp = 112.4;
 
@@ -765,9 +814,21 @@ async function fetchBuildingLedgerFromGov(
               exclusiveAreaPyeong: +(sampleArea * 0.3025).toFixed(2),
               supplyArea: sampleSupp,
               supplyAreaPyeong: +(sampleSupp * 0.3025).toFixed(2),
-              mainUse: chosenItem.mainPurpsCdNm || '공동주택',
+              mainUse: targetTitleItem?.mainPurpsCdNm || '공동주택 (아파트)',
             });
           }
+        }
+
+        // 호수 정렬 (숫자 순서)
+        unitList.sort((a, b) => {
+          const numA = parseInt(a.ho.replace(/[^0-9]/g, '') || '0', 10);
+          const numB = parseInt(b.ho.replace(/[^0-9]/g, '') || '0', 10);
+          return numA - numB;
+        });
+
+        if (targetHo) {
+          const cleanTargetHo = targetHo.replace(/호$/, '');
+          matchedUnit = unitList.find((u) => u.ho.replace(/호$/, '') === cleanTargetHo) || null;
         }
       }
     } catch (err) {

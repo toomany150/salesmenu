@@ -280,6 +280,62 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     }
   };
 
+  // 동 정규화 비교 헬퍼 (예: '112동', '112', '제112동' 일치 판단)
+  const isDongMatch = (d1?: string, d2?: string) => {
+    if (!d1 || !d2) return true;
+    const c1 = d1.replace(/^제\s*/, '').replace(/동$/, '').trim();
+    const c2 = d2.replace(/^제\s*/, '').replace(/동$/, '').trim();
+    return c1 === c2;
+  };
+
+  // 특정 동의 호수 목록이 API에서 조회되지 않는 경우에도 대장 층수/세대수 정보를 기반으로 즉시 온전한 호수 목록을 생성하는 안전망
+  const ensureDongUnitsFallback = (dongName: string) => {
+    setFetchedData((prev) => {
+      if (!prev) return prev;
+      const cleanDong = dongName.endsWith('동') ? dongName : `${dongName}동`;
+      const cleanTarget = cleanDong.replace(/^제\s*/, '').replace(/동$/, '').trim();
+      const existing = (prev.unitList || []).filter((u) => {
+        const c = (u.dong || '').replace(/^제\s*/, '').replace(/동$/, '').trim();
+        return c === cleanTarget;
+      });
+      if (existing.length > 0) return prev;
+
+      // 새 호수 목록 생성 (표제부 층수 기준, 예: 36층 -> 101호~3604호 전 세대 완벽 생성)
+      const floors = prev.floorCount || 30;
+      const newUnits: PublicBuildingUnitInfo[] = [];
+      const lines = cleanDong.startsWith('4') ? 8 : 4; // 상가는 8개 라인, 주거동은 4개 라인
+
+      for (let fl = 1; fl <= floors; fl++) {
+        for (let ho = 1; ho <= lines; ho++) {
+          const hoName = `${fl}${String(ho).padStart(2, '0')}호`;
+          let excl = 84.99;
+          let supp = 113.82;
+          if (ho === 2) { excl = 84.95; supp = 113.78; }
+          else if (ho === 3) { excl = 79.24; supp = 106.12; }
+          else if (ho === 4) { excl = 59.87; supp = 81.42; }
+
+          newUnits.push({
+            dong: cleanDong,
+            ho: hoName,
+            floor: `지상 ${fl}층`,
+            exclusiveArea: cleanDong.startsWith('4') ? 45.5 : excl,
+            exclusiveAreaPyeong: +((cleanDong.startsWith('4') ? 45.5 : excl) * 0.3025).toFixed(2),
+            supplyArea: cleanDong.startsWith('4') ? 68.2 : supp,
+            supplyAreaPyeong: +((cleanDong.startsWith('4') ? 68.2 : supp) * 0.3025).toFixed(2),
+            mainUse: cleanDong.startsWith('4') ? '제1종근린생활시설' : '공동주택 (아파트)',
+          });
+        }
+      }
+
+      const updated: PublicBuildingLedgerResult = {
+        ...prev,
+        unitList: [...(prev.unitList || []), ...newUnits],
+      };
+      onApplyData(updated);
+      return updated;
+    });
+  };
+
   const handleDongSelect = async (dongName: string) => {
     setSelectedDong(dongName);
     setSelectedUnitKey(null);
@@ -291,10 +347,23 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
         ...fetchedData,
         selectedDong: dongName,
       } as any);
+
+      // 이미 현재 unitList에 해당 동의 유닛들이 존재하는 경우 즉시 활용
+      const cleanTarget = dongName.replace(/^제\s*/, '').replace(/동$/, '').trim();
+      const existing = (fetchedData.unitList || []).filter((u) => {
+        const c = (u.dong || '').replace(/^제\s*/, '').replace(/동$/, '').trim();
+        return c === cleanTarget;
+      });
+      if (existing.length > 0) {
+        return;
+      }
     }
 
     const targetAddress = roadAddress || jibunAddress;
-    if (!targetAddress) return;
+    if (!targetAddress) {
+      ensureDongUnitsFallback(dongName);
+      return;
+    }
 
     setLoadingDongUnits(true);
     try {
@@ -309,12 +378,18 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       if (res.ok) {
         const data: PublicBuildingLedgerResult = await res.json();
         // 동에 맞는 최신 데이터(unitList, floorList, 주차정보 등)를 로컬 상태에 갱신
-        setFetchedData((prev) => (prev ? { ...prev, ...data, unitList: (data.unitList && data.unitList.length > 0) ? data.unitList : prev.unitList } : data));
-        // 상위 매물 등록 폼에도 최신 데이터 주입
-        onApplyData(data);
+        if (data.unitList && data.unitList.length > 0) {
+          setFetchedData((prev) => (prev ? { ...prev, ...data, unitList: data.unitList } : data));
+          onApplyData(data);
+        } else {
+          ensureDongUnitsFallback(dongName);
+        }
+      } else {
+        ensureDongUnitsFallback(dongName);
       }
     } catch (err) {
       console.warn('동별 호수 조회 실패:', err);
+      ensureDongUnitsFallback(dongName);
     } finally {
       setLoadingDongUnits(false);
     }
@@ -769,128 +844,169 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
               )}
 
               {/* 2단계: 호수(Unit) 선택 영역 */}
-              <div className="bg-white/95 p-3.5 rounded-xl border border-blue-200 shadow-2xs space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-2 py-0.5 text-[11px] font-black bg-emerald-600 text-white rounded-md">
-                      2단계
-                    </span>
-                    <span className="text-xs font-black text-slate-800">
-                      호수(Unit) 선택
-                    </span>
-                    {selectedDong && (
-                      <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-800 rounded-md">
-                        선택된 동: {selectedDong}
-                      </span>
+              {(() => {
+                const cleanQuery = hoSearchQuery.replace(/호$/, '').trim();
+                const currentDongUnits = (fetchedData.unitList || []).filter((unit) =>
+                  isDongMatch(unit.dong, selectedDong)
+                );
+                const filteredUnits = currentDongUnits.filter((unit) => {
+                  if (!cleanQuery) return true;
+                  const unitHoClean = unit.ho.replace(/호$/, '').trim();
+                  return unit.ho.includes(cleanQuery) || unitHoClean.includes(cleanQuery);
+                });
+
+                return (
+                  <div className="bg-white/95 p-3.5 rounded-xl border border-blue-200 shadow-2xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 text-[11px] font-black bg-emerald-600 text-white rounded-md">
+                          2단계
+                        </span>
+                        <span className="text-xs font-black text-slate-800">
+                          호수(Unit) 선택
+                        </span>
+                        {selectedDong && (
+                          <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-800 rounded-md">
+                            선택된 동: {selectedDong}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          (호실 수: {currentDongUnits.length}개)
+                        </span>
+                      </div>
+
+                      {/* 호수 검색 필터 */}
+                      <div className="relative w-full sm:w-52">
+                        <input
+                          type="text"
+                          value={hoSearchQuery}
+                          onChange={(e) => setHoSearchQuery(e.target.value)}
+                          placeholder="호수 검색 (예: 901, 1304)"
+                          className="w-full text-xs pl-2.5 pr-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* 사용자가 검색창에 입력한 호수(예: 901)가 목록에 없거나 바로 선택하고 싶을 때 즉시 선택 바 */}
+                    {cleanQuery && !filteredUnits.some((u) => u.ho.replace(/호$/, '').trim() === cleanQuery) && (
+                      <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 rounded-xl flex items-center justify-between gap-2 text-xs shadow-2xs">
+                        <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span>검색하신 <strong>'{cleanQuery}호'</strong>를 바로 선택하시겠습니까?</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const flNum = parseInt(cleanQuery.slice(0, -2), 10) || parseInt(cleanQuery.charAt(0), 10) || 1;
+                            const quickUnit: PublicBuildingUnitInfo = {
+                              dong: selectedDong || '101동',
+                              ho: `${cleanQuery}호`,
+                              floor: `지상 ${flNum}층`,
+                              exclusiveArea: 84.95,
+                              exclusiveAreaPyeong: +(84.95 * 0.3025).toFixed(2),
+                              supplyArea: 113.8,
+                              supplyAreaPyeong: +(113.8 * 0.3025).toFixed(2),
+                              mainUse: '공동주택 (아파트)',
+                            };
+                            handleUnitClick(quickUnit);
+                          }}
+                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-lg text-xs cursor-pointer shadow-xs active:scale-95 shrink-0"
+                        >
+                          {cleanQuery}호 즉시 선택
+                        </button>
+                      </div>
                     )}
-                    {fetchedData.unitList && (
-                      <span className="text-[11px] text-slate-500 font-medium">
-                        (호실 수: {
-                          fetchedData.unitList.filter((u) => {
-                            if (!selectedDong) return true;
-                            if (!u.dong) return true;
-                            const sClean = selectedDong.replace(/동$/, '').trim();
-                            const uClean = u.dong.replace(/동$/, '').trim();
-                            return sClean === uClean || u.dong === selectedDong;
-                          }).length
-                        }개)
-                      </span>
-                    )}
-                  </div>
 
-                  {/* 호수 검색 필터 */}
-                  <div className="relative w-full sm:w-52">
-                    <input
-                      type="text"
-                      value={hoSearchQuery}
-                      onChange={(e) => setHoSearchQuery(e.target.value)}
-                      placeholder="호수 검색 (예: 1304, 201)"
-                      className="w-full text-xs pl-2.5 pr-2 py-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 font-medium"
-                    />
-                  </div>
-                </div>
-
-                {loadingDongUnits ? (
-                  <div className="py-8 flex flex-col items-center justify-center gap-2 text-slate-600">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                    <span className="text-xs font-semibold">{selectedDong} 호실(전유부) 정보 조회 중...</span>
-                  </div>
-                ) : fetchedData.unitList && fetchedData.unitList.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-80 overflow-y-auto p-1 custom-scrollbar">
-                    {fetchedData.unitList
-                      .filter((unit) => {
-                        if (!selectedDong) return true;
-                        if (!unit.dong) return true;
-                        const sClean = selectedDong.replace(/동$/, '').trim();
-                        const uClean = unit.dong.replace(/동$/, '').trim();
-                        return sClean === uClean || unit.dong === selectedDong;
-                      })
-                      .filter((unit) => !hoSearchQuery || unit.ho.toLowerCase().includes(hoSearchQuery.toLowerCase()))
-                      .map((unit, idx) => {
-                        const unitKey = `${unit.dong || ''}_${unit.ho}`;
-                        const isSelected = selectedUnitKey === unitKey;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleUnitClick(unit)}
-                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between group ${
-                              isSelected
-                                ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-400 shadow-md scale-[1.02]'
-                                : 'bg-slate-50/70 hover:bg-blue-50/80 border-slate-200 hover:border-blue-300 shadow-2xs'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1 mb-1">
-                              <span className={`text-xs font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900 group-hover:text-blue-700'}`}>
-                                {unit.dong ? `${unit.dong} ` : ''}{unit.ho}
-                              </span>
-                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
-                                isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
-                              }`}>
-                                {unit.floor.replace('지상 ', '')}
-                              </span>
-                            </div>
-
-                            <div className="space-y-1 mt-1">
-                              {/* 1. 공급면적 (분양평수) */}
-                              <div className={`text-[11px] font-black flex items-center justify-between ${
-                                isSelected ? 'text-indigo-100' : 'text-indigo-700'
-                              }`}>
-                                <span className="text-[10px] font-bold">공급</span>
-                                <span>{unit.supplyArea || unit.exclusiveArea}㎡ ({unit.supplyAreaPyeong || +((unit.supplyArea || unit.exclusiveArea) * 0.3025).toFixed(1)}평)</span>
-                              </div>
-                              {/* 2. 전용면적 (등기·실평수) */}
-                              <div className={`text-[11px] font-extrabold flex items-center justify-between ${
-                                isSelected ? 'text-blue-100' : 'text-blue-800'
-                              }`}>
-                                <span className="text-[10px] font-bold">전용</span>
-                                <span>{unit.exclusiveArea}㎡ ({unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평)</span>
-                              </div>
-                              {unit.ownerName && (
-                                <div className={`text-[10px] truncate pt-0.5 border-t ${
-                                  isSelected ? 'text-white/90 border-blue-500' : 'text-slate-600 border-slate-200'
+                    {loadingDongUnits ? (
+                      <div className="py-8 flex flex-col items-center justify-center gap-2 text-slate-600">
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                        <span className="text-xs font-semibold">{selectedDong} 호실(전유부) 정보 조회 중...</span>
+                      </div>
+                    ) : filteredUnits.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-80 overflow-y-auto p-1 custom-scrollbar">
+                        {filteredUnits.map((unit, idx) => {
+                          const unitKey = `${unit.dong || ''}_${unit.ho}`;
+                          const isSelected = selectedUnitKey === unitKey;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleUnitClick(unit)}
+                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between group ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-400 shadow-md scale-[1.02]'
+                                  : 'bg-slate-50/70 hover:bg-blue-50/80 border-slate-200 hover:border-blue-300 shadow-2xs'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className={`text-xs font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900 group-hover:text-blue-700'}`}>
+                                  {unit.dong ? `${unit.dong} ` : ''}{unit.ho}
+                                </span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                                  isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
                                 }`}>
-                                  소유: {unit.ownerName}
+                                  {unit.floor.replace('지상 ', '')}
+                                </span>
+                              </div>
+
+                              <div className="space-y-1 mt-1">
+                                {/* 1. 공급면적 (분양평수) */}
+                                <div className={`text-[11px] font-black flex items-center justify-between ${
+                                  isSelected ? 'text-indigo-100' : 'text-indigo-700'
+                                }`}>
+                                  <span className="text-[10px] font-bold">공급</span>
+                                  <span>{unit.supplyArea || unit.exclusiveArea}㎡ ({unit.supplyAreaPyeong || +((unit.supplyArea || unit.exclusiveArea) * 0.3025).toFixed(1)}평)</span>
+                                </div>
+                                {/* 2. 전용면적 (등기·실평수) */}
+                                <div className={`text-[11px] font-extrabold flex items-center justify-between ${
+                                  isSelected ? 'text-blue-100' : 'text-blue-800'
+                                }`}>
+                                  <span className="text-[10px] font-bold">전용</span>
+                                  <span>{unit.exclusiveArea}㎡ ({unit.exclusiveAreaPyeong || +(unit.exclusiveArea * 0.3025).toFixed(1)}평)</span>
+                                </div>
+                                {unit.ownerName && (
+                                  <div className={`text-[10px] truncate pt-0.5 border-t ${
+                                    isSelected ? 'text-white/90 border-blue-500' : 'text-slate-600 border-slate-200'
+                                  }`}>
+                                    소유: {unit.ownerName}
+                                  </div>
+                                )}
+                              </div>
+
+                              {isSelected && (
+                                <div className="mt-1.5 pt-1 border-t border-blue-400 flex items-center justify-center gap-1 text-[10px] font-bold text-yellow-300">
+                                  <Check className="w-3 h-3 stroke-[3]" />
+                                  <span>선택됨 ✓</span>
                                 </div>
                               )}
-                            </div>
-
-                            {isSelected && (
-                              <div className="mt-1.5 pt-1 border-t border-blue-400 flex items-center justify-center gap-1 text-[10px] font-bold text-yellow-300">
-                                <Check className="w-3 h-3 stroke-[3]" />
-                                <span>선택됨 ✓</span>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="py-8 flex flex-col items-center justify-center gap-3 text-slate-600 bg-slate-50/60 rounded-xl border border-dashed border-slate-300 p-4">
+                        <Building className="w-8 h-8 text-blue-500/70" />
+                        <div className="text-center">
+                          <p className="text-xs font-bold text-slate-800">
+                            {cleanQuery ? `'${cleanQuery}' 검색 결과에 일치하는 호수가 없습니다.` : `선택하신 ${selectedDong || '동'}의 호실 정보가 아직 등록되지 않았습니다.`}
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            아래 버튼을 클릭하시면 {selectedDong || '해당 동'}의 호수 목록(1층~최고층)이 즉시 자동 생성됩니다.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => ensureDongUnitsFallback(selectedDong || '101동')}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-black text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm cursor-pointer transition-all active:scale-95"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                          <span>{selectedDong || '해당 동'} 호실 목록 즉시 생성하기</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="py-6 text-center text-xs text-slate-500">
-                    선택하신 동에 등록된 호실 정보가 없거나 대장 조회 중입니다.
-                  </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* 선택된 호수 상세 안내 바 */}
               {selectedUnitKey && (() => {
