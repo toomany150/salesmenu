@@ -26,7 +26,9 @@ import {
   Trash2,
   Building2,
   Copy,
-  Check
+  Check,
+  Download,
+  FolderDown
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -57,6 +59,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copiedAddressType, setCopiedAddressType] = useState<'road' | 'jibun' | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [downloadSuccessType, setDownloadSuccessType] = useState<'single' | 'all' | null>(null);
 
   const handleCopyPropertyAddress = (text: string, type: 'road' | 'jibun') => {
     if (!text) return;
@@ -270,6 +274,99 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // 사진 다운로드 헬퍼 (Blob / DataURL 완벽 변환, 모바일/PC 호환)
+  const triggerDownload = (dataUrl: string, filename: string) => {
+    try {
+      if (dataUrl.startsWith('data:')) {
+        const parts = dataUrl.split(',');
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const byteString = atob(parts[1]);
+        const ia = new Uint8Array(byteString.length);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ia], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 500);
+      } else {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+        }, 500);
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
+  const getSafeBaseFilename = () => {
+    const cleanTitle = (titleName || property.propertyNumber || '매물사진')
+      .replace(/[\\/:*?"<>|]/g, '')
+      .replace(/\s+/g, '_')
+      .trim();
+    const propNo = property.propertyNumber ? `_${property.propertyNumber}` : '';
+    return `${cleanTitle}${propNo}`;
+  };
+
+  // 1. 현재 사진 1장 다운로드
+  const handleDownloadCurrentPhoto = () => {
+    if (!images || images.length === 0) return;
+    const currentImg = images[currentPhotoIndex];
+    if (!currentImg) return;
+    
+    const baseName = getSafeBaseFilename();
+    const isRep = currentPhotoIndex === 0 ? '_대표' : '';
+    const filename = `${baseName}_사진${currentPhotoIndex + 1}${isRep}.jpg`;
+    
+    triggerDownload(currentImg, filename);
+    setDownloadSuccessType('single');
+    setTimeout(() => setDownloadSuccessType(null), 2500);
+  };
+
+  // 2. 등록된 사진 전체 한 번에 다운로드
+  const handleDownloadAllPhotos = async () => {
+    if (!images || images.length === 0 || isDownloadingAll) return;
+    setIsDownloadingAll(true);
+    try {
+      const baseName = getSafeBaseFilename();
+      for (let i = 0; i < images.length; i++) {
+        const isRep = i === 0 ? '_대표' : '';
+        const filename = `${baseName}_사진${i + 1}${isRep}.jpg`;
+        triggerDownload(images[i], filename);
+        if (i < images.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+      }
+      setDownloadSuccessType('all');
+      setTimeout(() => setDownloadSuccessType(null), 3000);
+    } catch (err) {
+      console.error('전체 사진 다운로드 실패:', err);
+      alert('전체 사진 다운로드 중 오류가 발생했습니다.');
+    } finally {
+      setIsDownloadingAll(false);
+    }
   };
 
   return (
@@ -658,14 +755,66 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsPhotoLightboxOpen(true)}
-                  className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full transition-colors"
-                  title="크게 보기"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
+                {/* 상단 우측 사진 액션 툴바: [현재 사진 저장] [전체 다운로드] [크게 보기] */}
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
+                  {/* 1. 현재 사진 저장 버튼 */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadCurrentPhoto}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold text-white bg-black/65 hover:bg-black/85 active:scale-95 border border-white/20 backdrop-blur-xs transition-all shadow-md cursor-pointer"
+                    title="현재 보고 있는 사진 1장 다운로드"
+                  >
+                    {downloadSuccessType === 'single' ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
+                        <span className="text-emerald-300 font-black text-[11px]">저장완료</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5 text-blue-400" />
+                        <span className="hidden sm:inline text-[11px]">현재 사진 저장</span>
+                        <span className="sm:hidden text-[11px]">저장</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 2. 전체 사진 다운로드 버튼 */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadAllPhotos}
+                    disabled={isDownloadingAll}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold text-white bg-black/65 hover:bg-black/85 active:scale-95 border border-white/20 backdrop-blur-xs transition-all shadow-md disabled:opacity-50 cursor-pointer"
+                    title={`등록된 사진 전체(${images.length}장) 일괄 다운로드`}
+                  >
+                    {isDownloadingAll ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0"></span>
+                        <span className="text-[11px]">저장 중...</span>
+                      </>
+                    ) : downloadSuccessType === 'all' ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
+                        <span className="text-emerald-300 font-black text-[11px]">전체저장완료</span>
+                      </>
+                    ) : (
+                      <>
+                        <FolderDown className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="hidden sm:inline text-[11px]">전체 다운로드 ({images.length}장)</span>
+                        <span className="sm:hidden text-[11px]">전체({images.length})</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 3. 크게 보기(확대) 버튼 */}
+                  <button
+                    type="button"
+                    onClick={() => setIsPhotoLightboxOpen(true)}
+                    className="bg-black/65 hover:bg-black/85 active:scale-95 text-white p-1.5 rounded-full backdrop-blur-xs transition-all border border-white/20 shadow-md cursor-pointer"
+                    title="크게 보기"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                </div>
 
                 {images.length > 1 && (
                   <>
@@ -1577,13 +1726,62 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       {/* Fullscreen Photo Lightbox Modal */}
       {isPhotoLightboxOpen && images.length > 0 && (
         <div className="fixed inset-0 z-60 bg-black/95 flex items-center justify-center p-4">
-          <button
-            onClick={() => setIsPhotoLightboxOpen(false)}
-            className="absolute top-4 right-4 text-white hover:text-slate-300 p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
-            title="닫기"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+            {/* 현재 사진 저장 */}
+            <button
+              type="button"
+              onClick={handleDownloadCurrentPhoto}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/15 hover:bg-white/25 active:scale-95 border border-white/30 backdrop-blur-xs transition-all shadow-md cursor-pointer"
+              title="현재 사진 다운로드"
+            >
+              {downloadSuccessType === 'single' ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                  <span className="text-emerald-300 font-black">저장완료</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-blue-400" />
+                  <span>현재 사진 저장</span>
+                </>
+              )}
+            </button>
+
+            {/* 전체 사진 일괄 다운로드 */}
+            <button
+              type="button"
+              onClick={handleDownloadAllPhotos}
+              disabled={isDownloadingAll}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-white/15 hover:bg-white/25 active:scale-95 border border-white/30 backdrop-blur-xs transition-all shadow-md disabled:opacity-50 cursor-pointer"
+              title={`등록된 사진 전체(${images.length}장) 일괄 다운로드`}
+            >
+              {isDownloadingAll ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0"></span>
+                  <span>저장 중...</span>
+                </>
+              ) : downloadSuccessType === 'all' ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                  <span className="text-emerald-300 font-black">전체저장완료</span>
+                </>
+              ) : (
+                <>
+                  <FolderDown className="w-4 h-4 text-emerald-400" />
+                  <span>전체 다운로드 ({images.length}장)</span>
+                </>
+              )}
+            </button>
+
+            {/* 닫기 버튼 */}
+            <button
+              onClick={() => setIsPhotoLightboxOpen(false)}
+              className="text-white hover:text-slate-300 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors ml-1 cursor-pointer"
+              title="닫기"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
           
           <div className="relative max-w-5xl max-h-[90vh] flex flex-col items-center">
             <img
