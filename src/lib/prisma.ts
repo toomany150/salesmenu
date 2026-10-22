@@ -24,7 +24,10 @@ function ensureDatabaseUrl(): string {
         optimizedUrl += optimizedUrl.includes('?') ? '&pgbouncer=true' : '?pgbouncer=true';
       }
       if (!optimizedUrl.includes('connection_limit=')) {
-        optimizedUrl += '&connection_limit=1';
+        optimizedUrl += '&connection_limit=10';
+      }
+      if (!optimizedUrl.includes('pool_timeout=')) {
+        optimizedUrl += '&pool_timeout=20';
       }
     }
     process.env.DATABASE_URL = optimizedUrl;
@@ -113,6 +116,13 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 let isInitializingSchema = false;
 
 export async function ensureDatabaseSchema(): Promise<void> {
+  // PostgreSQL (Supabase 클라우드)는 이미 모든 스키마/컬럼이 완벽하게 구축되어 있습니다.
+  // DDL(ALTER TABLE) 실행 시 테이블에 AccessExclusiveLock이 걸려 쿼리가 수 분간 멈추는 현상을 원천 차단합니다.
+  if (!activeDbUrl.startsWith('file:')) {
+    globalForPrisma.dbInitialized = true;
+    return;
+  }
+
   if (globalForPrisma.dbInitialized || isInitializingSchema) {
     return;
   }
