@@ -233,7 +233,62 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     maintenanceFeeSummary = '관리비: 별도 협의';
   }
 
-  // 실평수 계산
+  const formatShortDate = (dateStr?: string | Date | null) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const yy = String(d.getFullYear()).slice(-2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  };
+
+  // 해당 평수 계산 (모든 매물 유형 지원)
+  const getPyeongDisplay = () => {
+    if (property.propertyType === 'STORE') {
+      const p = property.storeDetail?.actualAreaPyeong || 
+        (property.storeDetail?.actualArea ? (property.storeDetail.actualArea * 0.3025).toFixed(1) : null) ||
+        (property.storeDetail?.buildingArea ? (property.storeDetail.buildingArea * 0.3025).toFixed(1) : null);
+      return p ? `${p}평` : null;
+    }
+    if (property.propertyType === 'OFFICE') {
+      const p = property.officeDetail?.actualAreaPyeong || 
+        (property.officeDetail?.actualArea ? (property.officeDetail.actualArea * 0.3025).toFixed(1) : null) ||
+        (property.officeDetail?.buildingArea ? (property.officeDetail.buildingArea * 0.3025).toFixed(1) : null);
+      return p ? `${p}평` : null;
+    }
+    if (property.propertyType === 'APARTMENT') {
+      const p = property.apartmentDetail?.pyeongType || 
+        (property.apartmentDetail?.exclusiveArea ? (property.apartmentDetail.exclusiveArea * 0.3025).toFixed(1) + '평' : null) ||
+        (property.apartmentDetail?.supplyArea ? (property.apartmentDetail.supplyArea * 0.3025).toFixed(1) + '평' : null);
+      return p ? (p.includes('평') ? p : `${p}평`) : null;
+    }
+    if (property.propertyType === 'HOUSE') {
+      const p = property.houseDetail?.exclusiveArea 
+        ? (property.houseDetail.exclusiveArea * 0.3025).toFixed(1) 
+        : (property.actualArea 
+            ? (property.actualArea * 0.3025).toFixed(1) 
+            : (property.totalFloorArea ? (property.totalFloorArea * 0.3025).toFixed(1) : null));
+      return p ? `${p}평` : null;
+    }
+    if (property.propertyType === 'LAND') {
+      const p = (property.landDetail as any)?.landAreaPyeong || 
+        (property.landDetail?.landArea ? (property.landDetail.landArea * 0.3025).toFixed(1) : null) ||
+        (property.landArea ? (property.landArea * 0.3025).toFixed(1) : null);
+      return p ? `${p}평` : null;
+    }
+    if (property.propertyType === 'FACTORY_WAREHOUSE') {
+      const p = property.factoryWarehouseDetail?.buildingArea 
+        ? (property.factoryWarehouseDetail.buildingArea * 0.3025).toFixed(1) 
+        : (property.totalFloorArea ? (property.totalFloorArea * 0.3025).toFixed(1) : null);
+      return p ? `${p}평` : null;
+    }
+    const generalP = property.actualAreaPyeong || 
+      (property.actualArea ? (property.actualArea * 0.3025).toFixed(1) : null) ||
+      (property.totalFloorArea ? (property.totalFloorArea * 0.3025).toFixed(1) : null);
+    return generalP ? `${generalP}평` : null;
+  };
+
   const actualAreaVal = property.actualArea || 
     property.storeDetail?.actualArea || 
     property.officeDetail?.actualArea || 
@@ -435,52 +490,118 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           {/* Main Title & Price Header (한눈에 들어오는 깔끔한 프리미엄 디자인) */}
           <div className="rounded-2xl bg-white border-2 border-slate-200/90 shadow-sm overflow-hidden space-y-0">
             {/* 상단 1열: 매물명/상호명, 태그, 상태 및 우측 메인 가격/권리금 */}
-            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="space-y-1.5 min-w-0">
+            {/* 상단 1열: 접수일자, 물건종류, 해당평수, 거래유형, 상태 및 우측 매매가/전세가/보증금월세/권리금 */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-2 min-w-0 flex-1">
+                {/* 상단 메타 태그 배지 라인 */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-500 text-white shadow-xs">
+                  {/* 1. 접수일자 */}
+                  {property.receiptDate && (
+                    <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1 shadow-2xs">
+                      <span className="text-[11px] text-emerald-400">접수일자</span>
+                      <span className="font-extrabold text-white">{formatShortDate(property.receiptDate)}</span>
+                    </span>
+                  )}
+
+                  {/* 2. 물건종류 */}
+                  <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-blue-600 text-white shadow-xs flex items-center gap-1">
+                    <span className="text-blue-200 text-[11px]">물건종류 :</span>
+                    <span className="font-extrabold">{PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}</span>
+                  </span>
+
+                  {/* 3. 거래유형 */}
+                  <span className="px-2.5 py-1 rounded-md text-xs font-black bg-sky-500/25 text-sky-200 border border-sky-400/35">
                     {property.transactionType}
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/15 text-slate-100 border border-white/20">
-                    {PROPERTY_TYPE_LABELS[property.propertyType]}
-                  </span>
-                  <span className="text-xs text-slate-300 font-mono bg-black/20 px-2 py-0.5 rounded">
+
+                  {/* 4. 해당평수 */}
+                  {getPyeongDisplay() && (
+                    <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-purple-500/25 text-purple-200 border border-purple-400/35 flex items-center gap-1 shadow-2xs">
+                      <span className="text-purple-300 text-[11px]">해당평수 :</span>
+                      <span className="font-extrabold text-white">{getPyeongDisplay()}</span>
+                    </span>
+                  )}
+
+                  {/* 5. 매물번호 */}
+                  <span className="text-xs text-slate-300 font-mono bg-black/30 px-2 py-1 rounded border border-white/10">
                     #{property.propertyNumber}
                   </span>
+
+                  {/* 6. 계약 상태 */}
                   {property.status === 'CONTRACTED' ? (
-                    <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-rose-600 text-white border border-rose-300 shadow-xs flex items-center gap-1 animate-pulse">
+                    <span className="text-xs font-black px-2.5 py-1 rounded-md bg-rose-600 text-white border border-rose-300 shadow-xs flex items-center gap-1 animate-pulse">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       ✓ 계약완료
                     </span>
                   ) : (
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${
                       property.status === 'AVAILABLE' ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/30' : 'bg-slate-700 text-slate-300'
                     }`}>
                       {STATUS_LABELS[property.status]?.label || property.status}
                     </span>
                   )}
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight break-keep">
+
+                {/* 매물 상호명 / 주소 타이틀 */}
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight break-keep pt-0.5">
                   {titleName}
                 </h3>
               </div>
 
-              {/* 우측 가격 & 권리금 표시 */}
-              <div className="flex flex-col md:items-end justify-center shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/10">
-                <div className="text-2xl sm:text-3xl font-black text-amber-300 tracking-tight break-keep">
-                  {priceText}
+              {/* 우측 가격 & 권리금 표시 (매매가, 전세가, 보증금/월세, 권리금 눈에 쏙 들어오게 최적화) */}
+              <div className="flex flex-col md:items-end justify-center shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-white/10 space-y-1">
+                {/* 메인 가격 */}
+                <div className="flex items-baseline gap-2 flex-wrap justify-start md:justify-end">
+                  {property.transactionType === '매매' && (
+                    <>
+                      <span className="text-sm sm:text-base font-extrabold text-amber-200/90">매매가</span>
+                      <span className="text-2xl sm:text-3xl font-black text-amber-300 tracking-tight">
+                        {property.price ? `${property.price.toLocaleString()} 만원` : '협의'}
+                      </span>
+                    </>
+                  )}
+                  {property.transactionType === '전세' && (
+                    <>
+                      <span className="text-sm sm:text-base font-extrabold text-amber-200/90">전세가</span>
+                      <span className="text-2xl sm:text-3xl font-black text-amber-300 tracking-tight">
+                        {property.deposit ? `${property.deposit.toLocaleString()} 만원` : '협의'}
+                      </span>
+                    </>
+                  )}
+                  {property.transactionType === '월세' && (
+                    <div className="text-left md:text-right">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-xs sm:text-sm font-bold text-slate-300">보증금</span>
+                        <span className="text-xl sm:text-2xl font-black text-white">
+                          {property.deposit ? `${property.deposit.toLocaleString()}만` : '0'}
+                        </span>
+                        <span className="text-slate-400">/</span>
+                        <span className="text-xs sm:text-sm font-bold text-amber-300">월세</span>
+                        <span className="text-xl sm:text-2xl font-black text-amber-300">
+                          {property.monthlyRent ? `${property.monthlyRent.toLocaleString()}만원` : '0'}
+                        </span>
+                      </div>
+                      {(property.monthlyRentVat || property.storeDetail?.monthlyRentVat || property.officeDetail?.monthlyRentVat) && (
+                        <div className="text-[11px] text-amber-200/80 font-medium pt-0.5">(부가세 별도)</div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {/* 상가 권리금 뱃지 */}
+
+                {/* 상가 권리금 뱃지 (있을 때 눈에 띄게 배치) */}
                 {isStore && (
-                  <div className="mt-1">
+                  <div className="pt-0.5">
                     {isNoPrem ? (
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-black bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 shadow-2xs">
                         ✨ 권리금 없음 (무권리)
                       </span>
-                    ) : (premVal !== undefined && premVal !== null) ? (
+                    ) : (premVal !== undefined && premVal !== null && premVal > 0) ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black bg-amber-400/25 text-amber-300 border border-amber-400/40 shadow-2xs">
-                        💰 권리금: {formatPremStr(premVal)}
-                        {negoPremVal && negoPremVal !== premVal ? ` (조정: ${formatPremStr(negoPremVal)})` : ''}
+                        <span className="text-amber-300">💰 권리금:</span>
+                        <span className="text-sm font-black text-amber-200">{formatPremStr(premVal)}</span>
+                        {negoPremVal && negoPremVal !== premVal ? (
+                          <span className="text-[11px] text-amber-300/80 font-medium">(조정: {formatPremStr(negoPremVal)})</span>
+                        ) : null}
                       </span>
                     ) : null}
                   </div>

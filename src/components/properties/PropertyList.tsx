@@ -93,15 +93,25 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     }
   }, [properties, filterCriteria]);
 
+  const formatShortDate = (dateStr?: string | Date | null) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const yy = String(d.getFullYear()).slice(-2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  };
+
   const getPriceDisplay = (p: PropertyItem) => {
     if (p.transactionType === '매매') {
-      return p.price ? `${p.price.toLocaleString()} 만원` : '협의';
+      return p.price ? `매매 ${p.price.toLocaleString()} 만원` : '매매 협의';
     } else if (p.transactionType === '전세') {
-      return p.deposit ? `${p.deposit.toLocaleString()} 만원` : '협의';
+      return p.deposit ? `전세 ${p.deposit.toLocaleString()} 만원` : '전세 협의';
     } else {
       const isVat = p.monthlyRentVat || p.storeDetail?.monthlyRentVat || p.officeDetail?.monthlyRentVat;
       const vatText = isVat ? ' (부가세 별도)' : '';
-      let display = `${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
+      let display = `보증금 ${p.deposit ? p.deposit.toLocaleString() + '만' : '0'} / 월세 ${p.monthlyRent ? p.monthlyRent.toLocaleString() + '만' : '0'}${vatText}`;
       if (p.propertyType === 'STORE') {
         const isNoPrem = !!(p.storeDetail?.isNoPremium || p.isNoPremium || (p.storeDetail && p.storeDetail.premium === 0));
         const premVal = isNoPrem
@@ -271,15 +281,20 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                       <div className="flex-1 min-w-0 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between gap-1 mb-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-600 text-white">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {property.receiptDate && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+                                  {formatShortDate(property.receiptDate)}
+                                </span>
+                              )}
+                              <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-600 text-white shrink-0">
                                 {PROPERTY_TYPE_LABELS[property.propertyType]}
                               </span>
-                              <span className="px-1.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-800">
+                              <span className="px-1.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-800 shrink-0">
                                 {property.transactionType}
                               </span>
                               {property.status === 'CONTRACTED' && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-rose-600 text-white shadow-2xs">
+                                <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-rose-600 text-white shadow-2xs shrink-0">
                                   ✓ 계약완료
                                 </span>
                               )}
@@ -473,7 +488,12 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               alt=""
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
-                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
+                              {property.receiptDate && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-white/95 text-slate-700 shadow-xs">
+                                  {formatShortDate(property.receiptDate)}
+                                </span>
+                              )}
                               <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-xs">
                                 {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
                               </span>
@@ -490,7 +510,12 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50">
                             <ImageIcon className="w-8 h-8 stroke-[1.5]" />
                             <span className="text-xs mt-1 font-medium">사진 미등록</span>
-                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
+                              {property.receiptDate && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-white text-slate-700 shadow-xs border border-slate-200">
+                                  {formatShortDate(property.receiptDate)}
+                                </span>
+                              )}
                               <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white">
                                 {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
                               </span>
