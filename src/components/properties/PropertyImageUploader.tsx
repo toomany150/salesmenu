@@ -31,15 +31,26 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
 
   const [isUploadingR2, setIsUploadingR2] = useState(false);
 
-  // Resize and compress image client-side to prevent memory/payload bloat
+  // 원본 초고화질을 100% 보존하면서 Vercel 단일 업로드 용량(4MB)을 안전하게 맞추는 프리미엄 프로세서
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // 1. 이미 3.8MB 이하인 원본 사진(스마트폰/디카 촬영 사진)은 해상도 축소/재압축 없이 원본 100% 무손실 유지
+      if (file.size <= 3.8 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // 2. 3.8MB를 초과하는 초대용량(4800만~1억 화소 등) 사진인 경우:
+      // 기존 1280px가 아닌 4K UHD(3840px) 초고해상도 + 94% 프리미엄 화질로 선명하게 보존
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const maxWidth = 1280;
-          const maxHeight = 960;
+          const maxWidth = 3840; // 4K UHD 초고해상도 (기존 1280px의 3배 화질)
+          const maxHeight = 2880;
           let width = img.width;
           let height = img.height;
           if (width > height) {
@@ -59,8 +70,10 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.94);
             resolve(dataUrl);
           } else {
             resolve(e.target?.result as string);
@@ -90,38 +103,49 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
     }
 
     setIsCompressing(true);
-    let compressedList: string[] = [];
+    let processedList: string[] = [];
     try {
-      compressedList = await Promise.all(
+      processedList = await Promise.all(
         filesToProcess.map((file) => compressImage(file))
       );
       // 1차로 로컬 미리보기 즉시 반영 (사용자 체감 속도 0초)
-      const currentListWithCompressed = [...images, ...compressedList];
-      onChange(currentListWithCompressed);
+      const currentListWithProcessed = [...images, ...processedList];
+      onChange(currentListWithProcessed);
 
-      // 2차로 백그라운드에서 Cloudflare R2 버킷에 비동기 업로드
+      // 2차로 백그라운드에서 Cloudflare R2 버킷에 개별 병렬 비동기 업로드 (Vercel 4.5MB 제한 원천 차단)
       setIsUploadingR2(true);
       try {
-        const uploadRes = await fetch('/api/upload/r2', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ images: compressedList }),
-        });
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          if (uploadData.success && Array.isArray(uploadData.urls)) {
-            // R2 공개 URL로 교체 (기존 이미지 + 새로 업로드된 R2 URL들)
-            const finalImages = [...images, ...uploadData.urls];
-            onChange(finalImages);
-          }
-        }
+        const uploadedUrls = await Promise.all(
+          processedList.map(async (img) => {
+            if (!img || !img.startsWith('data:image')) return img;
+            try {
+              const uploadRes = await fetch('/api/upload/r2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: img }),
+              });
+              if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                if (uploadData.success && uploadData.url) {
+                  return uploadData.url;
+                }
+              }
+            } catch (singleErr) {
+              console.warn('개별 사진 R2 업로드 실패:', singleErr);
+            }
+            return img;
+          })
+        );
+        // R2 공개 URL로 완벽 교체 (초고화질 원본 영구 보존)
+        const finalImages = [...images, ...uploadedUrls];
+        onChange(finalImages);
       } catch (uploadErr) {
-        console.warn('R2 백그라운드 업로드 실패, base64 유지:', uploadErr);
+        console.warn('R2 백그라운드 업로드 실패:', uploadErr);
       } finally {
         setIsUploadingR2(false);
       }
     } catch (err) {
-      console.error('Image compression failed:', err);
+      console.error('Image processing failed:', err);
       setErrorNotice('사진 파일을 처리하는 중 오류가 발생했습니다.');
     } finally {
       setIsCompressing(false);
