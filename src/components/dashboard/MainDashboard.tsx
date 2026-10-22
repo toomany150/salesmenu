@@ -994,6 +994,19 @@ const DashboardContent: React.FC = () => {
         isOpen={!!currentUser && !!selectedProperty}
         onClose={() => setSelectedProperty(null)}
         onEditProperty={handleOpenEditProperty}
+        onPropertyUpdated={(updated) => {
+          setSelectedProperty(updated);
+          setProperties((prev) => {
+            const idx = prev.findIndex((p) => p.id === updated.id || p.propertyNumber === updated.propertyNumber);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = updated;
+              return next;
+            }
+            return [updated, ...prev];
+          });
+          saveCustomProperty(updated);
+        }}
         onPropertyDeleted={(deletedId) => {
           setProperties((prev) => prev.filter((p) => p.id !== deletedId && p.propertyNumber !== deletedId));
           setSelectedProperty(null);

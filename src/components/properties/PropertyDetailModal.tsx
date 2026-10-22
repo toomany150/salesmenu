@@ -28,7 +28,10 @@ import {
   Copy,
   Check,
   Download,
-  FolderDown
+  FolderDown,
+  Upload,
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -46,6 +49,7 @@ interface PropertyDetailModalProps {
   onClose: () => void;
   onEditProperty?: (property: PropertyItem) => void;
   onPropertyDeleted?: (propertyId: string) => void;
+  onPropertyUpdated?: (property: PropertyItem) => void;
 }
 
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
@@ -54,6 +58,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onClose,
   onEditProperty,
   onPropertyDeleted,
+  onPropertyUpdated,
 }) => {
   const { currentUser } = useAuth();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
@@ -65,6 +70,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [isPhotoDownloadModalOpen, setIsPhotoDownloadModalOpen] = useState(false);
   const [fullImages, setFullImages] = useState<string[] | null>(null);
   const [isLoadingFullPhotos, setIsLoadingFullPhotos] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+  const [photoActionNotice, setPhotoActionNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   React.useEffect(() => {
     if (isOpen && property) {
@@ -389,6 +398,334 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const handleDownloadAllPhotos = () => {
     if (!images || images.length === 0) return;
     setIsPhotoDownloadModalOpen(true);
+  };
+
+  // 3. 사진 압축 (3.8MB 이하는 원본 100% 무손실, 초과는 4K UHD 94% 프리미엄 화질 유지)
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (file.size <= 3.8 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxWidth = 3840;
+          const maxHeight = 2880;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.94);
+            resolve(dataUrl);
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // 4. 사진 즉시 업로드 및 서버 저장
+  const handleUploadPhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !property) return;
+
+    if (!canEdit) {
+      alert('매물 사진을 등록/수정할 권한이 없습니다. (개업공인중개사(대표) 및 지정된 권한자만 가능)');
+      return;
+    }
+
+    const maxPhotos = 20;
+    const currentList = images;
+    const remaining = maxPhotos - currentList.length;
+    if (remaining <= 0) {
+      alert(`사진은 최대 ${maxPhotos}장까지만 등록할 수 있습니다. 기존 사진을 삭제 후 다시 시도해주세요.`);
+      return;
+    }
+
+    const selectedFiles = Array.from(files).slice(0, remaining);
+    if (files.length > remaining) {
+      alert(`최대 ${maxPhotos}장 제한으로 ${remaining}장의 사진만 추가됩니다.`);
+    }
+
+    setIsUploadingPhotos(true);
+    setPhotoActionNotice(null);
+
+    try {
+      // 1) 고화질 이미지 압축
+      const compressedList = await Promise.all(selectedFiles.map((f) => compressImage(f)));
+
+      // 2) Cloudflare R2 비동기 업로드 시도 (실패 시 무손실 base64 보존)
+      let finalUploadedList = compressedList;
+      try {
+        const r2Results = await Promise.all(
+          compressedList.map(async (img) => {
+            if (!img || !img.startsWith('data:image')) return img;
+            try {
+              const uploadRes = await fetch('/api/upload/r2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: img }),
+              });
+              if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                if (uploadData.success && uploadData.url) {
+                  return uploadData.url;
+                }
+              }
+            } catch (err) {
+              console.warn('개별 사진 R2 업로드 오류(원본 유지):', err);
+            }
+            return img;
+          })
+        );
+        finalUploadedList = r2Results;
+      } catch (r2Err) {
+        console.warn('R2 일괄 업로드 경고:', r2Err);
+      }
+
+      const updatedImages = [...currentList, ...finalUploadedList];
+
+      // 3) 서버 PUT 저장
+      const res = await fetch('/api/properties', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'AGENT',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': encodeURIComponent(currentUser?.name || ''),
+        },
+        body: JSON.stringify({
+          id: property.id,
+          propertyNumber: property.propertyNumber,
+          images: updatedImages,
+          currentUser,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || '사진 저장에 실패했습니다.');
+      }
+
+      const savedData = await res.json();
+      const updatedListFromServer = Array.isArray(savedData.images) ? savedData.images : updatedImages;
+
+      // 로컬 상태 즉시 반영 및 상위 동기화
+      setFullImages(updatedListFromServer);
+      setActivePhotoIndex(currentList.length); // 새로 추가된 사진으로 뷰어 이동
+
+      const updatedPropertyObj: PropertyItem = {
+        ...property,
+        images: updatedListFromServer,
+        photoCount: updatedListFromServer.length,
+      };
+      if (onPropertyUpdated) {
+        onPropertyUpdated(updatedPropertyObj);
+      }
+
+      setPhotoActionNotice({
+        type: 'success',
+        text: `📷 사진 ${selectedFiles.length}장이 성공적으로 추가 및 저장되었습니다.`,
+      });
+      setTimeout(() => setPhotoActionNotice(null), 3000);
+    } catch (err: any) {
+      console.error('사진 추가 실패:', err);
+      setPhotoActionNotice({
+        type: 'error',
+        text: err.message || '사진 업로드 중 오류가 발생했습니다.',
+      });
+      alert(err.message || '사진 업로드 중 오류가 발생했습니다.');
+    } finally {
+      setIsUploadingPhotos(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // 5. 사진 삭제 및 서버 저장
+  const handleDeletePhoto = async (targetIndex: number) => {
+    if (!property || images.length === 0) return;
+
+    if (!canEdit) {
+      alert('매물 사진을 삭제할 권한이 없습니다. (개업공인중개사(대표) 및 지정된 권한자만 가능)');
+      return;
+    }
+
+    if (targetIndex < 0 || targetIndex >= images.length) return;
+
+    const isRepresentative = targetIndex === 0;
+    const confirmMsg = isRepresentative
+      ? `현재 보고 계신 1번째 사진은 [대표사진]입니다.\n정말로 이 사진을 삭제하시겠습니까?\n삭제 후 다음 사진이 새로운 대표사진으로 지정됩니다.`
+      : `현재 보고 계신 ${targetIndex + 1}번째 사진을 삭제하시겠습니까?\n삭제 후 매물장에 즉시 영구 저장됩니다.`;
+
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+
+    setIsDeletingPhoto(true);
+    setPhotoActionNotice(null);
+
+    try {
+      const updatedImages = images.filter((_, idx) => idx !== targetIndex);
+
+      // 서버에 PUT 저장
+      const res = await fetch('/api/properties', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'AGENT',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': encodeURIComponent(currentUser?.name || ''),
+        },
+        body: JSON.stringify({
+          id: property.id,
+          propertyNumber: property.propertyNumber,
+          images: updatedImages,
+          currentUser,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || '사진 삭제에 실패했습니다.');
+      }
+
+      const savedData = await res.json();
+      const updatedListFromServer = Array.isArray(savedData.images) ? savedData.images : updatedImages;
+
+      // 로컬 상태 즉시 갱신
+      setFullImages(updatedListFromServer);
+      if (targetIndex >= updatedListFromServer.length) {
+        setActivePhotoIndex(Math.max(0, updatedListFromServer.length - 1));
+      } else {
+        setActivePhotoIndex(targetIndex);
+      }
+
+      const updatedPropertyObj: PropertyItem = {
+        ...property,
+        images: updatedListFromServer,
+        photoCount: updatedListFromServer.length,
+      };
+      if (onPropertyUpdated) {
+        onPropertyUpdated(updatedPropertyObj);
+      }
+
+      setPhotoActionNotice({
+        type: 'success',
+        text: '🗑️ 사진이 성공적으로 삭제되었습니다.',
+      });
+      setTimeout(() => setPhotoActionNotice(null), 3000);
+    } catch (err: any) {
+      console.error('사진 삭제 실패:', err);
+      setPhotoActionNotice({
+        type: 'error',
+        text: err.message || '사진 삭제 중 오류가 발생했습니다.',
+      });
+      alert(err.message || '사진 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingPhoto(false);
+    }
+  };
+
+  // 6. 등록된 사진 전체 일괄 삭제
+  const handleDeleteAllPhotos = async () => {
+    if (!property || images.length === 0) {
+      alert('삭제할 사진이 없습니다.');
+      return;
+    }
+
+    if (!confirm(`⚠️ 정말로 등록된 사진 전체(${images.length}장)를 모두 삭제하시겠습니까?\n삭제 후에는 복구할 수 없으며 매물장에 즉시 영구 저장됩니다.`)) {
+      return;
+    }
+
+    setIsDeletingPhoto(true);
+    setPhotoActionNotice(null);
+
+    try {
+      const updatedImages: string[] = [];
+
+      // 서버에 PUT 저장
+      const res = await fetch('/api/properties', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': encodeURIComponent(currentUser?.name || ''),
+        },
+        body: JSON.stringify({
+          id: property.id,
+          propertyNumber: property.propertyNumber,
+          images: updatedImages,
+          currentUser,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || '사진 전체 삭제에 실패했습니다.');
+      }
+
+      const savedData = await res.json();
+      const updatedListFromServer = Array.isArray(savedData?.images) ? savedData.images : updatedImages;
+
+      // 로컬 상태 즉시 갱신
+      setFullImages(updatedListFromServer);
+      setActivePhotoIndex(0);
+
+      const updatedPropertyObj: PropertyItem = {
+        ...property,
+        images: updatedListFromServer,
+        photoCount: 0,
+      };
+      if (onPropertyUpdated) {
+        onPropertyUpdated(updatedPropertyObj);
+      }
+
+      setPhotoActionNotice({
+        type: 'success',
+        text: '💥 사진 전체가 성공적으로 삭제되었습니다.',
+      });
+      setTimeout(() => setPhotoActionNotice(null), 3000);
+    } catch (err: any) {
+      console.error('사진 전체 삭제 실패:', err);
+      setPhotoActionNotice({
+        type: 'error',
+        text: err.message || '사진 전체 삭제 중 오류가 발생했습니다.',
+      });
+      alert(err.message || '사진 전체 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingPhoto(false);
+    }
   };
 
   return (
@@ -843,9 +1180,101 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   )}
                 </div>
 
-                {/* 상단 우측 사진 액션 툴바: [현재 사진 저장] [전체 다운로드] [크게 보기] */}
-                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
-                  {/* 1. 현재 사진 저장 버튼 */}
+                {/* 사진 작업 실시간 안내 알림 바 */}
+                {photoActionNotice && (
+                  <div className={`absolute top-12 left-3 right-3 z-30 px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 ${
+                    photoActionNotice.type === 'success'
+                      ? 'bg-emerald-600/95 text-white border border-emerald-400/50'
+                      : 'bg-rose-600/95 text-white border border-rose-400/50'
+                  }`}>
+                    <span className="flex items-center gap-1.5">
+                      <span>{photoActionNotice.text}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoActionNotice(null)}
+                      className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* 상단 우측 사진 액션 툴바: [사진 올리기] [선택사진 삭제] [전체삭제] [현재 사진 저장] [전체 다운로드] [크게 보기] */}
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20 flex-wrap justify-end">
+                  {/* 1. 사진 다시 올리기 / 사진 추가 버튼 */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) {
+                        alert('사진 등록 권한이 없습니다. (개업공인중개사(대표) 및 지정된 권한자만 가능)');
+                        return;
+                      }
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={isUploadingPhotos || images.length >= 20}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600/90 hover:bg-blue-600 active:scale-95 border border-blue-400/50 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={images.length >= 20 ? '사진은 최대 20장까지 등록 가능합니다' : '새 사진 추가/다시 올리기'}
+                  >
+                    {isUploadingPhotos ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                        <span className="text-[11px]">올리는 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5 text-blue-200" />
+                        <span className="text-[11px]">사진 올리기</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 2. 선택사진 삭제 버튼 (현재 보고 있는 1장 삭제) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) {
+                        alert('사진 삭제 권한이 없습니다. (개업공인중개사(대표) 및 지정된 권한자만 가능)');
+                        return;
+                      }
+                      handleDeletePhoto(currentPhotoIndex);
+                    }}
+                    disabled={isDeletingPhoto}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold text-rose-100 hover:text-white bg-rose-900/80 hover:bg-rose-600 active:scale-95 border border-rose-500/50 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    title="현재 보고 있는 선택된 사진 1장 삭제"
+                  >
+                    {isDeletingPhoto ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-300" />
+                        <span className="text-[11px]">삭제 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5 text-rose-300" />
+                        <span className="text-[11px]">선택사진 삭제</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 3. 전체삭제 버튼 (등록된 사진 전체 일괄 삭제) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) {
+                        alert('사진 삭제 권한이 없습니다. (개업공인중개사(대표) 및 지정된 권한자만 가능)');
+                        return;
+                      }
+                      handleDeleteAllPhotos();
+                    }}
+                    disabled={isDeletingPhoto}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold text-red-100 hover:text-white bg-red-950/90 hover:bg-red-700 active:scale-95 border border-red-500/60 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    title={`등록된 사진 전체(${images.length}장) 일괄 삭제`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-300" />
+                    <span className="text-[11px]">전체삭제</span>
+                  </button>
+
+                  {/* 4. 현재 사진 저장 버튼 */}
                   <button
                     type="button"
                     onClick={handleDownloadCurrentPhoto}
@@ -860,13 +1289,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     ) : (
                       <>
                         <Download className="w-3.5 h-3.5 text-blue-400" />
-                        <span className="hidden sm:inline text-[11px]">현재 사진 저장</span>
-                        <span className="sm:hidden text-[11px]">저장</span>
+                        <span className="text-[11px]">현재 사진 저장</span>
                       </>
                     )}
                   </button>
 
-                  {/* 2. 전체 사진 다운로드 버튼 (경로 지정 & 누락 방지) */}
+                  {/* 5. 전체 사진 다운로드 버튼 (경로 지정 & 누락 방지) */}
                   <button
                     type="button"
                     onClick={handleDownloadAllPhotos}
@@ -874,11 +1302,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     title={`등록된 사진 전체(${images.length}장) 일괄 다운로드 (경로 지정)`}
                   >
                     <FolderDown className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="hidden sm:inline text-[11px]">전체 다운로드 ({images.length}장)</span>
-                    <span className="sm:hidden text-[11px]">전체({images.length})</span>
+                    <span className="text-[11px]">전체 다운로드 ({images.length}장)</span>
                   </button>
 
-                  {/* 3. 크게 보기(확대) 버튼 */}
+                  {/* 6. 크게 보기(확대) 버튼 */}
                   <button
                     type="button"
                     onClick={() => setIsPhotoLightboxOpen(true)}
@@ -911,42 +1338,167 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
               {/* Thumbnails Bar */}
               {images.length > 1 && (
-                <div className="p-2.5 bg-slate-950 flex gap-2 overflow-x-auto">
+                <div className="p-2.5 bg-slate-950 flex items-center gap-2 overflow-x-auto">
                   {images.map((img, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setActivePhotoIndex(idx)}
-                      className={`relative shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all ${
-                        idx === currentPhotoIndex
-                          ? 'border-blue-500 scale-105 shadow-md shadow-blue-500/30'
-                          : 'border-transparent opacity-60 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                      {idx === 0 && (
-                        <span className="absolute bottom-0 inset-x-0 bg-blue-600/90 text-[9px] text-white font-bold text-center">대표</span>
-                      )}
-                    </button>
+                    <div key={idx} className="relative group shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setActivePhotoIndex(idx)}
+                        className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition-all block ${
+                          idx === currentPhotoIndex
+                            ? 'border-blue-500 scale-105 shadow-md shadow-blue-500/30'
+                            : 'border-transparent opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        {idx === 0 && (
+                          <span className="absolute bottom-0 inset-x-0 bg-blue-600/90 text-[9px] text-white font-bold text-center">대표</span>
+                        )}
+                      </button>
+
+                      {/* 썸네일 개별 삭제 버튼 */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!canEdit) {
+                            alert('사진 삭제 권한이 없습니다.');
+                            return;
+                          }
+                          handleDeletePhoto(idx);
+                        }}
+                        disabled={isDeletingPhoto}
+                        title={`${idx + 1}번째 사진 삭제`}
+                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                      >
+                        <X className="w-2.5 h-2.5 stroke-[3]" />
+                      </button>
+                    </div>
                   ))}
+
+                  {/* 썸네일 끝에 추가 버튼 */}
+                  {images.length < 20 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!canEdit) {
+                          alert('사진 등록 권한이 없습니다.');
+                          return;
+                        }
+                        fileInputRef.current?.click();
+                      }}
+                      disabled={isUploadingPhotos}
+                      className="shrink-0 w-16 h-12 rounded-lg border-2 border-dashed border-slate-700 hover:border-blue-500 hover:bg-blue-950/40 text-slate-400 hover:text-blue-300 flex flex-col items-center justify-center transition-all cursor-pointer"
+                      title="사진 추가 올리기"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="text-[9px] font-bold mt-0.5">추가</span>
+                    </button>
+                  )}
                 </div>
               )}
+
+              {/* 하단 사진 조작 버튼 바 (어디서나 한눈에 바로 보이는 컨트롤 바) */}
+              <div className="px-3.5 py-2.5 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 font-semibold text-[11px]">
+                    선택된 사진: <span className="text-blue-400 font-extrabold">{currentPhotoIndex + 1}</span> / {images.length}장
+                    {currentPhotoIndex === 0 && <span className="ml-1 text-amber-400 font-bold">(대표)</span>}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* 사진 올리기 */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) {
+                        alert('사진 등록 권한이 없습니다.');
+                        return;
+                      }
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={isUploadingPhotos || images.length >= 20}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>사진 올리기</span>
+                  </button>
+
+                  {/* 선택사진 삭제 */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) {
+                        alert('사진 삭제 권한이 없습니다.');
+                        return;
+                      }
+                      handleDeletePhoto(currentPhotoIndex);
+                    }}
+                    disabled={isDeletingPhoto}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-100 hover:text-white bg-rose-900/80 hover:bg-rose-600 border border-rose-500/40 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                    title="현재 선택된 사진 1장 삭제"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-300" />
+                    <span>선택사진 삭제</span>
+                  </button>
+
+                  {/* 전체삭제 */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) {
+                        alert('사진 삭제 권한이 없습니다.');
+                        return;
+                      }
+                      handleDeleteAllPhotos();
+                    }}
+                    disabled={isDeletingPhoto}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-red-100 hover:text-white bg-red-950 hover:bg-red-700 border border-red-500/60 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                    title={`등록된 사진 전체(${images.length}장) 모두 삭제`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    <span>전체삭제</span>
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className={`p-4 rounded-xl border text-center text-xs flex flex-col sm:flex-row items-center justify-between gap-3 ${
+            <div className={`p-4 sm:p-5 rounded-2xl border text-center text-xs flex flex-col sm:flex-row items-center justify-between gap-3 ${
               property.status === 'CONTRACTED'
                 ? 'bg-rose-50 border-rose-300 text-rose-900'
-                : 'bg-slate-50 border-dashed border-slate-300 text-slate-500'
+                : 'bg-slate-50 border-dashed border-2 border-slate-300 text-slate-600'
             }`}>
-              <div className="flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-slate-400" />
-                <span>등록된 매물 사진이 없습니다. [수정] 버튼을 눌러 사진(최대 20장)을 등록할 수 있습니다.</span>
+              <div className="flex items-center gap-2 text-left">
+                <ImageIcon className="w-5 h-5 text-slate-400 shrink-0" />
+                <span>등록된 매물 사진이 없습니다. [사진 올리기] 버튼을 눌러 바로 사진(최대 20장)을 등록할 수 있습니다.</span>
               </div>
-              {property.status === 'CONTRACTED' && (
-                <div className="border-2 border-dashed border-rose-600 bg-rose-100 text-rose-800 font-black px-4 py-1.5 rounded-lg text-sm tracking-wider shadow-xs transform rotate-[-2deg]">
-                  [ 계 약 완 료 ]
-                </div>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingPhotos}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    {isUploadingPhotos ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>사진 올리는 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        <span>📷 사진 올리기</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {property.status === 'CONTRACTED' && (
+                  <div className="border-2 border-dashed border-rose-600 bg-rose-100 text-rose-800 font-black px-4 py-1.5 rounded-lg text-sm tracking-wider shadow-xs transform rotate-[-2deg]">
+                    [ 계 약 완 료 ]
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1800,6 +2352,46 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       {isPhotoLightboxOpen && images.length > 0 && (
         <div className="fixed inset-0 z-60 bg-black/95 flex items-center justify-center p-4">
           <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+            {/* 선택사진 삭제 (Lightbox 내부) */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!canEdit) {
+                  alert('사진 삭제 권한이 없습니다.');
+                  return;
+                }
+                handleDeletePhoto(currentPhotoIndex);
+                if (images.length <= 1) {
+                  setIsPhotoLightboxOpen(false);
+                }
+              }}
+              disabled={isDeletingPhoto}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-rose-200 hover:text-white bg-rose-950/70 hover:bg-rose-600 active:scale-95 border border-rose-500/40 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+              title="현재 보고 있는 선택된 사진 1장 삭제"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>선택사진 삭제</span>
+            </button>
+
+            {/* 전체삭제 (Lightbox 내부) */}
+            <button
+              type="button"
+              onClick={() => {
+                if (!canEdit) {
+                  alert('사진 삭제 권한이 없습니다.');
+                  return;
+                }
+                handleDeleteAllPhotos();
+                setIsPhotoLightboxOpen(false);
+              }}
+              disabled={isDeletingPhoto}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-red-200 hover:text-white bg-red-950/80 hover:bg-red-700 active:scale-95 border border-red-500/50 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+              title={`등록된 사진 전체(${images.length}장) 모두 삭제`}
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span>전체삭제</span>
+            </button>
+
             {/* 현재 사진 저장 */}
             <button
               type="button"
@@ -1890,6 +2482,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         images={images}
         titleName={titleName}
         propertyNumber={property.propertyNumber}
+      />
+
+      {/* 사진 업로드용 숨겨진 File Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*"
+        onChange={(e) => handleUploadPhotos(e.target.files)}
+        className="hidden"
       />
     </div>
   );
