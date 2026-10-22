@@ -367,10 +367,8 @@ export async function shareViaKakao(params: SharePropertyParams): Promise<boolea
     detailAddress: params.detailAddress,
   };
 
-  const pDataQuery = createSlimBriefingPayload(propTarget, addrMode, isHideName);
-
   const shareUrl = propIdentifier
-    ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}&addrMode=${addrMode}&hideName=${isHideName ? '1' : '0'}${pDataQuery}`
+    ? `${baseUrl}?propertyId=${encodeURIComponent(propIdentifier)}&addrMode=${addrMode}&hideName=${isHideName ? '1' : '0'}`
     : baseUrl;
   const kakaoKey = getKakaoKey();
 
@@ -470,8 +468,7 @@ export async function copyPropertyShareLink(
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
   const propId = property.propertyNumber || property.id || '';
-  const pDataQuery = createSlimBriefingPayload(property, addressMode, hidePropertyName);
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}${pDataQuery}`;
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}`;
   
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -551,8 +548,8 @@ export function generateSmsLink(
   hidePropertyName: boolean = true
 ): string {
   const baseUrl = getAppBaseUrl();
-  const pDataQuery = createSlimBriefingPayload(property, addressMode, hidePropertyName);
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(property.propertyNumber)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}${pDataQuery}`;
+  const propId = property.propertyNumber || (property as any).id || '';
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}`;
 
   let priceStr = '';
   if (property.transactionType === '매매') {
@@ -629,8 +626,7 @@ export function getSmsText(
 ): string {
   const baseUrl = getAppBaseUrl();
   const propId = property.propertyNumber || property.id || '';
-  const pDataQuery = createSlimBriefingPayload(property, addressMode, hidePropertyName);
-  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}${pDataQuery}`;
+  const shareUrl = `${baseUrl}?propertyId=${encodeURIComponent(propId)}&addrMode=${addressMode}&hideName=${hidePropertyName ? '1' : '0'}`;
 
   let priceStr = '';
   if (property.transactionType === '매매') {
