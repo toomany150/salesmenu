@@ -301,7 +301,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(formattedProperties);
   } catch (error: any) {
     console.error('Error fetching properties:', error);
-    return NextResponse.json(INITIAL_PROPERTIES);
+    return NextResponse.json({ error: error.message || 'Error fetching properties' }, { status: 500 });
   }
 }
 

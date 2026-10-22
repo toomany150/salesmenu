@@ -11,9 +11,24 @@ function ensureDatabaseUrl(): string {
   const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
   const currentUrl = process.env.DATABASE_URL?.trim();
 
-  // 원격 PostgreSQL / MySQL 등의 URL이 명시되어 있는 경우 그대로 사용
+  // 원격 PostgreSQL / MySQL 등의 URL이 명시되어 있는 경우
   if (currentUrl && !currentUrl.startsWith('file:')) {
-    return currentUrl;
+    let optimizedUrl = currentUrl;
+    // Supabase Pooler 최적화: 5432 포트(세션 모드)는 최대 15개 연결 제한으로 EMAXCONNSESSION 발생 위험이 있으므로
+    // 트랜잭션 풀러 포트인 6543 및 pgbouncer=true, connection_limit=1로 자동 보정하여 무제한 안전 접속 보장
+    if (optimizedUrl.includes('pooler.supabase.com:5432')) {
+      optimizedUrl = optimizedUrl.replace('pooler.supabase.com:5432', 'pooler.supabase.com:6543');
+    }
+    if (optimizedUrl.includes('pooler.supabase.com:6543')) {
+      if (!optimizedUrl.includes('pgbouncer=true')) {
+        optimizedUrl += optimizedUrl.includes('?') ? '&pgbouncer=true' : '?pgbouncer=true';
+      }
+      if (!optimizedUrl.includes('connection_limit=')) {
+        optimizedUrl += '&connection_limit=1';
+      }
+    }
+    process.env.DATABASE_URL = optimizedUrl;
+    return optimizedUrl;
   }
 
   // Vercel Serverless 환경: 루트 파일시스템은 읽기 전용이므로 /tmp에 SQLite 복사 및 탑재
