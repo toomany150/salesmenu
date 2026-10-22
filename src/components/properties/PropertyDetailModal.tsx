@@ -76,6 +76,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [photoActionNotice, setPhotoActionNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // 마우스 드래그 앤 드롭 및 마우스 스와이프 상태
+  const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
+  const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [isMouseDragging, setIsMouseDragging] = useState(false);
+  const [hasMovedViewer, setHasMovedViewer] = useState(false);
+
   React.useEffect(() => {
     if (isOpen && property) {
       setFullImages(null);
@@ -817,6 +824,105 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     }
   };
 
+  // 8. 마우스 드래그 앤 드롭 또는 버튼으로 사진 순서 이동 및 서버 영구 저장
+  const handleMovePhoto = async (fromIndex: number, toIndex: number) => {
+    if (!property || images.length <= 1) return;
+    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= images.length || toIndex >= images.length) return;
+
+    if (!canEdit) {
+      alert('사진 순서 이동 권한이 없습니다. (개업공인중개사(대표) 및 지정된 권한자만 가능)');
+      return;
+    }
+
+    const nextImages = [...images];
+    const [moved] = nextImages.splice(fromIndex, 1);
+    nextImages.splice(toIndex, 0, moved);
+
+    // 낙관적 UI 업데이트: 즉각 로컬 반영
+    setFullImages(nextImages);
+    setActivePhotoIndex(toIndex);
+
+    try {
+      const res = await fetch('/api/properties', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'AGENT',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': encodeURIComponent(currentUser?.name || ''),
+        },
+        body: JSON.stringify({
+          id: property.id,
+          propertyNumber: property.propertyNumber,
+          images: nextImages,
+          currentUser,
+        }),
+      });
+
+      if (res.ok) {
+        const savedData = await res.json();
+        const updatedList = Array.isArray(savedData?.images) ? savedData.images : nextImages;
+        setFullImages(updatedList);
+        if (onPropertyUpdated) {
+          onPropertyUpdated({
+            ...property,
+            images: updatedList,
+            photoCount: updatedList.length,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('사진 순서 이동 서버 저장 오류:', err);
+    }
+  };
+
+  // 메인 사진 마우스 드래그(스와이프)로 이전/다음 사진 이동
+  const handleMouseDownViewer = (e: React.MouseEvent) => {
+    setTouchStartX(e.clientX);
+    setIsMouseDragging(true);
+    setHasMovedViewer(false);
+  };
+
+  const handleMouseMoveViewer = (e: React.MouseEvent) => {
+    if (!isMouseDragging || touchStartX === null) return;
+    const diffX = e.clientX - touchStartX;
+    if (Math.abs(diffX) > 10) {
+      setHasMovedViewer(true);
+    }
+  };
+
+  const handleMouseUpViewer = (e: React.MouseEvent) => {
+    if (!isMouseDragging || touchStartX === null) return;
+    const diffX = e.clientX - touchStartX;
+    if (diffX < -50 && images.length > 1) {
+      // 마우스 왼쪽으로 50px 이상 드래그 -> 다음 사진
+      setActivePhotoIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+    } else if (diffX > 50 && images.length > 1) {
+      // 마우스 오른쪽으로 50px 이상 드래그 -> 이전 사진
+      setActivePhotoIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+    }
+    setIsMouseDragging(false);
+    setTouchStartX(null);
+  };
+
+  const handleTouchStartViewer = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+    setHasMovedViewer(false);
+  };
+
+  const handleTouchEndViewer = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const endX = e.changedTouches[0].clientX;
+    const diffX = endX - touchStartX;
+    if (diffX < -50 && images.length > 1) {
+      setActivePhotoIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+    } else if (diffX > 50 && images.length > 1) {
+      setActivePhotoIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+    }
+    setTouchStartX(null);
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -1243,12 +1349,25 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           {/* Property Photos Carousel / Gallery (최대 30장 지원) */}
           {images.length > 0 ? (
             <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-lg border border-slate-800">
-              <div className="relative aspect-16/9 sm:aspect-21/9 max-h-[380px] bg-black flex items-center justify-center">
+              <div 
+                className="relative aspect-16/9 sm:aspect-21/9 max-h-[380px] bg-black flex items-center justify-center select-none cursor-grab active:cursor-grabbing"
+                onMouseDown={handleMouseDownViewer}
+                onMouseMove={handleMouseMoveViewer}
+                onMouseUp={handleMouseUpViewer}
+                onMouseLeave={() => { setIsMouseDragging(false); setTouchStartX(null); }}
+                onTouchStart={handleTouchStartViewer}
+                onTouchEnd={handleTouchEndViewer}
+                title="마우스로 좌우를 드래그하여 사진을 넘겨볼 수 있습니다 (클릭 시 크게보기)"
+              >
                 <img
                   src={images[currentPhotoIndex]}
                   alt={`매물 사진 ${currentPhotoIndex + 1}`}
-                  className="max-h-[380px] w-full object-contain cursor-zoom-in"
-                  onClick={() => setIsPhotoLightboxOpen(true)}
+                  className="max-h-[380px] w-full object-contain pointer-events-none select-none"
+                  onClick={() => {
+                    if (!hasMovedViewer) {
+                      setIsPhotoLightboxOpen(true);
+                    }
+                  }}
                 />
                 
                 {/* 계약완료 워터마크 이미지 스탬프 오버레이 */}
@@ -1448,22 +1567,92 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               {/* Thumbnails Bar */}
               {images.length > 1 && (
                 <div className="p-2.5 bg-slate-950 flex items-center gap-2 overflow-x-auto">
+                  <div className="shrink-0 text-[10px] text-slate-400 font-bold px-2 py-1 bg-slate-900 rounded border border-slate-800 flex items-center gap-1 select-none">
+                    <span>🖱️</span>
+                    <span className="hidden sm:inline">마우스 드래그로 순서 이동</span>
+                  </div>
                   {images.map((img, idx) => (
-                    <div key={idx} className="relative group shrink-0">
+                    <div 
+                      key={idx} 
+                      className={`relative group shrink-0 transition-all ${
+                        draggedPhotoIndex === idx ? 'opacity-30 scale-95' : ''
+                      } ${
+                        dragOverPhotoIndex === idx ? 'scale-110 ring-2 ring-blue-400 rounded-lg shadow-lg shadow-blue-500/40' : ''
+                      }`}
+                      draggable={canEdit}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', String(idx));
+                        setDraggedPhotoIndex(idx);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (dragOverPhotoIndex !== idx) setDragOverPhotoIndex(idx);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverPhotoIndex === idx) setDragOverPhotoIndex(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverPhotoIndex(null);
+                        const fromIdx = draggedPhotoIndex !== null ? draggedPhotoIndex : parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        if (!isNaN(fromIdx) && fromIdx !== idx) {
+                          handleMovePhoto(fromIdx, idx);
+                        }
+                        setDraggedPhotoIndex(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedPhotoIndex(null);
+                        setDragOverPhotoIndex(null);
+                      }}
+                      title={`${idx + 1}번째 사진 (마우스로 끌어서 순서 이동 가능)`}
+                    >
                       <button
                         type="button"
                         onClick={() => setActivePhotoIndex(idx)}
-                        className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition-all block ${
+                        className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition-all block cursor-grab active:cursor-grabbing ${
                           idx === currentPhotoIndex
                             ? 'border-blue-500 scale-105 shadow-md shadow-blue-500/30'
                             : 'border-transparent opacity-60 hover:opacity-100'
                         }`}
                       >
-                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        <img src={img} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
                         {idx === 0 && (
                           <span className="absolute bottom-0 inset-x-0 bg-blue-600/90 text-[9px] text-white font-bold text-center">대표</span>
                         )}
                       </button>
+
+                      {/* 앞으로 이동 (◀) 버튼 */}
+                      {idx > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMovePhoto(idx, idx - 1);
+                          }}
+                          disabled={isDeletingPhoto}
+                          title="왼쪽(앞)으로 이동"
+                          className="absolute bottom-0.5 -left-1 w-4 h-4 rounded-full bg-slate-800/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                        >
+                          <ChevronLeft className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+
+                      {/* 뒤로 이동 (▶) 버튼 */}
+                      {idx < images.length - 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMovePhoto(idx, idx + 1);
+                          }}
+                          disabled={isDeletingPhoto}
+                          title="오른쪽(뒤)으로 이동"
+                          className="absolute bottom-0.5 -right-1 w-4 h-4 rounded-full bg-slate-800/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                        >
+                          <ChevronRight className="w-2.5 h-2.5" />
+                        </button>
+                      )}
 
                       {/* 썸네일 개별 대표사진 지정 별 버튼 (대표가 아닐 때 노출) */}
                       {idx > 0 && (

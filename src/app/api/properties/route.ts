@@ -298,7 +298,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(formattedProperties);
+    const cacheHeader = !userRole
+      ? 'public, s-maxage=30, stale-while-revalidate=120'
+      : 'private, no-cache, stale-while-revalidate=30';
+
+    return NextResponse.json(formattedProperties, {
+      headers: {
+        'Cache-Control': cacheHeader,
+      },
+    });
   } catch (error: any) {
     console.error('Error fetching properties:', error);
     return NextResponse.json({ error: error.message || 'Error fetching properties' }, { status: 500 });

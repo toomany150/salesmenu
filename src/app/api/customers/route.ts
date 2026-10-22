@@ -159,7 +159,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(customers);
+    return NextResponse.json(customers, {
+      headers: {
+        'Cache-Control': 'private, no-cache, stale-while-revalidate=30',
+      },
+    });
   } catch (error: any) {
     console.error('Error fetching customers:', error);
     return NextResponse.json({ error: error.message || 'Error fetching customers' }, { status: 500 });

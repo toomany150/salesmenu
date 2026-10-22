@@ -92,7 +92,16 @@ const DashboardContent: React.FC = () => {
     }
   });
   const [loading, setLoading] = useState(false);
-  const [isInitialLoaded, setIsInitialLoaded] = useState(false);
+  const [isInitialLoaded, setIsInitialLoaded] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const stored = localStorage.getItem('cham_real_estate_user');
+      const list = getCustomProperties();
+      return !!stored && list.length > 0;
+    } catch {
+      return false;
+    }
+  });
 
   // Modal States
   const [isPropertyRegOpen, setIsPropertyRegOpen] = useState(false);
@@ -308,7 +317,7 @@ const DashboardContent: React.FC = () => {
           if (decoded && (decoded.id || decoded.propertyNumber)) {
             setSharedBriefingProperty(decoded);
             setIsBriefingLoading(false);
-            return;
+            // pData로 즉각 화면을 띄운 뒤, 아래 2단계에서 서버 전체 사진(10~30장)을 백그라운드로 보강 로드합니다.
           }
         } catch (e) {
           try {
@@ -317,17 +326,16 @@ const DashboardContent: React.FC = () => {
             if (fallback && (fallback.id || fallback.propertyNumber)) {
               setSharedBriefingProperty(fallback);
               setIsBriefingLoading(false);
-              return;
             }
           } catch (err) {}
         }
       }
 
-      // 2. propertyId로 매물 검색 (현재 메모리 -> 로컬 스토리지 캐시 -> 서버 API)
+      // 2. propertyId로 매물 검색 및 전체 사진(10~30장) 보강 로드
       if (propId) {
         // 2-1. 현재 로드된 매물 목록에서 검색
         const found = properties.find((p) => p.id === propId || p.propertyNumber === propId);
-        if (found) {
+        if (found && Array.isArray(found.images) && found.images.length > 3) {
           setSharedBriefingProperty(found);
           setIsBriefingLoading(false);
           return;
@@ -336,14 +344,14 @@ const DashboardContent: React.FC = () => {
         // 2-2. 로컬 브라우저 등록 매물 목록에서 검색
         const localProps = getCustomProperties();
         const localFound = localProps.find((p) => p.id === propId || p.propertyNumber === propId);
-        if (localFound) {
+        if (localFound && Array.isArray(localFound.images) && localFound.images.length > 3) {
           setSharedBriefingProperty(localFound);
           setIsBriefingLoading(false);
           return;
         }
 
-        // 2-3. 비로그인 고객을 위해 서버 API 단일/전체 매물 조회
-        fetch(`/api/properties?propertyId=${encodeURIComponent(propId)}`)
+        // 2-3. 서버 API 단일 매물 조회 (fullPhotos=true로 10~30장 전체 사진 반환)
+        fetch(`/api/properties?propertyId=${encodeURIComponent(propId)}&fullPhotos=true`)
           .then((res) => res.json())
           .then((data) => {
             let match: PropertyItem | undefined = undefined;
@@ -358,7 +366,11 @@ const DashboardContent: React.FC = () => {
             }
 
             if (match) {
-              setSharedBriefingProperty(match);
+              setSharedBriefingProperty((prev: any) => ({
+                ...(prev || {}),
+                ...match,
+                images: Array.isArray(match.images) && match.images.length > 0 ? match.images : prev?.images,
+              }));
             }
           })
           .catch((err) => {

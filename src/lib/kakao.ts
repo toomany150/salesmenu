@@ -209,9 +209,12 @@ export function createSlimBriefingPayload(
   try {
     if (!propTarget) return '';
 
-    const cleanImages = Array.isArray(propTarget.images)
-      ? propTarget.images.filter((img: string) => typeof img === 'string' && img.startsWith('http')).slice(0, 3)
-      : [];
+    let cleanImages: string[] = [];
+    if (Array.isArray(propTarget.images)) {
+      cleanImages = propTarget.images
+        .filter((img: string) => typeof img === 'string' && img.startsWith('http'))
+        .slice(0, 10);
+    }
 
     let displayAddr = propTarget.address || '';
     let displayDetail = propTarget.detailAddress || '';
@@ -316,8 +319,11 @@ export function createSlimBriefingPayload(
       };
     }
 
-    const jsonStr = JSON.stringify(slim);
-    const b64 = toUtf8Base64(jsonStr);
+    let b64 = toUtf8Base64(JSON.stringify(slim));
+    while (b64.length >= 2400 && slim.images && slim.images.length > 1) {
+      slim.images = slim.images.slice(0, slim.images.length - 1);
+      b64 = toUtf8Base64(JSON.stringify(slim));
+    }
     if (b64 && b64.length < 2400) {
       return `&pData=${encodeURIComponent(b64)}`;
     }

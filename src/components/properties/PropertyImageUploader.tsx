@@ -28,6 +28,8 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const [isUploadingR2, setIsUploadingR2] = useState(false);
 
@@ -274,13 +276,44 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
             {images.map((img, idx) => (
               <div
                 key={idx}
-                className="group relative aspect-4/3 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs hover:shadow-md transition-all"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', String(idx));
+                  setDraggedIndex(idx);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverIndex !== idx) setDragOverIndex(idx);
+                }}
+                onDragLeave={() => {
+                  if (dragOverIndex === idx) setDragOverIndex(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverIndex(null);
+                  const fromIdx = draggedIndex !== null ? draggedIndex : parseInt(e.dataTransfer.getData('text/plain'), 10);
+                  if (!isNaN(fromIdx) && fromIdx !== idx) {
+                    handleMove(fromIdx, idx);
+                  }
+                  setDraggedIndex(null);
+                }}
+                onDragEnd={() => {
+                  setDraggedIndex(null);
+                  setDragOverIndex(null);
+                }}
+                className={`group relative aspect-4/3 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${
+                  draggedIndex === idx ? 'opacity-30 scale-95' : ''
+                } ${
+                  dragOverIndex === idx ? 'ring-2 ring-indigo-500 scale-105 shadow-md' : ''
+                }`}
+                title="마우스로 끌어서 사진 순서를 변경할 수 있습니다"
               >
                 {/* Image */}
                 <img
                   src={img}
                   alt={`매물 사진 ${idx + 1}`}
-                  className="w-full h-full object-cover cursor-pointer"
+                  className="w-full h-full object-cover cursor-pointer pointer-events-none select-none"
                   onClick={() => setPreviewIndex(idx)}
                 />
 

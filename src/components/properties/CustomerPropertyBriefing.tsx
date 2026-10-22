@@ -59,7 +59,43 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
   const [isPhotoLightboxOpen, setIsPhotoLightboxOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
-  const images = property.images && property.images.length > 0 ? property.images : [];
+  const [briefingImages, setBriefingImages] = useState<string[]>(
+    property.images && property.images.length > 0 ? property.images : []
+  );
+
+  React.useEffect(() => {
+    if (Array.isArray(property.images) && property.images.length > 0) {
+      const currentImgs = property.images;
+      setBriefingImages((prev) => (currentImgs.length >= prev.length ? currentImgs : prev));
+    }
+  }, [property.images]);
+
+  // 카카오톡 공유 시 경량화로 인해 일부 사진만 전달되었을 경우, 서버에서 10~30장 전체 사진 자동 추가 로드
+  React.useEffect(() => {
+    const propId = property.propertyNumber || property.id;
+    if (!propId) return;
+
+    fetch(`/api/properties?propertyId=${encodeURIComponent(propId)}&fullPhotos=true`)
+      .then((res) => res.json())
+      .then((data) => {
+        let match: any = undefined;
+        if (Array.isArray(data)) {
+          match = data.find((p: any) => p.id === propId || p.propertyNumber === propId) || data[0];
+        } else if (data && typeof data === 'object') {
+          if (data.id === propId || data.propertyNumber === propId) {
+            match = data;
+          } else if (Array.isArray(data.properties)) {
+            match = data.properties.find((p: any) => p.id === propId || p.propertyNumber === propId);
+          }
+        }
+        if (match && Array.isArray(match.images) && match.images.length > briefingImages.length) {
+          setBriefingImages(match.images);
+        }
+      })
+      .catch((err) => console.warn('전체 사진 백그라운드 로드 실패:', err));
+  }, [property.propertyNumber, property.id]);
+
+  const images = briefingImages;
   const currentPhotoIndex = activePhotoIndex < images.length ? activePhotoIndex : 0;
   const propType = PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType;
 
