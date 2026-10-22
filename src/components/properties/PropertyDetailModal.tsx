@@ -31,7 +31,8 @@ import {
   FolderDown,
   Upload,
   Plus,
-  Loader2
+  Loader2,
+  Star
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -462,7 +463,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       return;
     }
 
-    const maxPhotos = 20;
+    const maxPhotos = 30;
     const currentList = images;
     const remaining = maxPhotos - currentList.length;
     if (remaining <= 0) {
@@ -723,6 +724,94 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         text: err.message || '사진 전체 삭제 중 오류가 발생했습니다.',
       });
       alert(err.message || '사진 전체 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingPhoto(false);
+    }
+  };
+
+  // 7. 현재 사진을 대표사진으로 지정 (순서 맨 앞으로 이동 후 서버 영구 저장)
+  const handleSetRepresentative = async (targetIndex: number = currentPhotoIndex) => {
+    if (!property || images.length === 0) return;
+
+    if (!canEdit) {
+      alert('대표사진 지정 권한이 없습니다. (개업공인중개사(대표) 및 지정된 권한자만 가능)');
+      return;
+    }
+
+    if (targetIndex === 0) {
+      alert('현재 사진은 이미 대표사진입니다.');
+      return;
+    }
+
+    if (targetIndex < 0 || targetIndex >= images.length) return;
+
+    const selectedImg = images[targetIndex];
+    if (!selectedImg) return;
+
+    if (!confirm(`현재 보고 계신 ${targetIndex + 1}번째 사진을 매물의 [대표사진]으로 지정하시겠습니까?\n매물장 목록의 대표 썸네일과 공유 시 대표 이미지로 적용됩니다.`)) {
+      return;
+    }
+
+    setIsDeletingPhoto(true);
+    setPhotoActionNotice(null);
+
+    try {
+      // 선택한 사진을 맨 앞으로 이동하고 나머지 사진 순서 유지
+      const updatedImages = [
+        selectedImg,
+        ...images.filter((_, idx) => idx !== targetIndex),
+      ];
+
+      // 서버에 PUT 저장 (기존 데이터 보존 및 images 순서만 안전하게 업데이트)
+      const res = await fetch('/api/properties', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'ADMIN',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': encodeURIComponent(currentUser?.name || ''),
+        },
+        body: JSON.stringify({
+          id: property.id,
+          propertyNumber: property.propertyNumber,
+          images: updatedImages,
+          currentUser,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || '대표사진 지정에 실패했습니다.');
+      }
+
+      const savedData = await res.json();
+      const updatedListFromServer = Array.isArray(savedData?.images) ? savedData.images : updatedImages;
+
+      // 로컬 상태 즉시 갱신
+      setFullImages(updatedListFromServer);
+      setActivePhotoIndex(0); // 새로 지정된 대표사진(맨 앞)으로 포커스 유지
+
+      const updatedPropertyObj: PropertyItem = {
+        ...property,
+        images: updatedListFromServer,
+        photoCount: updatedListFromServer.length,
+      };
+      if (onPropertyUpdated) {
+        onPropertyUpdated(updatedPropertyObj);
+      }
+
+      setPhotoActionNotice({
+        type: 'success',
+        text: '⭐ 선택한 사진이 매물의 [대표사진]으로 지정되었습니다.',
+      });
+      setTimeout(() => setPhotoActionNotice(null), 3000);
+    } catch (err: any) {
+      console.error('대표사진 지정 실패:', err);
+      setPhotoActionNotice({
+        type: 'error',
+        text: err.message || '대표사진 지정 중 오류가 발생했습니다.',
+      });
+      alert(err.message || '대표사진 지정 중 오류가 발생했습니다.');
     } finally {
       setIsDeletingPhoto(false);
     }
@@ -1151,7 +1240,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Property Photos Carousel / Gallery (최대 20장 지원) */}
+          {/* Property Photos Carousel / Gallery (최대 30장 지원) */}
           {images.length > 0 ? (
             <div className="bg-slate-900 rounded-2xl overflow-hidden shadow-lg border border-slate-800">
               <div className="relative aspect-16/9 sm:aspect-21/9 max-h-[380px] bg-black flex items-center justify-center">
@@ -1200,9 +1289,29 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   </div>
                 )}
 
-                {/* 상단 우측 사진 액션 툴바: [사진 올리기] [선택사진 삭제] [전체삭제] [현재 사진 저장] [전체 다운로드] [크게 보기] */}
+                {/* 상단 우측 사진 액션 툴바: [대표사진 지정] [사진 올리기] [선택사진 삭제] [전체삭제] [현재 사진 저장] [전체 다운로드] [크게 보기] */}
                 <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20 flex-wrap justify-end">
-                  {/* 1. 사진 다시 올리기 / 사진 추가 버튼 */}
+
+                  {/* 1. 대표사진 지정 버튼 (현재 사진이 대표가 아니면 활성화, 대표면 대표 배지) */}
+                  {currentPhotoIndex === 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-black text-amber-300 bg-amber-950/80 border border-amber-500/50 backdrop-blur-xs shadow-md">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span className="text-[11px]">★ 대표사진</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSetRepresentative(currentPhotoIndex)}
+                      disabled={isDeletingPhoto}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-extrabold text-amber-950 bg-amber-400 hover:bg-amber-300 active:scale-95 border border-amber-300 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+                      title="현재 사진을 매물의 [대표사진]으로 지정 (첫 번째 사진으로 이동)"
+                    >
+                      <Star className="w-3.5 h-3.5 fill-amber-950 text-amber-950" />
+                      <span className="text-[11px] font-black">대표사진 지정</span>
+                    </button>
+                  )}
+
+                  {/* 2. 사진 다시 올리기 / 사진 추가 버튼 (최대 30장) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1212,9 +1321,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       }
                       fileInputRef.current?.click();
                     }}
-                    disabled={isUploadingPhotos || images.length >= 20}
+                    disabled={isUploadingPhotos || images.length >= 30}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600/90 hover:bg-blue-600 active:scale-95 border border-blue-400/50 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={images.length >= 20 ? '사진은 최대 20장까지 등록 가능합니다' : '새 사진 추가/다시 올리기'}
+                    title={images.length >= 30 ? '사진은 최대 30장까지 등록 가능합니다' : '새 사진 추가/다시 올리기 (최대 30장)'}
                   >
                     {isUploadingPhotos ? (
                       <>
@@ -1229,7 +1338,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     )}
                   </button>
 
-                  {/* 2. 선택사진 삭제 버튼 (현재 보고 있는 1장 삭제) */}
+                  {/* 3. 선택사진 삭제 버튼 (현재 보고 있는 1장 삭제) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1256,7 +1365,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     )}
                   </button>
 
-                  {/* 3. 전체삭제 버튼 (등록된 사진 전체 일괄 삭제) */}
+                  {/* 4. 전체삭제 버튼 (등록된 사진 전체 일괄 삭제) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1274,7 +1383,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <span className="text-[11px]">전체삭제</span>
                   </button>
 
-                  {/* 4. 현재 사진 저장 버튼 */}
+                  {/* 5. 현재 사진 저장 버튼 */}
                   <button
                     type="button"
                     onClick={handleDownloadCurrentPhoto}
@@ -1294,7 +1403,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     )}
                   </button>
 
-                  {/* 5. 전체 사진 다운로드 버튼 (경로 지정 & 누락 방지) */}
+                  {/* 6. 전체 사진 다운로드 버튼 (경로 지정 & 누락 방지) */}
                   <button
                     type="button"
                     onClick={handleDownloadAllPhotos}
@@ -1305,7 +1414,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <span className="text-[11px]">전체 다운로드 ({images.length}장)</span>
                   </button>
 
-                  {/* 6. 크게 보기(확대) 버튼 */}
+                  {/* 7. 크게 보기(확대) 버튼 */}
                   <button
                     type="button"
                     onClick={() => setIsPhotoLightboxOpen(true)}
@@ -1356,6 +1465,22 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                         )}
                       </button>
 
+                      {/* 썸네일 개별 대표사진 지정 별 버튼 (대표가 아닐 때 노출) */}
+                      {idx > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetRepresentative(idx);
+                          }}
+                          disabled={isDeletingPhoto}
+                          title={`${idx + 1}번째 사진을 대표사진으로 지정`}
+                          className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-amber-400 hover:bg-amber-300 text-amber-950 flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                        >
+                          <Star className="w-2.5 h-2.5 fill-current" />
+                        </button>
+                      )}
+
                       {/* 썸네일 개별 삭제 버튼 */}
                       <button
                         type="button"
@@ -1376,8 +1501,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </div>
                   ))}
 
-                  {/* 썸네일 끝에 추가 버튼 */}
-                  {images.length < 20 && (
+                  {/* 썸네일 끝에 추가 버튼 (최대 30장) */}
+                  {images.length < 30 && (
                     <button
                       type="button"
                       onClick={() => {
@@ -1389,7 +1514,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       }}
                       disabled={isUploadingPhotos}
                       className="shrink-0 w-16 h-12 rounded-lg border-2 border-dashed border-slate-700 hover:border-blue-500 hover:bg-blue-950/40 text-slate-400 hover:text-blue-300 flex flex-col items-center justify-center transition-all cursor-pointer"
-                      title="사진 추가 올리기"
+                      title="사진 추가 올리기 (최대 30장)"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-[9px] font-bold mt-0.5">추가</span>
@@ -1403,11 +1528,34 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400 font-semibold text-[11px]">
                     선택된 사진: <span className="text-blue-400 font-extrabold">{currentPhotoIndex + 1}</span> / {images.length}장
-                    {currentPhotoIndex === 0 && <span className="ml-1 text-amber-400 font-bold">(대표)</span>}
+                    {currentPhotoIndex === 0 ? (
+                      <span className="ml-1 text-amber-400 font-black">★ [대표사진]</span>
+                    ) : (
+                      <span className="ml-1 text-slate-500">(일반사진)</span>
+                    )}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {/* 사진 올리기 */}
+                  {/* 대표사진 지정 버튼 */}
+                  {currentPhotoIndex === 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-black text-amber-300 bg-amber-950/80 border border-amber-500/40 shadow-2xs">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>★ 대표사진</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSetRepresentative(currentPhotoIndex)}
+                      disabled={isDeletingPhoto}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-black text-amber-950 bg-amber-400 hover:bg-amber-300 active:scale-95 border border-amber-300 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      title="현재 보고 있는 사진을 매물의 [대표사진]으로 지정"
+                    >
+                      <Star className="w-3.5 h-3.5 fill-amber-950 text-amber-950" />
+                      <span>⭐ 대표사진 지정</span>
+                    </button>
+                  )}
+
+                  {/* 사진 올리기 (최대 30장) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1417,8 +1565,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       }
                       fileInputRef.current?.click();
                     }}
-                    disabled={isUploadingPhotos || images.length >= 20}
+                    disabled={isUploadingPhotos || images.length >= 30}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                    title={images.length >= 30 ? '사진은 최대 30장까지 등록 가능합니다' : '새 사진 추가/올리기 (최대 30장)'}
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span>사진 올리기</span>
@@ -1470,7 +1619,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             }`}>
               <div className="flex items-center gap-2 text-left">
                 <ImageIcon className="w-5 h-5 text-slate-400 shrink-0" />
-                <span>등록된 매물 사진이 없습니다. [사진 올리기] 버튼을 눌러 바로 사진(최대 20장)을 등록할 수 있습니다.</span>
+                <span>등록된 매물 사진이 없습니다. [사진 올리기] 버튼을 눌러 바로 사진(최대 30장)을 등록할 수 있습니다.</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {canEdit && (
@@ -2352,6 +2501,25 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       {isPhotoLightboxOpen && images.length > 0 && (
         <div className="fixed inset-0 z-60 bg-black/95 flex items-center justify-center p-4">
           <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+            {/* 대표사진 배지 또는 지정 버튼 (Lightbox 내부) */}
+            {currentPhotoIndex === 0 ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black text-amber-300 bg-amber-950/80 border border-amber-400/60 shadow-md">
+                <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
+                <span>★ 대표사진</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleSetRepresentative(currentPhotoIndex)}
+                disabled={isDeletingPhoto}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold text-amber-950 bg-amber-400 hover:bg-amber-300 active:scale-95 border border-amber-300 backdrop-blur-xs transition-all shadow-md cursor-pointer disabled:opacity-50"
+                title="현재 보고 있는 사진을 매물의 [대표사진]으로 지정"
+              >
+                <Star className="w-4 h-4 fill-amber-950 text-amber-950" />
+                <span>⭐ 대표사진 지정</span>
+              </button>
+            )}
+
             {/* 선택사진 삭제 (Lightbox 내부) */}
             <button
               type="button"

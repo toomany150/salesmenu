@@ -2716,12 +2716,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   />
                 </div>
 
-                {/* 7. 매물 현장 사진 등록 (최대 20장 - 맨 밑으로 배치) */}
+                {/* 7. 매물 현장 사진 등록 (최대 30장 - 맨 밑으로 배치) */}
                 <div className="pt-2">
                   <PropertyImageUploader
                     images={images}
                     onChange={setImages}
-                    maxImages={20}
+                    maxImages={30}
                   />
                 </div>
               </div>

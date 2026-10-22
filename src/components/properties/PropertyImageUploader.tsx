@@ -22,7 +22,7 @@ interface PropertyImageUploaderProps {
 export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
   images = [],
   onChange,
-  maxImages = 20,
+  maxImages = 30,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -212,7 +212,7 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
               )}
             </h4>
             <p className="text-[11px] text-slate-500">
-              첫 번째 사진이 매물장의 [대표사진]으로 지정됩니다. (최대 20장 등록 가능)
+              첫 번째 사진이 매물장의 [대표사진]으로 지정됩니다. (최대 {maxImages}장 등록 가능)
             </p>
           </div>
         </div>
@@ -264,7 +264,7 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
             {isCompressing ? '사진을 처리하고 있습니다...' : '클릭하여 사진을 추가하거나 여기로 끌어다 놓으세요'}
           </p>
           <p className="text-[11px] text-slate-500 mt-1">
-            스마트폰 촬영 사진을 한 번에 여러 장 선택하여 최대 20장까지 등록할 수 있습니다.
+            스마트폰 촬영 사진을 한 번에 여러 장 선택하여 최대 {maxImages}장까지 등록할 수 있습니다.
           </p>
         </div>
       ) : (
@@ -383,13 +383,32 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute top-2 right-2 flex items-center gap-2 z-10">
+              {previewIndex === 0 ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500 text-white text-xs font-bold shadow-xs">
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  대표사진
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSetRepresentative(previewIndex);
+                    setPreviewIndex(0);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  title="현재 보고 있는 사진을 대표사진으로 지정"
+                >
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  대표사진 지정
+                </button>
+              )}
               <span className="px-2 py-1 rounded bg-black/60 text-white text-xs font-mono font-bold">
                 {previewIndex + 1} / {images.length}
               </span>
               <button
                 type="button"
                 onClick={() => setPreviewIndex(null)}
-                className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors"
+                className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
