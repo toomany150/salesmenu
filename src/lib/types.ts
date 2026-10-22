@@ -518,6 +518,8 @@ export interface PropertyItem {
   jibunAddress?: string;
   detailAddress?: string;
   images?: string[];
+  photoCount?: number;
+  allPhotosLoaded?: boolean;
   latitude?: number;
   longitude?: number;
   direction?: string;
@@ -715,6 +717,7 @@ export interface UserItem {
   role: UserRole;
   phone?: string;
   isActive: boolean;
+  canAccessAllData?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

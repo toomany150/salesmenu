@@ -54,6 +54,7 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState<'AGENT' | 'ADMIN'>('AGENT');
+  const [newCanAccessAllData, setNewCanAccessAllData] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [userMsg, setUserMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -145,6 +146,7 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
           name: newName.trim(),
           phone: newPhone.trim(),
           role: newRole,
+          canAccessAllData: newCanAccessAllData,
           adminUser: currentUser || { id: 'usr-admin', name: '개업공인중개사 (대표)', role: 'ADMIN' },
         }),
       });
@@ -165,6 +167,7 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
           name: newName.trim(),
           phone: newPhone.trim() || null,
           role: newRole,
+          canAccessAllData: newCanAccessAllData,
           isActive: true,
           createdAt: new Date().toISOString(),
         };
@@ -179,16 +182,61 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
         addCustomAgent(newName.trim());
       }
 
-      setUserMsg({ type: 'success', text: `[${newName}] 소공 계정이 성공적으로 발급되었습니다!` });
+      setUserMsg({ type: 'success', text: `[${newName}] 소공 계정이 성공적으로 발급되었습니다!${newCanAccessAllData ? ' (전체 데이터 특별 권한 부여됨)' : ''}` });
       setNewUsername('');
       setNewPassword('1234');
       setNewName('');
       setNewPhone('');
+      setNewCanAccessAllData(false);
       fetchUsers();
     } catch (err: any) {
       setUserMsg({ type: 'error', text: err.message || '계정 생성 중 오류가 발생했습니다.' });
     } finally {
       setIsCreatingUser(false);
+    }
+  };
+
+  const handleToggleAccessAllData = async (userToUpdate: UserItem) => {
+    const nextVal = !userToUpdate.canAccessAllData;
+    const confirmMsg = nextVal
+      ? `'${userToUpdate.name}' 중개사에게 [모든 매물 및 고객 데이터 전체 접근 특별 권한]을 부여하시겠습니까?`
+      : `'${userToUpdate.name}' 중개사의 권한을 [본인 등록/담당 및 사무실 공용 물건만 접근]으로 변경하시겠습니까?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'ADMIN',
+        },
+        body: JSON.stringify({
+          id: userToUpdate.id,
+          canAccessAllData: nextVal,
+          adminUser: currentUser || { id: 'usr-admin', name: '개업공인중개사 (대표)', role: 'ADMIN' },
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || '권한 변경에 실패했습니다.');
+        return;
+      }
+
+      // 로컬 스토리지 계정 정보도 동기화
+      try {
+        const storedUsersRaw = localStorage.getItem('cham_custom_users');
+        if (storedUsersRaw) {
+          const list = JSON.parse(storedUsersRaw);
+          const updated = list.map((u: any) => u.id === userToUpdate.id ? { ...u, canAccessAllData: nextVal } : u);
+          localStorage.setItem('cham_custom_users', JSON.stringify(updated));
+        }
+      } catch (e) {}
+
+      fetchUsers();
+    } catch (err) {
+      alert('권한 변경 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -607,6 +655,21 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
                         <span>{isCreatingUser ? '등록 중...' : '계정 발급하기'}</span>
                       </button>
                     </div>
+
+                    <div className="sm:col-span-2 md:col-span-5 flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={newCanAccessAllData}
+                          onChange={(e) => setNewCanAccessAllData(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                        />
+                        <span className="text-indigo-950">⭐ 특별 권한 부여 (소속직원이지만 전체 매물 및 고객 데이터 열람 허용)</span>
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        * 미선택 시 기본 규칙(본인이 올린 물건/고객 + 사무실 공용 물건만 접근)이 적용됩니다.
+                      </span>
+                    </div>
                   </form>
                 </div>
 
@@ -656,11 +719,34 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
                             </div>
                           </div>
 
-                          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                            <span>{u.phone || '연락처 미등록'}</span>
-                            <span className="text-[11px] text-slate-400">
-                              {isUserAdmin ? '전체 관리/수정 권한' : '소공 전용 권한'}
-                            </span>
+                          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-500">{u.phone || '연락처 미등록'}</span>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                                isUserAdmin 
+                                  ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                                  : (u.canAccessAllData 
+                                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
+                                      : 'bg-slate-100 text-slate-600 border border-slate-200')
+                              }`}>
+                                {isUserAdmin ? '👑 전체 관리 권한' : (u.canAccessAllData ? '⭐ 전체 데이터 접근 (특별 권한)' : '🔒 본인+공용 전용')}
+                              </span>
+                            </div>
+                            {!isUserAdmin && (
+                              <div className="flex justify-end pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleAccessAllData(u)}
+                                  className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all ${
+                                    u.canAccessAllData
+                                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                      : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-300 shadow-2xs'
+                                  }`}
+                                >
+                                  {u.canAccessAllData ? '🔒 기본 권한(본인+공용만)으로 전환' : '⭐ 전체 데이터 특별 권한 부여'}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

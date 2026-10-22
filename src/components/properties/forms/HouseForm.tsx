@@ -418,8 +418,8 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
           <label className="block text-xs font-medium text-slate-700 mb-1">방수</label>
           <input
             type="number"
-            value={data.roomCount || ''}
-            onChange={(e) => updateField('roomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+            value={data.roomCount !== undefined && data.roomCount !== null ? data.roomCount : ''}
+            onChange={(e) => updateField('roomCount', e.target.value !== '' ? parseInt(e.target.value, 10) : undefined)}
             placeholder="원룸: 1, 투룸: 2"
             className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
           />
@@ -428,8 +428,8 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
           <label className="block text-xs font-medium text-slate-700 mb-1">욕실수</label>
           <input
             type="number"
-            value={data.bathroomCount || ''}
-            onChange={(e) => updateField('bathroomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+            value={data.bathroomCount !== undefined && data.bathroomCount !== null ? data.bathroomCount : ''}
+            onChange={(e) => updateField('bathroomCount', e.target.value !== '' ? parseInt(e.target.value, 10) : undefined)}
             placeholder="욕실 수"
             className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
           />

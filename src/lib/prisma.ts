@@ -145,7 +145,14 @@ export async function ensureDatabaseSchema(): Promise<void> {
         `);
       }
 
-      // 2. AccessLog 테이블 존재 여부 확인
+      // 1-1. User 테이블 canAccessAllData 컬럼 자동 보정
+      try {
+        const userCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("User");`).catch(() => []);
+        const existingUserCols = new Set(userCols ? userCols.map((c: any) => c.name) : []);
+        if (!existingUserCols.has('canAccessAllData')) {
+          await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "canAccessAllData" BOOLEAN DEFAULT 0;`);
+        }
+      } catch (userColErr) {}
       const logTableCheck = await prisma.$queryRawUnsafe<any[]>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='AccessLog';"
       ).catch(() => []);
@@ -229,27 +236,33 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingDemandCols.has('loanRequirement')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "loanRequirement" TEXT;`);
       } catch (colErr) {}
     } else {
-      // 4. PostgreSQL (Supabase / Production) 환경 누락 컬럼 자동 보정
-      try {
-        await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "isVacantStore" BOOLEAN DEFAULT false;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantLicenseRevoked" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantBizRegRevoked" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "monthlyRevenue" DOUBLE PRECISION;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN DEFAULT false;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "residenceType" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "moveOutPlanDate" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseContractPeriod" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseRemainingPeriod" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseRenewalClaimUsed" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyContractPeriod" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRemainingPeriod" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRenewalClaimUsed" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "loanRequirement" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "collateral" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "purchasePrice" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "currentMarketPrice" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "marketPriceBasis" TEXT;`);
-      } catch (pgColErr) {}
+      // 4. PostgreSQL (Supabase / Production) 환경 누락 컬럼 개별 안전 보정
+      const pgQueries = [
+        `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "isVacantStore" BOOLEAN DEFAULT false;`,
+        `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantLicenseRevoked" TEXT;`,
+        `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantBizRegRevoked" TEXT;`,
+        `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "monthlyRevenue" DOUBLE PRECISION;`,
+        `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "canAccessAllData" BOOLEAN DEFAULT false;`,
+        `ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN DEFAULT false;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "residenceType" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "moveOutPlanDate" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseContractPeriod" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseRemainingPeriod" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseRenewalClaimUsed" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyContractPeriod" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRemainingPeriod" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRenewalClaimUsed" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "loanRequirement" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "collateral" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "purchasePrice" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "currentMarketPrice" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "marketPriceBasis" TEXT;`,
+      ];
+      for (const q of pgQueries) {
+        try {
+          await prisma.$executeRawUnsafe(q);
+        } catch (e) {}
+      }
     }
 
     globalForPrisma.dbInitialized = true;

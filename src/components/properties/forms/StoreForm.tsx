@@ -382,8 +382,8 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               </label>
               <input
                 type="number"
-                value={data.roomCount || ''}
-                onChange={(e) => updateField('roomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                value={data.roomCount !== undefined && data.roomCount !== null ? data.roomCount : ''}
+                onChange={(e) => updateField('roomCount', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                 placeholder="예: 0 (오픈형) 또는 2개"
                 className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-hidden font-bold text-slate-900"
               />
@@ -396,8 +396,8 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               </label>
               <input
                 type="number"
-                value={data.bathroomCount || ''}
-                onChange={(e) => updateField('bathroomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                value={data.bathroomCount !== undefined && data.bathroomCount !== null ? data.bathroomCount : ''}
+                onChange={(e) => updateField('bathroomCount', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                 placeholder="예: 1 또는 2"
                 className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-hidden font-bold text-slate-900"
               />
@@ -459,8 +459,8 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                 <input
                   type="number"
                   disabled={data.isParkingImpossible}
-                  value={data.isParkingImpossible ? 0 : (data.parkingCount || '')}
-                  onChange={(e) => updateField('parkingCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                  value={data.isParkingImpossible ? 0 : (data.parkingCount !== undefined && data.parkingCount !== null ? data.parkingCount : '')}
+                  onChange={(e) => updateField('parkingCount', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                   placeholder={data.isParkingImpossible ? '주차 불가' : '가능 주차대수 입력 (예: 2)'}
                   className={`w-full text-sm px-3.5 py-2.5 border rounded-xl font-bold ${
                     data.isParkingImpossible

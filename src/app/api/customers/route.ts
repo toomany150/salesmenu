@@ -103,26 +103,36 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // 소속공인중개사(AGENT)인 경우, 자신이 담당/등록/추가지정된 고객이 아니면 연락처 마스킹 처리
-    if (userRole === 'AGENT' && userName && !userName.includes('개업공인중개사')) {
-      customers = customers.map((cust) => {
+    const rawCanAccessAll = request.headers.get('x-user-can-access-all') || searchParams.get('canAccessAll');
+    let canAccessAllData = rawCanAccessAll === 'true' || rawCanAccessAll === '1';
+
+    // DB에서 사용자 특별 권한(canAccessAllData) 확인
+    if (!canAccessAllData && userId && userRole === 'AGENT') {
+      try {
+        const u = await prisma.user.findUnique({ where: { id: userId }, select: { canAccessAllData: true } });
+        if (u?.canAccessAllData) {
+          canAccessAllData = true;
+        }
+      } catch (e) {}
+    }
+
+    // 소속공인중개사(AGENT)인 경우:
+    // 특별 권한(canAccessAllData)이 없는 일반 소속 직원은 [본인 등록/담당 고객 + 사무실 공용 고객]만 조회 허용
+    // 타 직원의 개인 고객은 목록에서 완전히 제외
+    if (userRole === 'AGENT' && !canAccessAllData && userName && !userName.includes('개업공인중개사') && !userName.includes('대표')) {
+      customers = customers.filter((cust) => {
+        const isOfficeCustomer = 
+          !cust.managerName ||
+          cust.managerName.trim() === '' ||
+          cust.managerName.includes('사무실') ||
+          (Array.isArray(cust.assignedAgents) && (cust.assignedAgents.includes('사무실(공용)') || cust.assignedAgents.includes('사무실 (공용)') || cust.assignedAgents.includes('사무실')));
+
         const isMyCustomer = 
           (cust.managerName && (cust.managerName === userName || cust.managerName.includes(userName))) ||
           (cust.createdById && cust.createdById === userId) ||
-          (cust.managerName && cust.managerName.includes('사무실')) ||
-          (Array.isArray(cust.assignedAgents) && (cust.assignedAgents.includes(userName) || cust.assignedAgents.includes('사무실(공용)') || cust.assignedAgents.includes('사무실')));
+          (Array.isArray(cust.assignedAgents) && cust.assignedAgents.includes(userName));
 
-        if (!isMyCustomer) {
-          return {
-            ...cust,
-            phone: maskPhoneNumber(cust.phone),
-            isMasked: true,
-          };
-        }
-        return {
-          ...cust,
-          isMasked: false,
-        };
+        return isOfficeCustomer || isMyCustomer;
       });
     }
 

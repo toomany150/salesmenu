@@ -33,7 +33,7 @@ import {
 type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP' | 'ALL_CUSTOMERS' | 'CUSTOMER_SEARCH';
 
 const DashboardContent: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading: authLoading } = useAuth();
 
   // Main view state:
   // HOME: 깔끔한 대시보드 요약 화면 (중복 목록 미노출)
@@ -54,7 +54,15 @@ const DashboardContent: React.FC = () => {
       const user = JSON.parse(stored);
       if (!user || !user.id) return [];
       const deletedCustIds = getDeletedCustomerIds();
-      return getCustomCustomers().filter((c) => !deletedCustIds.includes(c.id));
+      let list = getCustomCustomers().filter((c) => !deletedCustIds.includes(c.id));
+      if (user.role === 'AGENT' && !user.canAccessAllData && user.name && !user.name.includes('개업공인중개사') && !user.name.includes('대표')) {
+        list = list.filter((c) => {
+          const isOffice = !c.managerName || c.managerName.trim() === '' || c.managerName.includes('사무실') || (Array.isArray(c.assignedAgents) && (c.assignedAgents.includes('사무실') || c.assignedAgents.includes('사무실 (공용)') || c.assignedAgents.includes('사무실(공용)')));
+          const isMine = (c.managerName && (c.managerName === user.name || c.managerName.includes(user.name))) || (c.createdById && c.createdById === user.id) || (Array.isArray(c.assignedAgents) && c.assignedAgents.includes(user.name));
+          return isOffice || isMine;
+        });
+      }
+      return list;
     } catch {
       return [];
     }
@@ -67,14 +75,24 @@ const DashboardContent: React.FC = () => {
       const user = JSON.parse(stored);
       if (!user || !user.id) return [];
       const deletedPropIds = getDeletedPropertyIds();
-      return getCustomProperties().filter(
+      let list = getCustomProperties().filter(
         (p) => !deletedPropIds.includes(p.id) && !deletedPropIds.includes(p.propertyNumber)
       );
+      if (user.role === 'AGENT' && !user.canAccessAllData && user.name && !user.name.includes('개업공인중개사') && !user.name.includes('대표')) {
+        list = list.filter((propItem: any) => {
+          const p = propItem;
+          const isOffice = !p.managerName || p.managerName.trim() === '' || p.managerName.includes('사무실') || (p.customer && (!p.customer.managerName || p.customer.managerName.trim() === '' || p.customer.managerName.includes('사무실'))) || (Array.isArray(p.assignedAgents) && (p.assignedAgents.includes('사무실') || p.assignedAgents.includes('사무실 (공용)') || p.assignedAgents.includes('사무실(공용)'))) || (p.customer && Array.isArray(p.customer.assignedAgents) && (p.customer.assignedAgents.includes('사무실') || p.customer.assignedAgents.includes('사무실 (공용)') || p.customer.assignedAgents.includes('사무실(공용)')));
+          const isMine = (p.managerName && (p.managerName === user.name || p.managerName.includes(user.name))) || (p.createdById && p.createdById === user.id) || (p.customer && p.customer.managerName && (p.customer.managerName === user.name || p.customer.managerName.includes(user.name))) || (p.customer && p.customer.createdById && p.customer.createdById === user.id) || (Array.isArray(p.assignedAgents) && p.assignedAgents.includes(user.name)) || (p.customer && Array.isArray(p.customer.assignedAgents) && p.customer.assignedAgents.includes(user.name));
+          return isOffice || isMine;
+        });
+      }
+      return list;
     } catch {
       return [];
     }
   });
   const [loading, setLoading] = useState(false);
+  const [isInitialLoaded, setIsInitialLoaded] = useState(false);
 
   // Modal States
   const [isPropertyRegOpen, setIsPropertyRegOpen] = useState(false);
@@ -140,24 +158,40 @@ const DashboardContent: React.FC = () => {
       (c) => !deletedCustIds.includes(c.id)
     );
 
-    // [성능 개선 - 즉시 렌더링 (SWR 패턴)]: 서버 API 응답을 몇 초간 기다리지 않고, 로컬 캐시를 0.01초 만에 즉시 화면에 띄움
-    if (localCustomProps.length > 0) {
-      localCustomProps.sort((a: any, b: any) => {
+    // 소속공인중개사(AGENT) 중 특별 권한이 없는 경우 로컬 캐시도 본인+공용으로 제한
+    let filteredLocalProps = localCustomProps;
+    let filteredLocalCusts = localCustomCusts;
+    if (user.role === 'AGENT' && !user.canAccessAllData && user.name && !user.name.includes('개업공인중개사') && !user.name.includes('대표')) {
+      filteredLocalProps = localCustomProps.filter((p: any) => {
+        const isOffice = !p.managerName || p.managerName.trim() === '' || p.managerName.includes('사무실') || (p.customer && (!p.customer.managerName || p.customer.managerName.trim() === '' || p.customer.managerName.includes('사무실'))) || (Array.isArray(p.assignedAgents) && (p.assignedAgents.includes('사무실') || p.assignedAgents.includes('사무실 (공용)') || p.assignedAgents.includes('사무실(공용)'))) || (p.customer && Array.isArray(p.customer.assignedAgents) && (p.customer.assignedAgents.includes('사무실') || p.customer.assignedAgents.includes('사무실 (공용)') || p.customer.assignedAgents.includes('사무실(공용)')));
+        const isMine = (p.managerName && (p.managerName === user.name || p.managerName.includes(user.name))) || (p.createdById && p.createdById === user.id) || (p.customer && p.customer.managerName && (p.customer.managerName === user.name || p.customer.managerName.includes(user.name))) || (p.customer && p.customer.createdById && p.customer.createdById === user.id) || (Array.isArray(p.assignedAgents) && p.assignedAgents.includes(user.name)) || (p.customer && Array.isArray(p.customer.assignedAgents) && p.customer.assignedAgents.includes(user.name));
+        return isOffice || isMine;
+      });
+      filteredLocalCusts = localCustomCusts.filter((c: any) => {
+        const isOffice = !c.managerName || c.managerName.trim() === '' || c.managerName.includes('사무실') || (Array.isArray(c.assignedAgents) && (c.assignedAgents.includes('사무실') || c.assignedAgents.includes('사무실 (공용)') || c.assignedAgents.includes('사무실(공용)')));
+        const isMine = (c.managerName && (c.managerName === user.name || c.managerName.includes(user.name))) || (c.createdById && c.createdById === user.id) || (Array.isArray(c.assignedAgents) && c.assignedAgents.includes(user.name));
+        return isOffice || isMine;
+      });
+    }
+
+    // [성능 개선 - 즉시 렌더링 (SWR 패턴)]: 서버 API 응답을 기다리지 않고, 로컬 캐시를 0ms 즉각 화면에 띄움
+    if (filteredLocalProps.length > 0) {
+      filteredLocalProps.sort((a: any, b: any) => {
         const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
         const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
         return tB - tA;
       });
-      setProperties((prev) => (prev.length === 0 ? localCustomProps : prev));
+      setProperties(filteredLocalProps);
     }
-    if (localCustomCusts.length > 0) {
-      localCustomCusts.sort((a: any, b: any) => {
+    if (filteredLocalCusts.length > 0) {
+      filteredLocalCusts.sort((a: any, b: any) => {
         const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
         const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
         const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
         const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
         return tB - tA;
       });
-      setCustomers((prev) => (prev.length === 0 ? localCustomCusts : prev));
+      setCustomers(filteredLocalCusts);
     }
 
     try {
@@ -165,6 +199,7 @@ const DashboardContent: React.FC = () => {
         'x-user-role': user.role,
         'x-user-id': user.id,
         'x-user-name': encodeURIComponent(user.name || ''),
+        'x-user-can-access-all': user.canAccessAllData ? 'true' : 'false',
       };
       const [custRes, propRes] = await Promise.all([
         fetch('/api/customers', { headers }),
@@ -219,11 +254,15 @@ const DashboardContent: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setIsInitialLoaded(true);
     }
   }, [currentUser]);
 
   // 로그인 상태 변화 시: 로그인하면 데이터 로드, 로그아웃하면 즉시 모든 데이터 비움 및 HOME 복귀
   useEffect(() => {
+    // 세션 복원 중일 때는 기존 캐시 데이터를 비우지 않고 대기 (첫 접속 시 0ms 즉시 렌더링 유지)
+    if (authLoading) return;
+
     if (currentUser) {
       fetchData();
     } else {
@@ -231,7 +270,7 @@ const DashboardContent: React.FC = () => {
       setProperties([]);
       setActiveTab('HOME');
     }
-  }, [currentUser, fetchData]);
+  }, [currentUser, authLoading, fetchData]);
 
   // 카카오톡/문자 공유 링크로 접속 시 매물 브리핑 화면 자동 연결 (고객 및 중개사 즉시 조회)
   useEffect(() => {
@@ -492,21 +531,28 @@ const DashboardContent: React.FC = () => {
               </div>
               <div className="flex items-baseline justify-between mt-2">
                 {currentUser ? (
-                  <div>
-                    <span className="text-2xl sm:text-3xl font-black text-emerald-900">
-                      {properties.length}<span className="text-sm font-normal text-emerald-700 ml-1">건</span>
-                    </span>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.2 rounded">
-                        진행 {availablePropertiesCount}
-                      </span>
-                      {contractedPropertiesCount > 0 && (
-                        <span className="text-[11px] font-extrabold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded border border-rose-300">
-                          ✓ 계약완료 {contractedPropertiesCount}
-                        </span>
-                      )}
+                  !isInitialLoaded ? (
+                    <div className="py-1">
+                      <div className="h-8 w-20 bg-emerald-200/80 rounded-lg animate-pulse mb-1.5" />
+                      <div className="h-3.5 w-24 bg-emerald-100 rounded animate-pulse" />
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      <span className="text-2xl sm:text-3xl font-black text-emerald-900">
+                        {properties.length}<span className="text-sm font-normal text-emerald-700 ml-1">건</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.2 rounded">
+                          진행 {availablePropertiesCount}
+                        </span>
+                        {contractedPropertiesCount > 0 && (
+                          <span className="text-[11px] font-extrabold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded border border-rose-300">
+                            ✓ 계약완료 {contractedPropertiesCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <span className="text-base sm:text-lg font-bold text-slate-400 flex items-center gap-1">
                     🔒 로그인 필요
@@ -620,7 +666,7 @@ const DashboardContent: React.FC = () => {
                 <Building2 className="w-4 h-4 text-emerald-500" />
                 <span>매물장 검색 (조건 필터)</span>
                 <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-200 text-slate-800">
-                  {currentUser ? `${properties.length}건` : '로그인 필요'}
+                  {currentUser ? (isInitialLoaded ? `${properties.length}건` : '로딩중') : '로그인 필요'}
                 </span>
               </button>
             </div>

@@ -29,6 +29,8 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
   const [isCompressing, setIsCompressing] = useState(false);
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
+  const [isUploadingR2, setIsUploadingR2] = useState(false);
+
   // Resize and compress image client-side to prevent memory/payload bloat
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -40,7 +42,6 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
           const maxHeight = 960;
           let width = img.width;
           let height = img.height;
-
           if (width > height) {
             if (width > maxWidth) {
               height = Math.round((height * maxWidth) / width);
@@ -89,11 +90,36 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
     }
 
     setIsCompressing(true);
+    let compressedList: string[] = [];
     try {
-      const compressedList = await Promise.all(
+      compressedList = await Promise.all(
         filesToProcess.map((file) => compressImage(file))
       );
-      onChange([...images, ...compressedList]);
+      // 1차로 로컬 미리보기 즉시 반영 (사용자 체감 속도 0초)
+      const currentListWithCompressed = [...images, ...compressedList];
+      onChange(currentListWithCompressed);
+
+      // 2차로 백그라운드에서 Cloudflare R2 버킷에 비동기 업로드
+      setIsUploadingR2(true);
+      try {
+        const uploadRes = await fetch('/api/upload/r2', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ images: compressedList }),
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.success && Array.isArray(uploadData.urls)) {
+            // R2 공개 URL로 교체 (기존 이미지 + 새로 업로드된 R2 URL들)
+            const finalImages = [...images, ...uploadData.urls];
+            onChange(finalImages);
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('R2 백그라운드 업로드 실패, base64 유지:', uploadErr);
+      } finally {
+        setIsUploadingR2(false);
+      }
     } catch (err) {
       console.error('Image compression failed:', err);
       setErrorNotice('사진 파일을 처리하는 중 오류가 발생했습니다.');
@@ -154,6 +180,12 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
               }`}>
                 {images.length} / {maxImages}장
               </span>
+              {isUploadingR2 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  R2 클라우드 저장 중...
+                </span>
+              )}
             </h4>
             <p className="text-[11px] text-slate-500">
               첫 번째 사진이 매물장의 [대표사진]으로 지정됩니다. (최대 20장 등록 가능)

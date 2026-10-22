@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
           role: true,
           phone: true,
           isActive: true,
+          canAccessAllData: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
         role: u.role,
         phone: u.phone,
         isActive: u.isActive,
+        canAccessAllData: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       }));
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
   try {
     await ensureDatabaseSchema();
     const body = await request.json();
-    const { username, password, name, role, phone, isActive, adminUser } = body;
+    const { username, password, name, role, phone, isActive, canAccessAllData, adminUser } = body;
     const headerRole = request.headers.get('x-user-role');
 
     // 관리자(대표) 권한 확인: 헤더 또는 adminUser 정보 확인
@@ -106,6 +108,7 @@ export async function POST(request: NextRequest) {
         role: role === 'ADMIN' ? 'ADMIN' : 'AGENT',
         phone: phone?.trim() || null,
         isActive: isActive !== false,
+        canAccessAllData: Boolean(canAccessAllData),
       },
     });
 
@@ -138,7 +141,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, password, name, phone, isActive, adminUser } = body;
+    const { id, password, name, phone, isActive, canAccessAllData, adminUser } = body;
     const headerRole = request.headers.get('x-user-role');
 
     const isAuthorizedAdmin = 
@@ -165,6 +168,7 @@ export async function PUT(request: NextRequest) {
         ...(password ? { password: password.trim() } : {}),
         ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
         ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+        ...(canAccessAllData !== undefined ? { canAccessAllData: Boolean(canAccessAllData) } : {}),
       },
     });
 

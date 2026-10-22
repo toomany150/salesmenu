@@ -23,6 +23,13 @@ import {
 import { PublicBuildingLedgerResult, PublicBuildingFloorInfo, PublicBuildingUnitInfo } from '@/lib/types';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
 
+export interface PublicFloorSelectionSummary {
+  totalArea: number;
+  totalAreaPyeong: number;
+  floorText: string;
+  useText: string;
+}
+
 interface PublicDataFetcherProps {
   roadAddress: string;
   jibunAddress: string;
@@ -31,6 +38,7 @@ interface PublicDataFetcherProps {
   onAddressChange: (road: string, jibun: string) => void;
   onApplyData: (data: PublicBuildingLedgerResult) => void;
   onSelectFloor?: (floor: PublicBuildingFloorInfo) => void;
+  onSelectFloors?: (floors: PublicBuildingFloorInfo[], summary: PublicFloorSelectionSummary) => void;
   onSelectUnit?: (unit: PublicBuildingUnitInfo) => void;
 }
 
@@ -42,6 +50,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   onAddressChange,
   onApplyData,
   onSelectFloor,
+  onSelectFloors,
   onSelectUnit,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -50,6 +59,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedFloorName, setSelectedFloorName] = useState<string | null>(null);
   const [selectedFloorKey, setSelectedFloorKey] = useState<string | null>(null);
+  const [selectedFloorKeys, setSelectedFloorKeys] = useState<string[]>([]);
   // 집합건물 전유부(동/호수) 선택 상태
   const [selectedDong, setSelectedDong] = useState<string>('');
   const [selectedUnitKey, setSelectedUnitKey] = useState<string | null>(null);
@@ -458,6 +468,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setErrorMsg(null);
     setSelectedFloorName(null);
     setSelectedFloorKey(null);
+    setSelectedFloorKeys([]);
     setSelectedUnitKey(null);
     setSelectedDong('');
     setDongSearchQuery('');
@@ -466,10 +477,55 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   };
 
   const handleFloorClick = (floorInfo: PublicBuildingFloorInfo, uniqueKey: string) => {
-    setSelectedFloorName(floorInfo.floor);
-    setSelectedFloorKey(uniqueKey);
+    let nextKeys: string[];
+    if (selectedFloorKeys.includes(uniqueKey)) {
+      nextKeys = selectedFloorKeys.filter((k) => k !== uniqueKey);
+    } else {
+      nextKeys = [...selectedFloorKeys, uniqueKey];
+    }
+    setSelectedFloorKeys(nextKeys);
+    setSelectedFloorKey(nextKeys[nextKeys.length - 1] || null);
+
+    const allFloors = fetchedData?.floorList || [];
+    const chosenFloors = allFloors.filter((f, idx) => {
+      const key = `${f.floor}_${f.mainUse || ''}_${f.area}_${idx}`;
+      return nextKeys.includes(key);
+    });
+
+    if (chosenFloors.length === 0) {
+      setSelectedFloorName(null);
+      if (onSelectFloors) {
+        onSelectFloors([], { totalArea: 0, totalAreaPyeong: 0, floorText: '', useText: '' });
+      }
+      return;
+    }
+
+    const totalArea = +chosenFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0).toFixed(2);
+    const totalAreaPyeong = +(totalArea * 0.3025).toFixed(2);
+
+    // 층수 중복 제거 및 연결 (예: "1층, 2층")
+    const floorNames = Array.from(new Set(chosenFloors.map((f) => f.floor)));
+    const floorText = floorNames.join(', ');
+    setSelectedFloorName(floorText);
+
+    // 용도 중복 제거 및 연결 (예: "금융업소, 휴게음식점")
+    const useList = Array.from(new Set(chosenFloors.map((f) => f.mainUse || f.etcUse).filter(Boolean)));
+    const useText = useList.join(', ');
+
+    if (onSelectFloors) {
+      onSelectFloors(chosenFloors, { totalArea, totalAreaPyeong, floorText, useText });
+    }
     if (onSelectFloor) {
-      onSelectFloor(floorInfo);
+      onSelectFloor(chosenFloors[chosenFloors.length - 1]);
+    }
+  };
+
+  const handleClearFloorSelection = () => {
+    setSelectedFloorKeys([]);
+    setSelectedFloorKey(null);
+    setSelectedFloorName(null);
+    if (onSelectFloors) {
+      onSelectFloors([], { totalArea: 0, totalAreaPyeong: 0, floorText: '', useText: '' });
     }
   };
 
@@ -1251,16 +1307,66 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
 
           {/* 4. 층수에 따른 용도 및 면적 전체 표시 (층별개요: 일반 상가/사무실/단독 건물에서만 표시, 아파트 등 집합건물은 호실 선택 체계이므로 제외) */}
           {fetchedData.floorList && fetchedData.floorList.length > 0 && !fetchedData.isCollectiveBuilding && propertyType !== 'APARTMENT' && (
-            <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+            <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-3.5 space-y-3">
               <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 flex-wrap gap-1">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                   <Layers className="w-4 h-4 text-blue-600" />
                   층수에 따른 용도 및 면적 현황 (대장상 층별개요)
                 </span>
                 <span className="text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-semibold">
-                  💡 층을 클릭하면 아래 매물 폼의 해당층수·대장상면적·주용도가 자동 반영됩니다.
+                  💡 층을 클릭하면 여러 곳(1층 복수 구획, 1층+2층 등) 다중 선택이 가능하며 면적 합계가 자동 반영됩니다.
                 </span>
               </div>
+
+              {/* 다중 선택 시 선택된 구획 목록 및 합산 면적 실시간 요약 바 */}
+              {selectedFloorKeys.length > 0 && (() => {
+                const chosenFloors = (fetchedData.floorList || []).filter((f, idx) => {
+                  const key = `${f.floor}_${f.mainUse || ''}_${f.area}_${idx}`;
+                  return selectedFloorKeys.includes(key);
+                });
+                const sumArea = +chosenFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0).toFixed(2);
+                const sumPyeong = +(sumArea * 0.3025).toFixed(2);
+                const floorText = Array.from(new Set(chosenFloors.map((f) => f.floor))).join(', ');
+                const useText = Array.from(new Set(chosenFloors.map((f) => f.mainUse || f.etcUse).filter(Boolean))).join(', ');
+
+                return (
+                  <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-xl p-3 shadow-md border border-blue-400 flex flex-wrap items-center justify-between gap-2.5 animate-in fade-in duration-150">
+                    <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                      <span className="font-black bg-white text-blue-900 px-2.5 py-0.5 rounded-lg text-xs shadow-2xs">
+                        선택 {selectedFloorKeys.length}개 구획
+                      </span>
+                      <span className="font-extrabold text-blue-100">
+                        선택 층수: <span className="text-white font-black underline underline-offset-2">{floorText}</span>
+                      </span>
+                      <span className="text-blue-300">|</span>
+                      <span className="font-bold text-blue-100">
+                        선택 면적 합계: <span className="text-yellow-300 font-black text-sm tracking-wide">{sumArea} ㎡</span>
+                        <span className="ml-1 text-blue-100 font-semibold">(약 {sumPyeong}평)</span>
+                      </span>
+                      {useText && (
+                        <>
+                          <span className="text-blue-300">|</span>
+                          <span className="font-medium text-blue-100">
+                            주용도: <span className="text-white font-bold">{useText}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <span className="text-[11px] text-blue-100 font-medium hidden sm:inline">
+                        ✓ 매물 폼에 자동 반영 완료
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearFloorSelection}
+                        className="text-xs font-bold bg-white/20 hover:bg-white/30 active:scale-95 text-white px-2.5 py-1 rounded-lg transition-all cursor-pointer border border-white/30"
+                      >
+                        ✕ 전체 해제
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {[...fetchedData.floorList]
@@ -1285,26 +1391,43 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                   })
                   .map((item, idx) => {
                   const itemKey = `${item.floor}_${item.mainUse || ''}_${item.area}_${idx}`;
-                  const isSelected = selectedFloorKey === itemKey;
+                  const isSelected = selectedFloorKeys.includes(itemKey);
                   return (
                     <div
                       key={itemKey}
                       onClick={() => handleFloorClick(item, itemKey)}
-                      className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
+                      className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex flex-col justify-between ${
                         isSelected
-                          ? 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-300 shadow-xs'
+                          ? 'bg-blue-50/95 border-blue-600 ring-2 ring-blue-400 shadow-sm'
                           : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/30 shadow-2xs'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-black text-xs px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 border border-blue-200">
-                          {item.floor}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-black text-xs px-2 py-0.5 rounded-md border ${
+                            isSelected 
+                              ? 'bg-blue-600 text-white border-blue-600' 
+                              : 'bg-blue-100 text-blue-800 border-blue-200'
+                          }`}>
+                            {item.floor}
+                          </span>
+                          {isSelected && (
+                            <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded">
+                              선택됨
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-xs font-black text-slate-900">
+                          <span className={`text-xs font-black ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
                             {item.area} ㎡
                           </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 stroke-[3]" />}
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all ${
+                            isSelected 
+                              ? 'bg-blue-600 border-blue-600 text-white' 
+                              : 'border-slate-300 text-transparent'
+                          }`}>
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </span>
                         </div>
                       </div>
                       <div className="text-xs text-slate-900 font-bold break-keep leading-tight">

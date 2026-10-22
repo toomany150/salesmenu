@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma, ensureDatabaseSchema } from '@/lib/prisma';
 import { INITIAL_PROPERTIES } from '@/lib/mockData';
 import { recordAccessLog, maskPhoneNumber } from '@/lib/auth';
+import { uploadMultipleBase64ToR2 } from '@/lib/r2';
 
-function formatPropertyOutput(p: any) {
+function formatPropertyOutput(p: any, options: { fullPhotos?: boolean } = { fullPhotos: true }) {
   if (!p) return p;
   let parsedImages: string[] = [];
   if (p.images) {
@@ -15,6 +16,10 @@ function formatPropertyOutput(p: any) {
       parsedImages = [];
     }
   }
+  const totalPhotoCount = parsedImages.length;
+  // 목록 조회 시 대표사진 1장만 반환하여 속도 극대화, 상세 조회 시 전체 사진 반환
+  const returnedImages = options.fullPhotos ? parsedImages : parsedImages.slice(0, 1);
+
   let parsedAssignedAgents: string[] = [];
   if (p.assignedAgents) {
     try {
@@ -80,7 +85,9 @@ function formatPropertyOutput(p: any) {
     purchasePrice: p.purchasePrice || undefined,
     currentMarketPrice: p.currentMarketPrice || undefined,
     marketPriceBasis: p.marketPriceBasis || undefined,
-    images: parsedImages,
+    images: returnedImages,
+    photoCount: totalPhotoCount,
+    allPhotosLoaded: options.fullPhotos || totalPhotoCount <= 1,
     assignedAgents: parsedAssignedAgents,
   };
 }
@@ -220,38 +227,48 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    let formattedProperties = properties.map(formatPropertyOutput);
+    const fullPhotosParam = searchParams.get('fullPhotos');
+    // 단건 상세 조회(propertyIdParam 있음)이거나 명시적으로 fullPhotos=true인 경우 전체 사진 반환
+    // 전체 목록 조회 시에는 fullPhotos=false로 대표사진(1장)만 반환하여 속도를 수십 배 향상
+    const shouldLoadFullPhotos = !!propertyIdParam || fullPhotosParam === 'true';
 
-    // 소속공인중개사(AGENT)인 경우, 자신이 등록/담당한 매물 또는 사무실 매물이 아니면 고객 연락처 마스킹
-    if (userRole === 'AGENT' && userName && !userName.includes('개업공인중개사')) {
-      formattedProperties = formattedProperties.map((p: any) => {
-        if (!p.customer || !p.customer.phone) return p;
+    let formattedProperties = properties.map((p: any) => formatPropertyOutput(p, { fullPhotos: shouldLoadFullPhotos }));
 
+    const rawCanAccessAll = request.headers.get('x-user-can-access-all') || searchParams.get('canAccessAll');
+    let canAccessAllData = rawCanAccessAll === 'true' || rawCanAccessAll === '1';
+
+    // DB에서 사용자 특별 권한(canAccessAllData) 확인
+    if (!canAccessAllData && userId && userRole === 'AGENT') {
+      try {
+        const u = await prisma.user.findUnique({ where: { id: userId }, select: { canAccessAllData: true } });
+        if (u?.canAccessAllData) {
+          canAccessAllData = true;
+        }
+      } catch (e) {}
+    }
+
+    // 소속공인중개사(AGENT)인 경우:
+    // 특별 권한(canAccessAllData)이 없는 일반 소속 직원은 [본인 등록/담당 물건 + 사무실 공용 물건]만 조회 허용
+    // 타 직원의 개인 물건은 목록에서 완전히 제외
+    if (userRole === 'AGENT' && !canAccessAllData && userName && !userName.includes('개업공인중개사') && !userName.includes('대표')) {
+      formattedProperties = formattedProperties.filter((p: any) => {
         const isOffice = 
-          (p.managerName && p.managerName.includes('사무실')) ||
-          (p.customer.managerName && p.customer.managerName.includes('사무실')) ||
-          (Array.isArray(p.assignedAgents) && (p.assignedAgents.includes('사무실') || p.assignedAgents.includes('사무실 (공용)'))) ||
-          (Array.isArray(p.customer.assignedAgents) && (p.customer.assignedAgents.includes('사무실') || p.customer.assignedAgents.includes('사무실 (공용)')));
+          !p.managerName ||
+          p.managerName.trim() === '' ||
+          p.managerName.includes('사무실') ||
+          (p.customer && (!p.customer.managerName || p.customer.managerName.trim() === '' || p.customer.managerName.includes('사무실'))) ||
+          (Array.isArray(p.assignedAgents) && (p.assignedAgents.includes('사무실') || p.assignedAgents.includes('사무실 (공용)') || p.assignedAgents.includes('사무실(공용)'))) ||
+          (p.customer && Array.isArray(p.customer.assignedAgents) && (p.customer.assignedAgents.includes('사무실') || p.customer.assignedAgents.includes('사무실 (공용)') || p.customer.assignedAgents.includes('사무실(공용)')));
 
         const isMine =
           (p.managerName && (p.managerName === userName || p.managerName.includes(userName))) ||
           (p.createdById && p.createdById === userId) ||
-          (p.customer.managerName && (p.customer.managerName === userName || p.customer.managerName.includes(userName))) ||
-          (p.customer.createdById && p.customer.createdById === userId) ||
+          (p.customer && p.customer.managerName && (p.customer.managerName === userName || p.customer.managerName.includes(userName))) ||
+          (p.customer && p.customer.createdById && p.customer.createdById === userId) ||
           (Array.isArray(p.assignedAgents) && p.assignedAgents.includes(userName)) ||
-          (Array.isArray(p.customer.assignedAgents) && p.customer.assignedAgents.includes(userName));
+          (p.customer && Array.isArray(p.customer.assignedAgents) && p.customer.assignedAgents.includes(userName));
 
-        if (!isOffice && !isMine) {
-          return {
-            ...p,
-            customer: {
-              ...p.customer,
-              phone: maskPhoneNumber(p.customer.phone),
-              isMasked: true,
-            },
-          };
-        }
-        return p;
+        return isOffice || isMine;
       });
     }
 
@@ -479,6 +496,16 @@ export async function POST(request: NextRequest) {
               ? parseFloat(storeDetail.negotiablePremium)
               : prem));
 
+    // Cloudflare R2 자동 업로드 (base64 이미지가 포함되어 있을 경우 영구 R2 URL로 자동 변환)
+    let processedImages = images;
+    if (Array.isArray(images) && images.some((img: string) => typeof img === 'string' && img.startsWith('data:image/'))) {
+      try {
+        processedImages = await uploadMultipleBase64ToR2(images);
+      } catch (r2Err) {
+        console.warn('[R2 Server Upload Warning in POST]', r2Err);
+      }
+    }
+
     const newProperty = await prisma.property.create({
       data: {
         propertyNumber,
@@ -489,7 +516,7 @@ export async function POST(request: NextRequest) {
         address,
         roadAddress: roadAddress || null,
         jibunAddress: jibunAddress || null,
-        images: images ? (Array.isArray(images) ? JSON.stringify(images) : images) : null,
+        images: processedImages ? (Array.isArray(processedImages) ? JSON.stringify(processedImages) : processedImages) : null,
         detailAddress,
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
@@ -999,6 +1026,16 @@ export async function PUT(request: NextRequest) {
               ? (storeDetail.negotiablePremium !== null ? parseFloat(storeDetail.negotiablePremium) : null)
               : (prem !== undefined ? prem : undefined)));
 
+    // Cloudflare R2 자동 업로드 (base64 이미지가 포함되어 있을 경우 영구 R2 URL로 자동 변환)
+    let processedPutImages = images;
+    if (images !== undefined && Array.isArray(images) && images.some((img: string) => typeof img === 'string' && img.startsWith('data:image/'))) {
+      try {
+        processedPutImages = await uploadMultipleBase64ToR2(images);
+      } catch (r2Err) {
+        console.warn('[R2 Server Upload Warning in PUT]', r2Err);
+      }
+    }
+
     const updatedProperty = await prisma.property.update({
       where: { id: targetId },
       data: {
@@ -1010,7 +1047,7 @@ export async function PUT(request: NextRequest) {
         address: address || undefined,
         roadAddress: roadAddress !== undefined ? roadAddress : undefined,
         jibunAddress: jibunAddress !== undefined ? jibunAddress : undefined,
-        images: images !== undefined ? (Array.isArray(images) ? JSON.stringify(images) : images) : undefined,
+        images: processedPutImages !== undefined ? (Array.isArray(processedPutImages) ? JSON.stringify(processedPutImages) : processedPutImages) : undefined,
         detailAddress: detailAddress !== undefined ? detailAddress : undefined,
         latitude: latitude !== undefined ? (latitude ? parseFloat(latitude) : null) : undefined,
         longitude: longitude !== undefined ? (longitude ? parseFloat(longitude) : null) : undefined,

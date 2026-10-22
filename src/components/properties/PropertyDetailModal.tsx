@@ -63,6 +63,29 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [copiedAddressType, setCopiedAddressType] = useState<'road' | 'jibun' | null>(null);
   const [downloadSuccessType, setDownloadSuccessType] = useState<'single' | 'all' | null>(null);
   const [isPhotoDownloadModalOpen, setIsPhotoDownloadModalOpen] = useState(false);
+  const [fullImages, setFullImages] = useState<string[] | null>(null);
+  const [isLoadingFullPhotos, setIsLoadingFullPhotos] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen && property) {
+      setFullImages(null);
+      const photoCount = property.photoCount || (property.images ? property.images.length : 0);
+      const currentlyLoaded = property.images ? property.images.length : 0;
+      if (photoCount > currentlyLoaded) {
+        setIsLoadingFullPhotos(true);
+        fetch(`/api/properties?id=${property.id}&fullPhotos=true`)
+          .then((res) => res.json())
+          .then((data) => {
+            const item = Array.isArray(data) ? data[0] : data;
+            if (item && Array.isArray(item.images) && item.images.length > 0) {
+              setFullImages(item.images);
+            }
+          })
+          .catch((err) => console.warn('전체 사진 추가 조회 실패:', err))
+          .finally(() => setIsLoadingFullPhotos(false));
+      }
+    }
+  }, [isOpen, property?.id]);
 
   const handleCopyPropertyAddress = (text: string, type: 'road' | 'jibun') => {
     if (!text) return;
@@ -135,7 +158,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     }
   };
 
-  const images = property.images && property.images.length > 0 ? property.images : [];
+  const images = fullImages || (property.images && property.images.length > 0 ? property.images : []);
   const currentPhotoIndex = activePhotoIndex < images.length ? activePhotoIndex : 0;
   const statusInfo = STATUS_LABELS[property.status] || { label: property.status, color: 'bg-slate-100 text-slate-800' };
 
@@ -1734,7 +1757,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
       {/* Share & Address Disclosure Options Modal */}
       <SharePropertyModal
-        property={property}
+        property={fullImages ? { ...property, images: fullImages } : property}
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
       />

@@ -23,6 +23,7 @@ model User {
   role        String      @default("AGENT") // ADMIN (대표/개발자) 또는 AGENT (소속공인중개사)
   phone       String?     // 연락처
   isActive    Boolean     @default(true)
+  canAccessAllData Boolean @default(false)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 

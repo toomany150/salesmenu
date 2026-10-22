@@ -28,8 +28,28 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<UserItem | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<UserItem | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = localStorage.getItem('cham_real_estate_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) return parsed;
+      }
+    } catch (e) {}
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const stored = localStorage.getItem('cham_real_estate_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) return false;
+      }
+    } catch (e) {}
+    return false;
+  });
   const [availableAgents, setAvailableAgents] = useState<string[]>([
     '개업공인중개사 (대표)',
   ]);
@@ -72,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updatedAt: new Date().toISOString(),
   };
 
-  // 초기 로드 시 localStorage에서 세션 복원 (처음 접속 시에는 로그아웃된 상태로 시작)
+  // 초기 로드 시 localStorage에서 세션 복원 및 유효성 확인
   useEffect(() => {
     try {
       const stored = localStorage.getItem('cham_real_estate_user');
@@ -84,7 +104,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentUser(null);
         }
       } else {
-        // 처음 접속 시 로그아웃된 상태
         setCurrentUser(null);
       }
     } catch (e) {
@@ -176,6 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: matched.role || 'AGENT',
                 phone: matched.phone || null,
                 isActive: matched.isActive !== false,
+                canAccessAllData: Boolean(matched.canAccessAllData),
                 createdAt: matched.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               };
@@ -209,6 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 role: matched.role || 'AGENT',
                 phone: matched.phone || null,
                 isActive: matched.isActive !== false,
+                canAccessAllData: Boolean(matched.canAccessAllData),
                 createdAt: matched.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               };

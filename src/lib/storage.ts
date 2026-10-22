@@ -24,23 +24,51 @@ export function getCustomProperties(): PropertyItem[] {
 }
 
 /**
+ * 브라우저 localStorage 5MB 용량 한도 초과(QuotaExceededError) 방지 헬퍼
+ * - 수 메가바이트의 base64 고용량 이미지로 인해 25~26개 전체 매물 저장이 실패하고
+ *   과거 14개만 캐시에 남는 현상을 원천 방지합니다.
+ * - 메타데이터(금액, 면적, 주소, 상세 스펙 등)는 100% 온전히 보존하며, 50KB 이하의 첫 썸네일만 남깁니다.
+ */
+function sanitizePropertyForStorage(p: PropertyItem, keepOneThumb = true): PropertyItem {
+  if (!p) return p;
+  let safeImages: string[] = [];
+  if (keepOneThumb && Array.isArray(p.images) && p.images.length > 0) {
+    const firstImg = p.images[0];
+    if (typeof firstImg === 'string' && firstImg.length < 50000) {
+      safeImages = [firstImg];
+    }
+  }
+  return {
+    ...p,
+    images: safeImages,
+  };
+}
+
+/**
  * 2. 매물 신규 저장 또는 수정 시 로컬스토리지에 안전하게 영구 보존
  */
 export function saveCustomProperty(property: PropertyItem): void {
   if (typeof window === 'undefined' || !property) return;
   try {
     const list = getCustomProperties();
+    const cleanProp = sanitizePropertyForStorage(property, true);
     const idx = list.findIndex(
       (p) => (property.id && p.id === property.id) || (property.propertyNumber && p.propertyNumber === property.propertyNumber)
     );
 
     if (idx >= 0) {
-      list[idx] = { ...list[idx], ...property };
+      list[idx] = { ...list[idx], ...cleanProp };
     } else {
-      list.unshift(property);
+      list.unshift(cleanProp);
     }
 
-    localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(list));
+    try {
+      localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(list));
+    } catch (e) {
+      // 5MB 용량 초과 시 이미지 완전 제외 순수 메타데이터로 100% 저장 보장
+      const pureList = list.map((p) => sanitizePropertyForStorage(p, false));
+      localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(pureList));
+    }
 
     // 혹시 삭제 목록에 들어있었다면 복원
     const deletedIds = getDeletedPropertyIds();
@@ -86,13 +114,23 @@ export function getDeletedPropertyIds(): string[] {
 
 /**
  * 서버 최신 매물 목록으로 로컬 캐시 동기화
+ * (모든 매물의 메타데이터가 100% 안전하게 로컬에 보존되어 다음 접속 시에도 0ms 즉시 온전한 개수로 렌더링)
  */
 export function setCustomProperties(list: PropertyItem[]): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !Array.isArray(list)) return;
   try {
-    localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(list));
+    // 1차 시도: 썸네일 포함 경량화 목록 저장
+    const sanitized = list.map((p) => sanitizePropertyForStorage(p, true));
+    localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(sanitized));
   } catch (err) {
-    console.error('Failed to set custom properties to localStorage:', err);
+    console.warn('Quota exceeded with thumbnails, falling back to pure metadata cache:', err);
+    try {
+      // 2차 시도: 이미지 완전 제외 순수 메타데이터로 100% 저장 보장 (수백 개 매물도 수십 KB로 저장 가능)
+      const pureMeta = list.map((p) => sanitizePropertyForStorage(p, false));
+      localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(pureMeta));
+    } catch (fallbackErr) {
+      console.error('Failed to set custom properties to localStorage:', fallbackErr);
+    }
   }
 }
 

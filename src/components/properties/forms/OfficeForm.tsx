@@ -289,9 +289,9 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
               </label>
               <input
                 type="number"
-                value={data.roomCount || ''}
-                onChange={(e) => updateField('roomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                placeholder="예: 3 (유리 칸막이 룸)"
+                value={data.roomCount !== undefined && data.roomCount !== null ? data.roomCount : ''}
+                onChange={(e) => updateField('roomCount', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                placeholder="예: 0 (오픈형) 또는 3개"
                 className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white font-bold text-slate-900"
               />
             </div>
@@ -302,9 +302,9 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
               </label>
               <input
                 type="number"
-                value={data.bathroomCount || ''}
-                onChange={(e) => updateField('bathroomCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                placeholder="예: 2 (외부 층별/내부)"
+                value={data.bathroomCount !== undefined && data.bathroomCount !== null ? data.bathroomCount : ''}
+                onChange={(e) => updateField('bathroomCount', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                placeholder="예: 1 또는 2"
                 className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white font-bold text-slate-900"
               />
             </div>
@@ -363,8 +363,8 @@ export const OfficeForm: React.FC<OfficeFormProps> = ({ data, onChange }) => {
                 <input
                   type="number"
                   disabled={data.isParkingImpossible}
-                  value={data.isParkingImpossible ? 0 : (data.parkingCount || '')}
-                  onChange={(e) => updateField('parkingCount', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                  value={data.isParkingImpossible ? 0 : (data.parkingCount !== undefined && data.parkingCount !== null ? data.parkingCount : '')}
+                  onChange={(e) => updateField('parkingCount', e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
                   placeholder={data.isParkingImpossible ? '주차 불가' : '무료 배정 대수 (예: 무료 2대)'}
                   className={`w-full text-sm px-3.5 py-2.5 border rounded-xl font-bold ${
                     data.isParkingImpossible

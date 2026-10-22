@@ -315,8 +315,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           if (!initialStore.buildingArea) initialStore.buildingArea = 112.8;
           if (!initialStore.buildingUse) initialStore.buildingUse = '제1종근린생활시설';
           if (!initialStore.approvalDate) initialStore.approvalDate = '1987-04-09';
-          if (!initialStore.roomCount) initialStore.roomCount = 1;
-          if (!initialStore.bathroomCount) initialStore.bathroomCount = 1;
+          if (initialStore.roomCount === undefined || initialStore.roomCount === null) initialStore.roomCount = 1;
+          if (initialStore.bathroomCount === undefined || initialStore.bathroomCount === null) initialStore.bathroomCount = 1;
           if (!initialStore.toiletGenderType) initialStore.toiletGenderType = '남녀공용(내부)';
           if (!initialStore.electricityCapacity) initialStore.electricityCapacity = '15kW';
           if (!initialStore.electricityType) initialStore.electricityType = '개별계량기';
@@ -660,7 +660,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     syncFloorFromDetailAddress(val, ledgerData);
   };
 
-  // 대장상 층수 클릭 시 해당층수, 대장상면적, 대장상주용도 자동 입력 (수정 가능)
+  // 대장상 층수 단일 클릭 시 자동 입력 (호환성 유지)
   const handleSelectFloorFromLedger = (floorInfo: PublicBuildingFloorInfo) => {
     setDetailAddress(floorInfo.floor);
     const pyeong = +(floorInfo.area * 0.3025).toFixed(2);
@@ -690,6 +690,50 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         currentFloor: floorInfo.floor,
         buildingArea: floorInfo.area,
         buildingUse: floorInfo.mainUse,
+      }));
+    }
+  };
+
+  // 대장상 층수 다중 선택 시 해당층수, 대장상면적 합계, 주용도 자동 입력 (수정 가능)
+  const handleSelectFloorsFromLedger = (
+    floors: PublicBuildingFloorInfo[],
+    summary: { totalArea: number; totalAreaPyeong: number; floorText: string; useText: string }
+  ) => {
+    if (!floors || floors.length === 0) return;
+
+    setDetailAddress(summary.floorText);
+    if (propertyType === 'STORE') {
+      setStoreData((prev: any) => ({
+        ...prev,
+        currentFloor: summary.floorText,
+        buildingArea: summary.totalArea,
+        buildingAreaPyeong: summary.totalAreaPyeong,
+        buildingUse: summary.useText || prev.buildingUse,
+        actualArea: summary.totalArea, // 다중 선택 시 실평수 초기값도 선택 면적 합계로 즉시 갱신
+        actualAreaPyeong: summary.totalAreaPyeong,
+      }));
+    } else if (propertyType === 'OFFICE') {
+      setOfficeData((prev: any) => ({
+        ...prev,
+        currentFloor: summary.floorText,
+        buildingArea: summary.totalArea,
+        buildingAreaPyeong: summary.totalAreaPyeong,
+        buildingUse: summary.useText || prev.buildingUse,
+        actualArea: summary.totalArea,
+        actualAreaPyeong: summary.totalAreaPyeong,
+      }));
+    } else if (propertyType === 'HOUSE') {
+      setHouseData((prev: any) => ({
+        ...prev,
+        currentFloor: summary.floorText,
+        buildingArea: summary.totalArea,
+        buildingUse: summary.useText || prev.buildingUse,
+      }));
+    } else if (propertyType === 'APARTMENT') {
+      setApartmentData((prev: any) => ({
+        ...prev,
+        currentFloor: summary.floorText,
+        supplyArea: summary.totalArea,
       }));
     }
   };
@@ -1261,6 +1305,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   }}
                   onApplyData={handleApplyPublicData}
                   onSelectFloor={handleSelectFloorFromLedger}
+                  onSelectFloors={handleSelectFloorsFromLedger}
                   onSelectUnit={handleSelectUnitFromLedger}
                 />
 

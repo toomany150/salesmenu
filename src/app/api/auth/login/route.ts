@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
         name: user.name,
         role: user.role,
         phone: user.phone,
+        canAccessAllData: Boolean((user as any).canAccessAllData),
       },
     });
   } catch (error: any) {
