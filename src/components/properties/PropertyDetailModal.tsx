@@ -281,12 +281,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
       return p ? (p.includes('평') ? p : `${p}평`) : null;
     }
     if (property.propertyType === 'HOUSE') {
-      const p = property.houseDetail?.exclusiveArea 
-        ? (property.houseDetail.exclusiveArea * 0.3025).toFixed(1) 
-        : (property.actualArea 
-            ? (property.actualArea * 0.3025).toFixed(1) 
-            : (property.totalFloorArea ? (property.totalFloorArea * 0.3025).toFixed(1) : null));
-      return p ? `${p}평` : null;
+      const p = property.houseDetail?.actualAreaPyeong || 
+        (property.houseDetail?.actualArea ? (property.houseDetail.actualArea * 0.3025).toFixed(1) : null) ||
+        (property.houseDetail?.buildingAreaPyeong) ||
+        (property.houseDetail?.buildingArea ? (property.houseDetail.buildingArea * 0.3025).toFixed(1) : null) ||
+        (property.houseDetail?.exclusiveArea ? (property.houseDetail.exclusiveArea * 0.3025).toFixed(1) : null) ||
+        (property.actualArea ? (property.actualArea * 0.3025).toFixed(1) : null) ||
+        (property.buildingArea ? (property.buildingArea * 0.3025).toFixed(1) : null) ||
+        (property.totalFloorArea ? (property.totalFloorArea * 0.3025).toFixed(1) : null);
+      return p ? (String(p).includes('평') ? p : `${p}평`) : null;
     }
     if (property.propertyType === 'LAND') {
       const p = (property.landDetail as any)?.landAreaPyeong || 
@@ -309,7 +312,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const actualAreaVal = property.actualArea || 
     property.storeDetail?.actualArea || 
     property.officeDetail?.actualArea || 
-    property.apartmentDetail?.exclusiveArea;
+    property.apartmentDetail?.exclusiveArea ||
+    property.houseDetail?.actualArea ||
+    property.houseDetail?.buildingArea;
   const actualAreaPyeong = actualAreaVal ? (actualAreaVal * 0.3025).toFixed(1) : null;
 
   const titleName =
@@ -1989,25 +1994,27 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <div>
                 <span className="text-[11px] text-slate-500 block">대지면적</span>
                 <span className="font-bold text-slate-900">
-                  {property.landArea ? `${property.landArea} ㎡` : '-'}
+                  {property.landArea ? `${property.landArea} ㎡` : (property.houseDetail?.landArea ? `${property.houseDetail.landArea} ㎡` : '-')}
                 </span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-500 block">연면적</span>
                 <span className="font-bold text-slate-900">
-                  {property.totalFloorArea ? `${property.totalFloorArea} ㎡` : '-'}
+                  {property.totalFloorArea ? `${property.totalFloorArea} ㎡` : (property.houseDetail?.totalFloorArea ? `${property.houseDetail.totalFloorArea} ㎡` : '-')}
                 </span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-500 block">대장상 주용도</span>
                 <span className="font-bold text-slate-900">
-                  {property.buildingRegisterUse || '-'}
+                  {property.buildingRegisterUse || property.houseDetail?.buildingUse || '-'}
                 </span>
               </div>
               <div>
                 <span className="text-[11px] text-slate-500 block">사용승인일</span>
                 <span className="font-bold text-slate-900">
-                  {property.approvalDate ? property.approvalDate.substring(0, 10) : '-'}
+                  {property.approvalDate 
+                    ? property.approvalDate.substring(0, 10) 
+                    : (property.houseDetail?.approvalDate ? String(property.houseDetail.approvalDate).substring(0, 10) : '-')}
                 </span>
               </div>
             </div>

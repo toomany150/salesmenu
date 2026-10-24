@@ -342,6 +342,65 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           if (!initialStore.adminActionChecked) initialStore.adminActionChecked = '행정처분 없음 (클린)';
         }
         setStoreData(initialStore);
+
+        // 주택(단독/다가구/다세대/빌라/원룸) 서브 데이터 완벽 복원 및 로드
+        const rawHouse = initialData.houseDetail ? { ...initialData.houseDetail } : {};
+        const bArea = rawHouse.buildingArea !== undefined && rawHouse.buildingArea !== null 
+          ? rawHouse.buildingArea 
+          : initialData.buildingArea;
+        const bAreaPyeong = rawHouse.buildingAreaPyeong !== undefined && rawHouse.buildingAreaPyeong !== null
+          ? rawHouse.buildingAreaPyeong 
+          : (bArea ? +(bArea * 0.3025).toFixed(2) : undefined);
+        const actArea = rawHouse.actualArea !== undefined && rawHouse.actualArea !== null 
+          ? rawHouse.actualArea 
+          : (rawHouse.exclusiveArea !== undefined && rawHouse.exclusiveArea !== null ? rawHouse.exclusiveArea : bArea);
+        const actAreaPyeong = rawHouse.actualAreaPyeong !== undefined && rawHouse.actualAreaPyeong !== null 
+          ? rawHouse.actualAreaPyeong 
+          : (actArea ? +(actArea * 0.3025).toFixed(2) : undefined);
+
+        const initialHouse: any = {
+          ...rawHouse,
+          totalFloors: rawHouse.totalFloors !== undefined && rawHouse.totalFloors !== null ? rawHouse.totalFloors : initialData.floorCount,
+          currentFloor: rawHouse.currentFloor || initialData.floorText || (initialData.floorCount ? `지상 ${initialData.floorCount}층` : undefined),
+          landArea: rawHouse.landArea !== undefined && rawHouse.landArea !== null ? rawHouse.landArea : initialData.landArea,
+          totalFloorArea: rawHouse.totalFloorArea !== undefined && rawHouse.totalFloorArea !== null ? rawHouse.totalFloorArea : initialData.totalFloorArea,
+          buildingArea: bArea,
+          buildingAreaPyeong: bAreaPyeong,
+          actualArea: actArea,
+          actualAreaPyeong: actAreaPyeong,
+          buildingUse: rawHouse.buildingUse || initialData.buildingRegisterUse,
+          zoningArea: rawHouse.zoningArea || initialData.zoningArea,
+          structure: rawHouse.structure || initialData.structureName,
+          approvalDate: (() => {
+            const dateVal = rawHouse.approvalDate || initialData.approvalDate;
+            if (!dateVal) return undefined;
+            if ((dateVal as any) instanceof Date) return (dateVal as any).toISOString().substring(0, 10);
+            const str = String(dateVal);
+            if (str.includes('T')) return str.substring(0, 10);
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10);
+            const d = new Date(str);
+            return !isNaN(d.getTime()) ? d.toISOString().substring(0, 10) : str.substring(0, 10);
+          })(),
+          roomCount: rawHouse.roomCount !== undefined && rawHouse.roomCount !== null ? rawHouse.roomCount : undefined,
+          bathroomCount: rawHouse.bathroomCount !== undefined && rawHouse.bathroomCount !== null ? rawHouse.bathroomCount : undefined,
+          parkingCount: rawHouse.parkingCount !== undefined && rawHouse.parkingCount !== null ? rawHouse.parkingCount : undefined,
+          heatingType: rawHouse.heatingType || undefined,
+          currentLeaseStatus: rawHouse.currentLeaseStatus || undefined,
+          maintenanceFeeCommon: rawHouse.maintenanceFeeCommon !== undefined && rawHouse.maintenanceFeeCommon !== null ? rawHouse.maintenanceFeeCommon : undefined,
+          maintenanceFeeWater: rawHouse.maintenanceFeeWater !== undefined && rawHouse.maintenanceFeeWater !== null ? rawHouse.maintenanceFeeWater : undefined,
+          maintenanceFeeElectricity: rawHouse.maintenanceFeeElectricity !== undefined && rawHouse.maintenanceFeeElectricity !== null ? rawHouse.maintenanceFeeElectricity : undefined,
+          maintenanceFeeGas: rawHouse.maintenanceFeeGas !== undefined && rawHouse.maintenanceFeeGas !== null ? rawHouse.maintenanceFeeGas : undefined,
+          options: rawHouse.options || undefined,
+          optionsList: rawHouse.optionsList || undefined,
+          airconType: rawHouse.airconType || undefined,
+          airconRooms: rawHouse.airconRooms || undefined,
+        };
+        setHouseData(initialHouse);
+
+        // 사무실 서브 데이터 복원 및 로드
+        const initialOffice = initialData.officeDetail ? { ...initialData.officeDetail } : {};
+        setOfficeData(initialOffice);
+
         setFactoryWarehouseData(initialData.factoryWarehouseDetail || {});
         setLandData(initialData.landDetail || {});
       } else {
@@ -800,12 +859,19 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         approvalDate: data.approvalDate || prev.approvalDate,
       }));
     } else if (propertyType === 'HOUSE') {
+      const area = data.buildingArea;
+      const pyeong = area ? +(area * 0.3025).toFixed(2) : undefined;
       setHouseData((prev: any) => ({
         ...prev,
         landArea: data.landArea || prev.landArea,
         totalFloorArea: data.totalFloorArea || prev.totalFloorArea,
-        buildingArea: data.buildingArea || prev.buildingArea,
+        buildingArea: area !== undefined ? area : prev.buildingArea,
+        buildingAreaPyeong: pyeong !== undefined ? pyeong : prev.buildingAreaPyeong,
+        actualArea: prev.actualArea !== undefined ? prev.actualArea : area,
+        actualAreaPyeong: prev.actualAreaPyeong !== undefined ? prev.actualAreaPyeong : pyeong,
         buildingUse: data.buildingRegisterUse || prev.buildingUse,
+        zoningArea: data.zoningArea || prev.zoningArea,
+        structure: data.structureName || prev.structure,
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: data.floorText || (data.floorCount ? `지상 ${data.floorCount}층 / 지하 ${data.underFloorCount || 0}층` : prev.currentFloor),
@@ -1084,13 +1150,13 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       marketPriceBasis: marketPriceBasis.trim() || undefined,
       isNoMaintenanceFee,
       consultationNotes: consultationNotes.trim() || undefined,
-      landArea,
-      totalFloorArea,
-      buildingArea,
-      approvalDate,
-      buildingRegisterUse,
-      zoningArea,
-      structureName,
+      landArea: propertyType === 'HOUSE' && houseData?.landArea !== undefined ? houseData.landArea : landArea,
+      totalFloorArea: propertyType === 'HOUSE' && houseData?.totalFloorArea !== undefined ? houseData.totalFloorArea : totalFloorArea,
+      buildingArea: propertyType === 'HOUSE' && houseData?.buildingArea !== undefined ? houseData.buildingArea : buildingArea,
+      approvalDate: propertyType === 'HOUSE' && houseData?.approvalDate !== undefined ? houseData.approvalDate : approvalDate,
+      buildingRegisterUse: propertyType === 'HOUSE' && houseData?.buildingUse !== undefined ? houseData.buildingUse : buildingRegisterUse,
+      zoningArea: propertyType === 'HOUSE' && houseData?.zoningArea !== undefined ? houseData.zoningArea : zoningArea,
+      structureName: propertyType === 'HOUSE' && houseData?.structure !== undefined ? houseData.structure : structureName,
       floorCount,
       underFloorCount,
       floorText,

@@ -60,6 +60,45 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
   // 3. 기타 수동 직접 추가 텍스트
   const [customText, setCustomText] = useState<string>('');
 
+  // data props 변경 시 (수정 모달 로드 등) 내부 옵션 상태 자동 동기화
+  useEffect(() => {
+    let nextAirconType = '';
+    if (data.airconType) {
+      nextAirconType = data.airconType;
+    } else if (data.options?.includes('시스템에어컨')) {
+      nextAirconType = '시스템에어컨';
+    } else if (data.options?.includes('벽걸이에어컨')) {
+      nextAirconType = '벽걸이에어컨';
+    } else if (data.options?.includes('스탠드에어컨')) {
+      nextAirconType = '스탠드에어컨';
+    } else if (data.options?.includes('투인원')) {
+      nextAirconType = '투인원(2in1)';
+    } else if (data.options?.includes('에어컨')) {
+      nextAirconType = '벽걸이에어컨';
+    }
+    setAirconType(nextAirconType);
+
+    let nextRooms: string[] = [];
+    if (data.airconRooms && data.airconRooms.length > 0) {
+      nextRooms = data.airconRooms;
+    } else if (data.options) {
+      const matched = data.options.match(/에어컨\(([^)]+)\)/);
+      if (matched && matched[1]) {
+        nextRooms = matched[1].split(',').map((s) => s.trim());
+      }
+    }
+    setAirconRooms(nextRooms);
+
+    let nextOpts: string[] = [];
+    if (data.optionsList && data.optionsList.length > 0) {
+      nextOpts = data.optionsList;
+    } else if (data.options) {
+      const parts = data.options.split(',').map((s) => s.trim());
+      nextOpts = parts.filter((p) => p && !p.startsWith('에어컨') && !p.includes('에어컨('));
+    }
+    setSelectedOptions(nextOpts);
+  }, [data.options, data.optionsList, data.airconType, data.airconRooms]);
+
   const updateField = (field: keyof HouseData, value: any) => {
     onChange({ ...data, [field]: value });
   };
