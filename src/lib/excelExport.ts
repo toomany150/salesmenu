@@ -223,7 +223,8 @@ export function exportCustomersToExcel(customers: CustomerItem[], customFilename
       c.receivedDetail?.dealSupportDetails ? `지원사항: ${c.receivedDetail.dealSupportDetails}` : '',
     ].filter(Boolean).join(' / ');
 
-    // 등록일
+    // 접수일 및 등록일
+    const receiptDate = (c.receiptDate || (c.properties && c.properties[0]?.receiptDate) || c.createdAt || '').substring(0, 10);
     const createdDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('ko-KR') : '';
 
     return {
@@ -234,6 +235,7 @@ export function exportCustomersToExcel(customers: CustomerItem[], customFilename
       '고객구분': groupText,
       '세부유형': subTypeText,
       '담당자': c.managerName || '',
+      '접수일자': receiptDate,
       '희망매매가(만원)': c.price ?? '',
       '조정매매가(만원)': c.negotiablePrice ?? '',
       '희망보증금·전세(만원)': c.deposit ?? '',

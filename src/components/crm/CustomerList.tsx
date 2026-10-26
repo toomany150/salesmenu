@@ -17,7 +17,8 @@ import {
   Building2,
   Check,
   FileSpreadsheet,
-  Star
+  Star,
+  Calendar
 } from 'lucide-react';
 import { CustomerItem, CustomerGroup, PROPERTY_TYPE_LABELS } from '@/lib/types';
 import { exportCustomersToExcel } from '@/lib/excelExport';
@@ -421,14 +422,25 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                       </div>
                     </div>
 
-                    <span className={`px-2.5 py-1 text-xs font-black rounded-lg shrink-0 ${
-                      customer.type === 'SELLER' ? 'bg-blue-100 text-blue-800' :
-                      customer.type === 'LESSOR' ? 'bg-sky-100 text-sky-800' :
-                      customer.type === 'BUYER' ? 'bg-indigo-100 text-indigo-800' :
-                      'bg-purple-100 text-purple-800'
-                    }`}>
-                      {typeLabel}
-                    </span>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <span className={`px-2.5 py-1 text-xs font-black rounded-lg shrink-0 ${
+                        customer.type === 'SELLER' ? 'bg-blue-100 text-blue-800' :
+                        customer.type === 'LESSOR' ? 'bg-sky-100 text-sky-800' :
+                        customer.type === 'BUYER' ? 'bg-indigo-100 text-indigo-800' :
+                        'bg-purple-100 text-purple-800'
+                      }`}>
+                        {typeLabel}
+                      </span>
+                      {receiptDateStr && (
+                        <span
+                          className="text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200/70 px-2 py-0.5 rounded-md border border-slate-200/90 font-mono flex items-center gap-1 shadow-2xs transition-colors"
+                          title={`접수일자: ${receiptDateStr}`}
+                        >
+                          <Calendar className="w-3 h-3 text-blue-600 shrink-0" />
+                          <span>접수 {receiptDateStr}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Middle: Content summary */}

@@ -92,6 +92,16 @@ function formatPropertyOutput(p: any, options: { fullPhotos?: boolean } = { full
   };
 }
 
+function parseMoneyInput(val: any): number | null {
+  if (val === undefined || val === null) return null;
+  const str = String(val).trim();
+  if (!str) return null;
+  const cleaned = str.replace(/[^0-9.]/g, '');
+  if (!cleaned) return null;
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -350,6 +360,12 @@ export async function POST(request: NextRequest) {
       factoryWarehouseDetail,
       landDetail,
       customerInput,
+      ownerSameAsCustomer,
+      ownerCustomerId,
+      ownerName,
+      ownerPhone,
+      ownerCarrier,
+      ownerCustomerInput,
       managerName,
       assignedAgents,
       createdById,
@@ -487,6 +503,54 @@ export async function POST(request: NextRequest) {
     if (cExists) validCustomerId = cExists.id;
   }
 
+  // 등기부상 소유주 처리 (접수 고객과 다를 경우 고객 DB 자동 연동)
+  const isOwnerSame = ownerSameAsCustomer !== false;
+  let finalOwnerCustomerId: string | null = null;
+  let finalOwnerName: string | null = null;
+  let finalOwnerPhone: string | null = null;
+  let finalOwnerCarrier: string | null = null;
+
+  if (!isOwnerSame) {
+    finalOwnerName = (ownerName || ownerCustomerInput?.name || '').trim() || null;
+    finalOwnerPhone = (ownerPhone || ownerCustomerInput?.phone || '').trim() || null;
+    finalOwnerCarrier = (ownerCarrier || ownerCustomerInput?.carrier || '').trim() || null;
+
+    if (ownerCustomerId) {
+      const ocExists = await prisma.customer.findUnique({ where: { id: ownerCustomerId } }).catch(() => null);
+      if (ocExists) finalOwnerCustomerId = ocExists.id;
+    }
+
+    if (!finalOwnerCustomerId && (finalOwnerName || finalOwnerPhone)) {
+      const ownerCustData = {
+        name: finalOwnerName || '등기부 소유자',
+        phone: finalOwnerPhone || '010-0000-0000',
+        carrier: finalOwnerCarrier,
+        type: transactionType === '매매' ? 'SELLER' : 'LESSOR',
+        subType: '등기부소유자',
+        group: 'RECEIVED',
+        memo: `[매물 #${propertyNumber} (${address})] 등기부상 소유주`,
+        managerName: managerName || '사무실',
+        createdById: validUserId,
+        creatorName: creatorName || null,
+      };
+
+      if (finalOwnerPhone && finalOwnerPhone !== '010-0000-0000') {
+        const existingOwner = await prisma.customer.findFirst({
+          where: { phone: finalOwnerPhone },
+        });
+        if (existingOwner) {
+          finalOwnerCustomerId = existingOwner.id;
+        } else {
+          const newOwnerCust = await prisma.customer.create({ data: ownerCustData });
+          finalOwnerCustomerId = newOwnerCust.id;
+        }
+      } else {
+        const newOwnerCust = await prisma.customer.create({ data: ownerCustData });
+        finalOwnerCustomerId = newOwnerCust.id;
+      }
+    }
+  }
+
     // 권리금 추출 (상가점포 등)
     const isNoPrem = !!(body.isNoPremium || storeDetail?.isNoPremium);
     const prem = isNoPrem
@@ -532,12 +596,17 @@ export async function POST(request: NextRequest) {
         directionCriteria,
         availableDate: availableDate ? new Date(availableDate) : null,
         isImmediateAvailable: !!body.isImmediateAvailable,
-        price: price ? parseFloat(price) : null,
-        negotiablePrice: body.negotiablePrice ? parseFloat(body.negotiablePrice) : null,
-        deposit: deposit ? parseFloat(deposit) : null,
-        negotiableDeposit: body.negotiableDeposit ? parseFloat(body.negotiableDeposit) : null,
-        monthlyRent: monthlyRent ? parseFloat(monthlyRent) : null,
-        negotiableMonthlyRent: body.negotiableMonthlyRent ? parseFloat(body.negotiableMonthlyRent) : null,
+        price: parseMoneyInput(price),
+        negotiablePrice: parseMoneyInput(body.negotiablePrice),
+        deposit: parseMoneyInput(deposit),
+        negotiableDeposit: parseMoneyInput(body.negotiableDeposit),
+        monthlyRent: parseMoneyInput(monthlyRent),
+        negotiableMonthlyRent: parseMoneyInput(body.negotiableMonthlyRent),
+        ownerSameAsCustomer: isOwnerSame,
+        ownerCustomerId: finalOwnerCustomerId,
+        ownerName: isOwnerSame ? null : finalOwnerName,
+        ownerPhone: isOwnerSame ? null : finalOwnerPhone,
+        ownerCarrier: isOwnerSame ? null : finalOwnerCarrier,
         monthlyRentVat: !!(body.isMonthlyRentVat || body.monthlyRentVat || storeDetail?.monthlyRentVat),
         premium: prem,
         negotiablePremium: negoPrem,
@@ -862,6 +931,12 @@ export async function PUT(request: NextRequest) {
       buildingRegisterUse,
       customerId,
       customerInput,
+      ownerSameAsCustomer,
+      ownerCustomerId,
+      ownerName,
+      ownerPhone,
+      ownerCarrier,
+      ownerCustomerInput,
       apartmentDetail,
       houseDetail,
       storeDetail,
@@ -1015,6 +1090,49 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // 등기부상 소유주 처리 (수정 시)
+    let finalOwnerSameAsCustomer = ownerSameAsCustomer !== undefined ? !!ownerSameAsCustomer : existingProp.ownerSameAsCustomer;
+    let finalOwnerCustomerId = ownerCustomerId !== undefined ? ownerCustomerId : existingProp.ownerCustomerId;
+    let finalOwnerName = ownerName !== undefined ? (ownerName ? String(ownerName).trim() : null) : existingProp.ownerName;
+    let finalOwnerPhone = ownerPhone !== undefined ? (ownerPhone ? String(ownerPhone).trim() : null) : existingProp.ownerPhone;
+    let finalOwnerCarrier = ownerCarrier !== undefined ? (ownerCarrier ? String(ownerCarrier).trim() : null) : existingProp.ownerCarrier;
+
+    if (finalOwnerSameAsCustomer === false) {
+      if (ownerCustomerInput && (ownerCustomerInput.name?.trim() || ownerCustomerInput.phone?.trim())) {
+        finalOwnerName = ownerCustomerInput.name?.trim() || finalOwnerName;
+        finalOwnerPhone = ownerCustomerInput.phone?.trim() || finalOwnerPhone;
+        finalOwnerCarrier = ownerCustomerInput.carrier?.trim() || finalOwnerCarrier;
+      }
+
+      if (finalOwnerPhone && finalOwnerPhone.trim()) {
+        const existingOwnerCust = await prisma.customer.findFirst({
+          where: { phone: finalOwnerPhone.trim() },
+        });
+        if (existingOwnerCust) {
+          finalOwnerCustomerId = existingOwnerCust.id;
+        } else if (finalOwnerName) {
+          const newOwner = await prisma.customer.create({
+            data: {
+              name: finalOwnerName,
+              phone: finalOwnerPhone,
+              carrier: finalOwnerCarrier,
+              type: transactionType === '매매' ? 'SELLER' : 'LESSOR',
+              subType: '등기부소유자',
+              group: 'RECEIVED',
+              memo: `[매물 #${propertyNumber || existingProp.propertyNumber}] 등기부상 소유주`,
+              managerName: managerName || existingProp.managerName || '사무실',
+            },
+          });
+          finalOwnerCustomerId = newOwner.id;
+        }
+      }
+    } else if (finalOwnerSameAsCustomer === true) {
+      finalOwnerCustomerId = null;
+      finalOwnerName = null;
+      finalOwnerPhone = null;
+      finalOwnerCarrier = null;
+    }
+
     // 권리금 추출 (상가점포 등)
     const isNoPrem = body.isNoPremium !== undefined
       ? !!body.isNoPremium
@@ -1063,12 +1181,17 @@ export async function PUT(request: NextRequest) {
         directionCriteria: directionCriteria !== undefined ? directionCriteria : undefined,
         availableDate: availableDate !== undefined ? (availableDate ? new Date(availableDate) : null) : undefined,
         isImmediateAvailable: body.isImmediateAvailable !== undefined ? !!body.isImmediateAvailable : undefined,
-        price: price !== undefined ? (price ? parseFloat(price) : null) : undefined,
-        negotiablePrice: body.negotiablePrice !== undefined ? (body.negotiablePrice ? parseFloat(body.negotiablePrice) : null) : undefined,
-        deposit: deposit !== undefined ? (deposit ? parseFloat(deposit) : null) : undefined,
-        negotiableDeposit: body.negotiableDeposit !== undefined ? (body.negotiableDeposit ? parseFloat(body.negotiableDeposit) : null) : undefined,
-        monthlyRent: monthlyRent !== undefined ? (monthlyRent ? parseFloat(monthlyRent) : null) : undefined,
-        negotiableMonthlyRent: body.negotiableMonthlyRent !== undefined ? (body.negotiableMonthlyRent ? parseFloat(body.negotiableMonthlyRent) : null) : undefined,
+        price: price !== undefined ? parseMoneyInput(price) : undefined,
+        negotiablePrice: body.negotiablePrice !== undefined ? parseMoneyInput(body.negotiablePrice) : undefined,
+        deposit: deposit !== undefined ? parseMoneyInput(deposit) : undefined,
+        negotiableDeposit: body.negotiableDeposit !== undefined ? parseMoneyInput(body.negotiableDeposit) : undefined,
+        monthlyRent: monthlyRent !== undefined ? parseMoneyInput(monthlyRent) : undefined,
+        negotiableMonthlyRent: body.negotiableMonthlyRent !== undefined ? parseMoneyInput(body.negotiableMonthlyRent) : undefined,
+        ownerSameAsCustomer: finalOwnerSameAsCustomer,
+        ownerCustomerId: finalOwnerCustomerId,
+        ownerName: finalOwnerName,
+        ownerPhone: finalOwnerPhone,
+        ownerCarrier: finalOwnerCarrier,
         monthlyRentVat: body.isMonthlyRentVat !== undefined ? !!body.isMonthlyRentVat : (body.monthlyRentVat !== undefined ? !!body.monthlyRentVat : undefined),
         premium: prem !== undefined ? prem : undefined,
         negotiablePremium: negoPrem !== undefined ? negoPrem : undefined,

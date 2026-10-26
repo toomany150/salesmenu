@@ -1275,80 +1275,116 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           {/* Quick Share Action Row: [📞 전화걸기] [💬 문자로 전송] [🟡 카톡 공유] */}
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <User className="w-4 h-4 text-slate-500" />
-              <span className="text-xs text-slate-600">접수 고객(의뢰인):</span>
-              {property.customer ? (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-slate-900">
-                    {canViewContact ? property.customer.name : '*** (비공개)'}
-                  </span>
-                  {canViewContact && property.customer.carrier && (
-                    <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-sm">
-                      {property.customer.carrier}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <User className="w-4 h-4 text-slate-500" />
+                <span className="text-xs text-slate-600">접수 고객(의뢰인):</span>
+                {property.customer ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-900">
+                      {canViewContact ? property.customer.name : '*** (비공개)'}
                     </span>
-                  )}
-                  <span className="text-xs font-mono font-bold text-slate-800">
-                    {canViewContact ? property.customer.phone : '010-****-****'}
-                  </span>
-                  {!canViewContact && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded">
-                      <Lock className="w-3 h-3 text-amber-600" />
-                      연락처 비공개
+                    {canViewContact && property.customer.carrier && (
+                      <span className="text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-sm">
+                        {property.customer.carrier}
+                      </span>
+                    )}
+                    <span className="text-xs font-mono font-bold text-slate-800">
+                      {canViewContact ? property.customer.phone : '010-****-****'}
                     </span>
-                  )}
-                </div>
-              ) : (
-                <span className="text-xs text-slate-400">직접 접수 (연결 고객 없음)</span>
-              )}
-            </div>
+                    {!canViewContact && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded">
+                        <Lock className="w-3 h-3 text-amber-600" />
+                        연락처 비공개
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400">직접 접수 (연결 고객 없음)</span>
+                )}
+              </div>
 
-            <div className="flex items-center gap-2">
-              {property.customer?.phone && canViewContact && (
-                <a
-                  href={`tel:${property.customer.phone}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all active:scale-95"
+              <div className="flex items-center gap-2">
+                {property.customer?.phone && canViewContact && (
+                  <a
+                    href={`tel:${property.customer.phone}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-all active:scale-95"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>📞 고객 전화걸기</span>
+                  </a>
+                )}
+
+                {/* 스마트폰 전용 문자 전송 버튼 (PC 환경에서는 사용자의 요청에 따라 완전 삭제/숨김) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const savedMode = (typeof window !== 'undefined' ? localStorage.getItem('pref_address_share_mode') : null) as any || 'dong';
+                    handleSmartSms(property, undefined, savedMode);
+                  }}
+                  className="inline-flex md:hidden items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all active:scale-95"
+                  title="스마트폰 문자 앱 즉시 실행"
                 >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>📞 고객 전화걸기</span>
-                </a>
-              )}
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>💬 문자로 전송</span>
+                </button>
 
-              {/* 스마트폰 전용 문자 전송 버튼 (PC 환경에서는 사용자의 요청에 따라 완전 삭제/숨김) */}
-              <button
-                type="button"
-                onClick={() => {
-                  const savedMode = (typeof window !== 'undefined' ? localStorage.getItem('pref_address_share_mode') : null) as any || 'dong';
-                  handleSmartSms(property, undefined, savedMode);
-                }}
-                className="inline-flex md:hidden items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all active:scale-95"
-                title="스마트폰 문자 앱 즉시 실행"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>💬 문자로 전송</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-all active:scale-95"
+                  title="주소 옵션 선택 후 매물 링크 및 요약 복사"
+                >
+                  <Copy className="w-3.5 h-3.5 text-slate-600" />
+                  <span>🔗 링크 복사</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setIsShareModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition-all active:scale-95"
-                title="주소 옵션 선택 후 매물 링크 및 요약 복사"
-              >
-                <Copy className="w-3.5 h-3.5 text-slate-600" />
-                <span>🔗 링크 복사</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsShareModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-xs transition-all active:scale-95"
-                title="주소 공개 범위(동까지만/전체/비공개) 선택 후 카카오톡 전송"
-              >
-                <span className="w-2 h-2 rounded-full bg-slate-900"></span>
-                <span>🟡 카톡 공유</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-xs transition-all active:scale-95"
+                  title="주소 공개 범위(동까지만/전체/비공개) 선택 후 카카오톡 전송"
+                >
+                  <span className="w-2 h-2 rounded-full bg-slate-900"></span>
+                  <span>🟡 카톡 공유</span>
+                </button>
+              </div>
             </div>
+
+            {/* 등기부상 소유주 (접수 고객과 다를 경우) */}
+            {property.ownerSameAsCustomer === false && (property.ownerName || property.ownerPhone || property.ownerCustomer) && (
+              <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-indigo-900">등기부상 소유주:</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-900">
+                      {canViewContact ? (property.ownerName || property.ownerCustomer?.name || '소유자') : '*** (비공개)'}
+                    </span>
+                    {canViewContact && (property.ownerCarrier || property.ownerCustomer?.carrier) && (
+                      <span className="text-[11px] px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded-sm">
+                        {property.ownerCarrier || property.ownerCustomer?.carrier}
+                      </span>
+                    )}
+                    {(property.ownerPhone || property.ownerCustomer?.phone) && (
+                      <span className="text-xs font-mono font-bold text-slate-800">
+                        {canViewContact ? (property.ownerPhone || property.ownerCustomer?.phone) : '010-****-****'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {(property.ownerPhone || property.ownerCustomer?.phone) && canViewContact && (
+                  <a
+                    href={`tel:${property.ownerPhone || property.ownerCustomer?.phone}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-all active:scale-95"
+                  >
+                    <Phone className="w-3 h-3 text-indigo-600" />
+                    <span>📞 소유주 전화걸기</span>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Property Photos Carousel / Gallery (최대 30장 지원) */}

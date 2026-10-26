@@ -17,7 +17,8 @@ import {
   Search,
   UserCheck,
   Lock,
-  DollarSign
+  DollarSign,
+  Calendar
 } from 'lucide-react';
 import { 
   PropertyType, 
@@ -135,6 +136,15 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
   const [allCustomers, setAllCustomers] = useState<CustomerItem[]>(customers);
 
+  // 등기부상 소유주 상태 (접수 고객과 다를 경우)
+  const [ownerSameAsCustomer, setOwnerSameAsCustomer] = useState<boolean>(true);
+  const [ownerCustomerMode, setOwnerCustomerMode] = useState<'DIRECT' | 'SELECT'>('DIRECT');
+  const [ownerCustomerId, setOwnerCustomerId] = useState<string>('');
+  const [ownerName, setOwnerName] = useState<string>('');
+  const [ownerPhone, setOwnerPhone] = useState<string>('');
+  const [ownerCarrier, setOwnerCarrier] = useState<string>('');
+  const [ownerSearchQuery, setOwnerSearchQuery] = useState<string>('');
+
   // Public data fields (7대 대장 연동 항목)
   const [landArea, setLandArea] = useState<number | undefined>();
   const [totalFloorArea, setTotalFloorArea] = useState<number | undefined>();
@@ -239,15 +249,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setIsAddingAgent(false);
         setNewAgentInput('');
 
-        // Customer
+        // Customer (매물수정 진입 시에도 사용자의 요청에 따라 'DIRECT' 직접입력(신규연동) 모드로 기본 표시)
+        setCustomerMode('DIRECT');
         if (initialData.customer) {
-          setCustomerMode('SELECT');
           setCustomerId(initialData.customer.id);
           setCustomerName(initialData.customer.name || '');
           setCustomerPhone(initialData.customer.phone || '');
           setCustomerCarrier(initialData.customer.carrier || '');
         } else if (initialData.customerId) {
-          setCustomerMode('SELECT');
           setCustomerId(initialData.customerId);
           const found = mergedCusts.find((c) => c.id === initialData.customerId);
           if (found) {
@@ -256,12 +265,21 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
             setCustomerCarrier(found.carrier || '');
           }
         } else {
-          setCustomerMode('DIRECT');
           setCustomerId('');
           setCustomerName('');
           setCustomerPhone('');
           setCustomerCarrier('');
         }
+
+        // Owner Customer (등기부상 소유주)
+        const isOwnerSame = initialData.ownerSameAsCustomer !== false;
+        setOwnerSameAsCustomer(isOwnerSame);
+        setOwnerCustomerMode('DIRECT');
+        setOwnerCustomerId(initialData.ownerCustomerId || '');
+        setOwnerName(initialData.ownerName || '');
+        setOwnerPhone(initialData.ownerPhone || '');
+        setOwnerCarrier(initialData.ownerCarrier || '');
+        setOwnerSearchQuery('');
 
         // Public data (7대 대장 데이터)
         setLandArea(initialData.landArea);
@@ -454,6 +472,13 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setCustomerPhone('');
         setCustomerCarrier('');
         setCustomerSearchQuery('');
+        setOwnerSameAsCustomer(true);
+        setOwnerCustomerMode('DIRECT');
+        setOwnerCustomerId('');
+        setOwnerName('');
+        setOwnerPhone('');
+        setOwnerCarrier('');
+        setOwnerSearchQuery('');
         setLedgerData(null);
         setLandArea(undefined);
         setTotalFloorArea(undefined);
@@ -546,7 +571,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     } else if (propertyType === 'APARTMENT') {
       const pyeongVal = Math.round(exclPyeong);
       const suppPyeongVal = Math.round(suppPyeong);
-      const autoPyeongType = `${suppPyeongVal}평형 (${Math.round(exclArea)}타입)`;
+      const autoPyeongType = `${suppPyeongVal}평형`;
 
       setApartmentData((prev: any) => ({
         ...prev,
@@ -837,7 +862,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       const effectiveSupp = targetUnit?.supplyArea ?? aptSupp;
       const effectiveSuppPy = targetUnit?.supplyAreaPyeong ?? aptSuppPy;
       const suppPyeongNum = effectiveSuppPy ? Math.round(effectiveSuppPy) : (effectiveSupp ? Math.round(effectiveSupp * 0.3025) : 34);
-      const autoPyeongType = `${suppPyeongNum}평형 (${Math.round(effectiveExcl || 84)}타입)`;
+      const autoPyeongType = `${suppPyeongNum}평형`;
 
       setApartmentData((prev: any) => ({
         ...prev,
@@ -1052,6 +1077,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         group: 'RECEIVED', // [물건 접수] 매도인/임대인란에 연계
         managerName: managerName || '개업공인중개사 (대표)',
         assignedAgents,
+        receiptDate: receiptDate || new Date().toISOString(),
         memo: consultationNotes.trim() ? `[매물 #${finalPropNumber} 접수] ${consultationNotes.trim()}` : `[매물 #${finalPropNumber} (${finalAddress})] 접수 고객`,
         price: price ? parseFloat(price) : undefined,
         negotiablePrice: negotiablePrice ? parseFloat(negotiablePrice) : undefined,
@@ -1093,6 +1119,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         type: newCustomerItem.type,
         subType: newCustomerItem.subType,
         group: newCustomerItem.group,
+        receiptDate: newCustomerItem.receiptDate,
         memo: newCustomerItem.memo,
         price: newCustomerItem.price,
         negotiablePrice: newCustomerItem.negotiablePrice,
@@ -1114,6 +1141,68 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       }
     }
 
+    // 등기부상 소유주 고객 연동 처리
+    let finalOwnerCustomerId: string | undefined = undefined;
+    let finalOwnerCustomer: CustomerItem | undefined = undefined;
+    let ownerCustomerInput: any = undefined;
+
+    if (!ownerSameAsCustomer) {
+      if (ownerCustomerMode === 'DIRECT' && (ownerName.trim() || ownerPhone.trim())) {
+        const ownerCustId = `cust-owner-${Date.now()}`;
+        const newOwnerItem: CustomerItem = {
+          id: ownerCustId,
+          name: ownerName.trim() || '등기부 소유자',
+          phone: ownerPhone.trim() || '010-0000-0000',
+          carrier: (ownerCarrier.trim() as MobileCarrier) || undefined,
+          type: transactionType === '매매' ? 'SELLER' : 'LESSOR',
+          subType: '등기부소유자',
+          group: 'RECEIVED',
+          managerName: managerName || '개업공인중개사 (대표)',
+          assignedAgents,
+          receiptDate: receiptDate || new Date().toISOString(),
+          memo: `[매물 #${finalPropNumber} (${finalAddress})] 등기부상 소유주`,
+          transactionType,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        saveCustomCustomer(newOwnerItem);
+        fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newOwnerItem),
+        }).catch((err) => console.warn('Owner registration sync notice:', err));
+
+        ownerCustomerInput = {
+          name: newOwnerItem.name,
+          phone: newOwnerItem.phone,
+          carrier: newOwnerItem.carrier,
+          type: newOwnerItem.type,
+          subType: newOwnerItem.subType,
+          group: newOwnerItem.group,
+          receiptDate: newOwnerItem.receiptDate,
+          memo: newOwnerItem.memo,
+          managerName: newOwnerItem.managerName,
+        };
+        finalOwnerCustomerId = ownerCustId;
+        finalOwnerCustomer = newOwnerItem;
+      } else if (ownerCustomerMode === 'SELECT' && ownerCustomerId) {
+        const found = allCustomers.find((c) => c.id === ownerCustomerId);
+        if (found) {
+          finalOwnerCustomer = found;
+          finalOwnerCustomerId = found.id;
+        }
+      }
+    }
+
+    const parseMoney = (val: string | undefined | null): number | undefined => {
+      if (!val) return undefined;
+      const cleaned = String(val).replace(/[^0-9.]/g, '');
+      if (!cleaned) return undefined;
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? undefined : num;
+    };
+
     const payload: any = {
       id: initialData?.id,
       propertyNumber: finalPropNumber,
@@ -1133,12 +1222,18 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       availableDate: isNegotiableDate ? undefined : (availableDate || undefined),
       isImmediateAvailable,
       isNegotiableDate,
-      price: price ? parseFloat(price) : undefined,
-      negotiablePrice: negotiablePrice ? parseFloat(negotiablePrice) : undefined,
-      deposit: deposit ? parseFloat(deposit) : undefined,
-      negotiableDeposit: negotiableDeposit ? parseFloat(negotiableDeposit) : undefined,
-      monthlyRent: monthlyRent ? parseFloat(monthlyRent) : undefined,
-      negotiableMonthlyRent: negotiableMonthlyRent ? parseFloat(negotiableMonthlyRent) : undefined,
+      price: parseMoney(price),
+      negotiablePrice: parseMoney(negotiablePrice),
+      deposit: parseMoney(deposit),
+      negotiableDeposit: parseMoney(negotiableDeposit),
+      monthlyRent: parseMoney(monthlyRent),
+      negotiableMonthlyRent: parseMoney(negotiableMonthlyRent),
+      ownerSameAsCustomer,
+      ownerCustomerId: ownerSameAsCustomer ? undefined : finalOwnerCustomerId,
+      ownerName: ownerSameAsCustomer ? undefined : (ownerName.trim() || finalOwnerCustomer?.name || undefined),
+      ownerPhone: ownerSameAsCustomer ? undefined : (ownerPhone.trim() || finalOwnerCustomer?.phone || undefined),
+      ownerCarrier: ownerSameAsCustomer ? undefined : (ownerCarrier.trim() || finalOwnerCustomer?.carrier || undefined),
+      ownerCustomerInput: ownerSameAsCustomer ? undefined : ownerCustomerInput,
       monthlyRentVat: isMonthlyRentVat,
       maintenanceFee: isNoMaintenanceFee ? 0 : (maintenanceFee ? parseFloat(maintenanceFee) : undefined),
       maintenanceFeeVat: isMaintenanceFeeVat,
@@ -1240,6 +1335,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       floorText: payload.floorText,
       customerId: finalCustomerId,
       customer: linkedCustomer,
+      ownerSameAsCustomer,
+      ownerCustomerId: payload.ownerCustomerId,
+      ownerName: payload.ownerName,
+      ownerPhone: payload.ownerPhone,
+      ownerCarrier: payload.ownerCarrier,
+      ownerCustomer: finalOwnerCustomer,
       apartmentDetail: payload.apartmentDetail,
       houseDetail: payload.houseDetail,
       storeDetail: payload.storeDetail,
@@ -1499,7 +1600,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
                   {customerMode === 'DIRECT' ? (
                     <div className="p-3.5 bg-white rounded-xl border border-blue-200/80 shadow-2xs space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
                             고객명 (성함)
@@ -1523,6 +1624,19 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             onChange={(e) => handlePhoneChange(e.target.value)}
                             placeholder="010-1234-5678"
                             className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono font-bold text-slate-900"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                            <span>접수일자</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={receiptDate}
+                            onChange={(e) => setReceiptDate(e.target.value)}
+                            className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
                           />
                         </div>
                       </div>
@@ -1686,6 +1800,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                                       {selectedCust.carrier}
                                     </span>
                                   )}
+                                  {(selectedCust.receiptDate || selectedCust.createdAt) && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 rounded font-mono flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-blue-600" />
+                                      <span>접수 {(selectedCust.receiptDate || selectedCust.createdAt).substring(0, 10)}</span>
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] text-slate-600 font-mono mt-0.5">
                                   {selectedCust.phone}
@@ -1711,6 +1831,236 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         );
                       })()}
                     </div>
+                  )}
+                </div>
+
+                {/* 4-1. 등기부상 소유주 고객 (접수 고객과 다를 경우) */}
+                <div className="bg-slate-50/90 p-4 rounded-xl border border-slate-200 space-y-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-md bg-purple-100 text-purple-700">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                            등기부상 소유주 고객
+                          </h4>
+                          {/* 접수 고객과 동일 옵션 */}
+                          <label className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold cursor-pointer transition-all border select-none bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 shadow-2xs">
+                            <input
+                              type="checkbox"
+                              checked={ownerSameAsCustomer}
+                              onChange={(e) => setOwnerSameAsCustomer(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span>동일 (접수 고객과 같음)</span>
+                          </label>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {ownerSameAsCustomer
+                            ? '✓ 접수 고객과 등기부상 소유자가 동일합니다. (소유주가 다를 경우 "동일" 체크를 해제하세요)'
+                            : '이름, 통신사(선택), 연락처를 입력하면 고객관리(CRM) 매도/임대인 탭에 자동 저장됩니다.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Mode Toggle: 직접 입력 vs 기존 고객 선택 (동일 체크 해제 시에만 표시) */}
+                    {!ownerSameAsCustomer && (
+                      <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setOwnerCustomerMode('DIRECT')}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold transition-all ${
+                            ownerCustomerMode === 'DIRECT'
+                              ? 'bg-purple-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          <span>직접 입력 (신규 연동)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOwnerCustomerMode('SELECT')}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-md font-bold transition-all ${
+                            ownerCustomerMode === 'SELECT'
+                              ? 'bg-purple-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5" />
+                          <span>기존 고객 선택</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 동일체크하면 등기부상 소유주 고객은 안나오게 해줘: ownerSameAsCustomer가 false일 때만 표시 */}
+                  {!ownerSameAsCustomer && (
+                    ownerCustomerMode === 'DIRECT' ? (
+                      <div className="p-3.5 bg-white rounded-xl border border-purple-200/80 shadow-2xs space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs font-semibold text-slate-700">
+                                소유자명 (성함)
+                              </label>
+                              {ledgerData?.ownerName && (
+                                <button
+                                  type="button"
+                                  onClick={() => setOwnerName(ledgerData.ownerName || '')}
+                                  className="text-[11px] text-purple-700 hover:underline font-bold"
+                                >
+                                  대장 소유자명({ledgerData.ownerName}) 입력
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              value={ownerName}
+                              onChange={(e) => setOwnerName(e.target.value)}
+                              placeholder="예: 김소유 (등기부등본 명의인)"
+                              className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-bold text-slate-900"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              연락처 (휴대폰 번호)
+                            </label>
+                            <input
+                              type="tel"
+                              value={ownerPhone}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                let formatted = val;
+                                if (val.length <= 3) formatted = val;
+                                else if (val.length <= 7) formatted = `${val.slice(0, 3)}-${val.slice(3)}`;
+                                else formatted = `${val.slice(0, 3)}-${val.slice(3, 7)}-${val.slice(7, 11)}`;
+                                setOwnerPhone(formatted);
+                              }}
+                              placeholder="010-1234-5678"
+                              className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono font-bold text-slate-900"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 소유자 통신사 선택 칩 (선택사항) */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-700">
+                              통신사 <span className="text-slate-400 font-normal">(선택할 수도 있고, 안할 수도 있음)</span>
+                            </label>
+                            {ownerCarrier && (
+                              <button
+                                type="button"
+                                onClick={() => setOwnerCarrier('')}
+                                className="text-[11px] text-slate-400 hover:text-slate-600"
+                              >
+                                선택 취소
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setOwnerCarrier('')}
+                              className={`py-1.5 px-2 text-xs font-medium rounded-lg border transition-all text-center ${
+                                !ownerCarrier
+                                  ? 'bg-slate-800 text-white border-slate-800 font-bold'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              선택안함
+                            </button>
+                            {CARRIER_OPTIONS.map((carrier) => (
+                              <button
+                                key={carrier}
+                                type="button"
+                                onClick={() => setOwnerCarrier(carrier)}
+                                className={`py-1.5 px-2 text-xs font-semibold rounded-lg border transition-all text-center ${
+                                  ownerCarrier === carrier
+                                    ? 'bg-purple-600 text-white border-purple-600 shadow-xs font-bold'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                {carrier}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 text-[11px] text-purple-700 flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                          <span>
+                            매물 등록 시 등기부상 소유주로 고객 CRM에 별도 저장되어 매물 상세 및 CRM에서 관리됩니다.
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 bg-white rounded-xl border border-purple-200/80 shadow-2xs space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                              <Search className="w-3.5 h-3.5 text-purple-600" />
+                              <span>기존 등록 고객에서 소유주 선택</span>
+                            </label>
+                            <span className="text-[11px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                              총 {allCustomers.length}명 등록됨
+                            </span>
+                          </div>
+
+                          <div className="relative mb-2">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={ownerSearchQuery}
+                              onChange={(e) => setOwnerSearchQuery(e.target.value)}
+                              placeholder="고객 이름, 휴대폰 번호 검색..."
+                              className="w-full text-xs pl-8.5 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-medium text-slate-900"
+                            />
+                          </div>
+
+                          <select
+                            value={ownerCustomerId}
+                            onChange={(e) => {
+                              const selectedId = e.target.value;
+                              setOwnerCustomerId(selectedId);
+                              const found = allCustomers.find((c) => c.id === selectedId);
+                              if (found) {
+                                setOwnerName(found.name || '');
+                                setOwnerPhone(found.phone || '');
+                                setOwnerCarrier(found.carrier || '');
+                              } else {
+                                setOwnerName('');
+                                setOwnerPhone('');
+                                setOwnerCarrier('');
+                              }
+                            }}
+                            className="w-full text-xs px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-bold text-slate-900 cursor-pointer"
+                          >
+                            <option value="">▼ 연결할 소유주 고객을 선택하세요</option>
+                            {allCustomers
+                              .filter((c) => {
+                                if (!ownerSearchQuery.trim()) return true;
+                                const q = ownerSearchQuery.toLowerCase();
+                                return (
+                                  c.name?.toLowerCase().includes(q) ||
+                                  c.phone?.includes(q) ||
+                                  (c.carrier && c.carrier.toLowerCase().includes(q))
+                                );
+                              })
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name} ({c.phone}) {c.carrier ? `[${c.carrier}]` : ''} - {c.subType || c.type}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+                    )
                   )}
                 </div>
 
@@ -2025,13 +2375,13 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         <div className="sm:col-span-1">
                           <label className="block text-sm font-bold text-indigo-900 mb-1.5 flex items-center justify-between">
                             <span>조정가능한 매매가액 (만원)</span>
-                            <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">협의 가능선</span>
+                            <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">직접 입력 가능</span>
                           </label>
                           <input
-                            type="number"
+                            type="text"
                             value={negotiablePrice}
                             onChange={(e) => setNegotiablePrice(e.target.value)}
-                            placeholder="예: 180000 (18억원 협의선)"
+                            placeholder="예: 17000 (직접 입력 가능, 협의선)"
                             className="w-full text-base px-3.5 py-2.5 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
                           />
                         </div>
@@ -2054,13 +2404,13 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         <div className="sm:col-span-1">
                           <label className="block text-sm font-bold text-indigo-900 mb-1.5 flex items-center justify-between">
                             <span>조정가능한 전세 보증금 (만원)</span>
-                            <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">협의 가능선</span>
+                            <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">직접 입력 가능</span>
                           </label>
                           <input
-                            type="number"
+                            type="text"
                             value={negotiableDeposit}
                             onChange={(e) => setNegotiableDeposit(e.target.value)}
-                            placeholder="예: 90000 (9억원 협의선)"
+                            placeholder="예: 90000 (직접 입력 가능, 협의선)"
                             className="w-full text-base px-3.5 py-2.5 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
                           />
                         </div>
@@ -2082,14 +2432,15 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-indigo-900 mb-1">
-                              조정가능한 보증금 (만원)
+                            <label className="block text-xs font-bold text-indigo-900 mb-1 flex items-center justify-between">
+                              <span>조정가능한 보증금 (만원)</span>
+                              <span className="text-[10px] text-indigo-600 font-normal">직접 입력</span>
                             </label>
                             <input
-                              type="number"
+                              type="text"
                               value={negotiableDeposit}
                               onChange={(e) => setNegotiableDeposit(e.target.value)}
-                              placeholder="예: 4000"
+                              placeholder="예: 4000 (직접 입력)"
                               className="w-full text-sm px-3.5 py-2 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
                             />
                           </div>
@@ -2126,14 +2477,15 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-indigo-900 mb-1">
-                              조정가능한 월 임대료 (만원)
+                            <label className="block text-xs font-bold text-indigo-900 mb-1 flex items-center justify-between">
+                              <span>조정가능한 월 임대료 (만원)</span>
+                              <span className="text-[10px] text-indigo-600 font-normal">직접 입력</span>
                             </label>
                             <input
-                              type="number"
+                              type="text"
                               value={negotiableMonthlyRent}
                               onChange={(e) => setNegotiableMonthlyRent(e.target.value)}
-                              placeholder="예: 320"
+                              placeholder="예: 320 (직접 입력)"
                               className="w-full text-sm px-3.5 py-2 bg-indigo-50/40 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-950"
                             />
                           </div>

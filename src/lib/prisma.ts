@@ -223,6 +223,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingCustCols.has('negotiablePremium')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "negotiablePremium" REAL;`);
         if (!existingCustCols.has('transactionType')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "transactionType" TEXT;`);
         if (!existingCustCols.has('isPinned')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "isPinned" BOOLEAN DEFAULT false;`);
+        if (!existingCustCols.has('receiptDate')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "receiptDate" DATETIME DEFAULT CURRENT_TIMESTAMP;`);
       } catch (colErr) {}
 
       try {
@@ -236,7 +237,22 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingPropCols.has('purchasePrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "purchasePrice" TEXT;`);
         if (!existingPropCols.has('currentMarketPrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "currentMarketPrice" TEXT;`);
         if (!existingPropCols.has('marketPriceBasis')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "marketPriceBasis" TEXT;`);
+        if (!existingPropCols.has('ownerSameAsCustomer')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerSameAsCustomer" BOOLEAN DEFAULT 1;`);
+        if (!existingPropCols.has('ownerCustomerId')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerCustomerId" TEXT;`);
+        if (!existingPropCols.has('ownerName')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerName" TEXT;`);
+        if (!existingPropCols.has('ownerPhone')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerPhone" TEXT;`);
+        if (!existingPropCols.has('ownerCarrier')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerCarrier" TEXT;`);
       } catch (colErr) {}
+
+      // PostgreSQL 환경 대응 안전 마이그레이션 (ADD COLUMN IF NOT EXISTS)
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerSameAsCustomer" BOOLEAN DEFAULT true;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerCustomerId" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerName" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerPhone" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerCarrier" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "ApartmentDetail" ADD COLUMN IF NOT EXISTS "pyeongType" TEXT;`).catch(() => {});
+      } catch (pgColErr) {}
 
       try {
         const storeCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("StoreDetail");`).catch(() => []);

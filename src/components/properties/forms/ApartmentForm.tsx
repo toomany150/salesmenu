@@ -205,10 +205,13 @@ export const ApartmentForm: React.FC<ApartmentFormProps> = ({ data, onChange }) 
               value={data.supplyArea !== undefined && data.supplyArea !== null ? data.supplyArea : ''}
               onChange={(e) => {
                 const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                const calculatedPyeong = val ? parseFloat((val * 0.3025).toFixed(2)) : undefined;
+                const roundedPyeongType = calculatedPyeong !== undefined ? `${Math.round(calculatedPyeong)}평형` : '';
                 onChange({
                   ...data,
                   supplyArea: val,
-                  supplyAreaPyeong: val ? parseFloat((val * 0.3025).toFixed(2)) : undefined,
+                  supplyAreaPyeong: calculatedPyeong,
+                  pyeongType: roundedPyeongType || data.pyeongType,
                 });
               }}
               placeholder="예: 112.4"
@@ -225,10 +228,12 @@ export const ApartmentForm: React.FC<ApartmentFormProps> = ({ data, onChange }) 
               value={data.supplyAreaPyeong !== undefined ? data.supplyAreaPyeong : (data.supplyArea ? parseFloat((data.supplyArea * 0.3025).toFixed(2)) : '')}
               onChange={(e) => {
                 const pyeong = e.target.value ? parseFloat(e.target.value) : undefined;
+                const roundedPyeongType = pyeong !== undefined ? `${Math.round(pyeong)}평형` : '';
                 onChange({
                   ...data,
                   supplyAreaPyeong: pyeong,
                   supplyArea: pyeong ? parseFloat((pyeong / 0.3025).toFixed(2)) : undefined,
+                  pyeongType: roundedPyeongType || data.pyeongType,
                 });
               }}
               placeholder="예: 34"
@@ -238,13 +243,16 @@ export const ApartmentForm: React.FC<ApartmentFormProps> = ({ data, onChange }) 
 
           {/* 평타입 */}
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">평타입</label>
+            <label className="block text-xs font-medium text-slate-700 mb-1 flex items-center justify-between">
+              <span>평타입</span>
+              <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-1 py-0.2 rounded">직접입력 가능</span>
+            </label>
             <input
               type="text"
               value={data.pyeongType || ''}
               onChange={(e) => updateField('pyeongType', e.target.value)}
-              placeholder="예: 34평형 A타입"
-              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium text-slate-900"
+              placeholder="예: 25평형 (직접 입력 가능)"
+              className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
             />
           </div>
 

@@ -243,6 +243,12 @@ model Property {
 
   // 접수한 고객 (매도인/임대인 연결)
   customerId          String?
+  // 등기부상 소유주 정보 (접수고객과 다를 경우)
+  ownerSameAsCustomer Boolean?  @default(true) // 접수 고객과 동일 여부
+  ownerCustomerId     String?   // 등기부상 소유주 고객 ID (CRM 연동)
+  ownerName           String?   // 등기부상 소유자명
+  ownerPhone          String?   // 등기부상 소유자 연락처
+  ownerCarrier        String?   // 등기부상 소유자 통신사
   customer            Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   // 7가지 매물 유형별 1:1 세부 스펙 관계

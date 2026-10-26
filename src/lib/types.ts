@@ -561,6 +561,19 @@ export interface PropertyItem {
   underFloorCount?: number;
   floorText?: string;
   customerId?: string;
+  // 등기부상 소유주 정보 (접수고객과 다를 경우)
+  ownerSameAsCustomer?: boolean;
+  ownerCustomerId?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  ownerCarrier?: MobileCarrier | string;
+  ownerCustomer?: {
+    id: string;
+    name: string;
+    phone: string;
+    carrier?: MobileCarrier;
+    type?: CustomerType;
+  };
   customer?: {
     id: string;
     name: string;
