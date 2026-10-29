@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
 
   // 3. 국토교통부 공공데이터포털 개별공시지가 API 실시간 호출 시도
   let liveOfficialPrice: number | null = null;
-  let const currentYear = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
   let livePriceYear: string = `${currentYear}년`;
   let apiSuccess = false;
 
