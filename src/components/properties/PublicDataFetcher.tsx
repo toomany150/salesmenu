@@ -752,84 +752,35 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
         {/* 안내 및 우편번호 검색 헤더 */}
         <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-100 flex-wrap gap-1.5">
           <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">
-            📍 도로명 또는 지번 중 하나만 입력하시면 상대방 주소가 자동으로 완성됩니다.
+            {propertyType === 'LAND'
+              ? '📍 토지는 건물이 없으므로 소재지 지번(필지)으로 100% 특정 및 거래됩니다.'
+              : '📍 도로명 또는 지번 중 하나만 입력하시면 상대방 주소가 자동으로 완성됩니다.'}
           </span>
           <button
             type="button"
-            onClick={handleOpenPostcode}
+            onClick={propertyType === 'LAND' ? handleOpenJibunSearchModal : handleOpenPostcode}
             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:scale-95 border border-blue-200 rounded-md transition-all shadow-2xs cursor-pointer"
           >
-            <span>우편번호로 주소 찾기</span>
+            {propertyType === 'LAND' ? (
+              <>
+                <Search className="w-3 h-3 text-emerald-600" />
+                <span>전국 토지 지번 정밀 검색</span>
+              </>
+            ) : (
+              <span>우편번호로 주소 찾기</span>
+            )}
           </button>
         </div>
 
-        {/* 2개 주소 입력란: 주소1 (도로명주소) & 주소2 (지번주소) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* 주소1 (도로명주소) */}
+        {/* 주소 입력란: 토지일 때는 도로명 주소 숨기고 "지번 주소" 단일 입력란만 전체 너비로 표시 */}
+        {propertyType === 'LAND' ? (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded">
-                  주소1
+                <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 rounded">
+                  소재지 지번
                 </span>
-                <span>도로명 주소</span>
-                <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center gap-1.5">
-                {converting && (
-                  <span className="text-[10px] text-blue-600 animate-pulse flex items-center gap-0.5">
-                    <ArrowRightLeft className="w-2.5 h-2.5" />
-                    자동 변환 중...
-                  </span>
-                )}
-                {roadAddress && (
-                  <button
-                    type="button"
-                    onClick={() => handleCopyAddress(roadAddress, 'road')}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:scale-95 border border-blue-200 rounded-md transition-all shadow-2xs cursor-pointer"
-                    title="도로명 주소 복사"
-                  >
-                    {copiedType === 'road' ? (
-                      <>
-                        <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
-                        <span className="text-emerald-700 font-extrabold">복사 완료!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3 text-blue-600" />
-                        <span>도로명 복사</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                value={roadAddress}
-                onChange={(e) => handleRoadAddressChange(e.target.value)}
-                placeholder="예: 서울특별시 강남구 삼성로 212"
-                className="w-full text-xs pl-3 pr-16 py-2.5 bg-slate-50/60 hover:bg-white focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 transition-colors"
-              />
-              <button
-                type="button"
-                onClick={handleOpenPostcode}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] font-bold text-blue-700 bg-white hover:bg-blue-50 rounded border border-blue-200 transition-colors cursor-pointer shadow-2xs"
-              >
-                검색
-              </button>
-            </div>
-          </div>
-
-          {/* 주소2 (지번주소) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-amber-100 text-amber-800 rounded">
-                  주소2
-                </span>
-                <span>지번 주소</span>
+                <span>토지 지번 주소</span>
                 <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center gap-1.5">
@@ -837,7 +788,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                   <button
                     type="button"
                     onClick={() => handleCopyAddress(jibunAddress, 'jibun')}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:scale-95 border border-amber-200 rounded-md transition-all shadow-2xs cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 active:scale-95 border border-emerald-200 rounded-md transition-all shadow-2xs cursor-pointer"
                     title="지번 주소 복사"
                   >
                     {copiedType === 'jibun' ? (
@@ -847,7 +798,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3 h-3 text-amber-700" />
+                        <Copy className="w-3 h-3 text-emerald-700" />
                         <span>지번 복사</span>
                       </>
                     )}
@@ -859,22 +810,137 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
               <input
                 type="text"
                 value={jibunAddress}
-                onChange={(e) => handleJibunAddressChange(e.target.value)}
-                placeholder="예: 서울특별시 강남구 대치동 316"
-                className="w-full text-xs pl-3 pr-16 py-2.5 bg-slate-50/60 hover:bg-white focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-hidden font-medium text-slate-900 transition-colors"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  onAddressChange(val, val);
+                }}
+                placeholder="예: 경남 김해시 장유동 808-5 (또는 경기 양평군 서종면 문호리 산 12)"
+                className="w-full text-xs pl-3 pr-24 py-2.5 bg-slate-50/60 hover:bg-white focus:bg-white border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-medium text-slate-900 transition-colors"
               />
               <button
                 type="button"
                 onClick={handleOpenJibunSearchModal}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-300 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
                 title="토지 지번(농지/산 번지) 정밀 검색"
               >
-                <Search className="w-3 h-3 text-indigo-600" />
+                <Search className="w-3 h-3 text-emerald-700" />
                 <span>지번 검색</span>
               </button>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 주소1 (도로명주소) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded">
+                    주소1
+                  </span>
+                  <span>도로명 주소</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  {converting && (
+                    <span className="text-[10px] text-blue-600 animate-pulse flex items-center gap-0.5">
+                      <ArrowRightLeft className="w-2.5 h-2.5" />
+                      자동 변환 중...
+                    </span>
+                  )}
+                  {roadAddress && (
+                    <button
+                      type="button"
+                      onClick={() => handleCopyAddress(roadAddress, 'road')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:scale-95 border border-blue-200 rounded-md transition-all shadow-2xs cursor-pointer"
+                      title="도로명 주소 복사"
+                    >
+                      {copiedType === 'road' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                          <span className="text-emerald-700 font-extrabold">복사 완료!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-blue-600" />
+                          <span>도로명 복사</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={roadAddress}
+                  onChange={(e) => handleRoadAddressChange(e.target.value)}
+                  placeholder="예: 서울특별시 강남구 삼성로 212"
+                  className="w-full text-xs pl-3 pr-16 py-2.5 bg-slate-50/60 hover:bg-white focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-medium text-slate-900 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleOpenPostcode}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] font-bold text-blue-700 bg-white hover:bg-blue-50 rounded border border-blue-200 transition-colors cursor-pointer shadow-2xs"
+                >
+                  검색
+                </button>
+              </div>
+            </div>
+
+            {/* 주소2 (지번주소) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 text-[10px] font-extrabold bg-amber-100 text-amber-800 rounded">
+                    주소2
+                  </span>
+                  <span>지번 주소</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1.5">
+                  {jibunAddress && (
+                    <button
+                      type="button"
+                      onClick={() => handleCopyAddress(jibunAddress, 'jibun')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:scale-95 border border-amber-200 rounded-md transition-all shadow-2xs cursor-pointer"
+                      title="지번 주소 복사"
+                    >
+                      {copiedType === 'jibun' ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                          <span className="text-emerald-700 font-extrabold">복사 완료!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-amber-700" />
+                          <span>지번 복사</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={jibunAddress}
+                  onChange={(e) => handleJibunAddressChange(e.target.value)}
+                  placeholder="예: 서울특별시 강남구 대치동 316"
+                  className="w-full text-xs pl-3 pr-16 py-2.5 bg-slate-50/60 hover:bg-white focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-hidden font-medium text-slate-900 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleOpenJibunSearchModal}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                  title="토지 지번(농지/산 번지) 정밀 검색"
+                >
+                  <Search className="w-3 h-3 text-indigo-600" />
+                  <span>지번 검색</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 액션 버튼 바: 대장 정보 불러오기 */}
         <div className="flex items-center justify-between pt-1 border-t border-slate-100 flex-wrap gap-2">
@@ -981,7 +1047,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
             <div className="p-2.5 bg-amber-50/70 rounded-xl border border-amber-200">
               <span className="text-[11px] font-medium text-amber-800 block mb-0.5 flex items-center justify-between">
                 <span>개별공시지가 (㎡당)</span>
-                <span className="text-[10px] text-amber-700 font-bold">{landData.officialPriceYear || '2024년'}</span>
+                <span className="text-[10px] text-amber-700 font-bold">{landData.officialPriceYear || '2026년'}</span>
               </span>
               <div className="font-extrabold text-amber-900 text-sm">
                 {landData.officialLandPrice ? landData.officialLandPrice.toLocaleString() : '-'}원
@@ -2370,7 +2436,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                     type="text"
                     value={landEditForm.officialPriceYear || ''}
                     onChange={(e) => setLandEditForm({ ...landEditForm, officialPriceYear: e.target.value })}
-                    placeholder="예: 2024년"
+                    placeholder="예: 2026년"
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg"
                   />
                 </div>

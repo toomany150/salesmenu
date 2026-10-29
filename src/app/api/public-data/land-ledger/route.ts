@@ -160,9 +160,15 @@ function estimateOfficialLandPrice(address: string, landCategory: string): { pri
     basePriceM2 = 900000;
   } else if (address.includes('제주')) {
     basePriceM2 = 320000;
+  } else if (address.includes('경남') || address.includes('김해') || address.includes('창원')) {
+    if (address.includes('장유') || address.includes('율하') || address.includes('내외')) {
+      basePriceM2 = 520000;
+    } else {
+      basePriceM2 = 280000;
+    }
   } else {
     // 지방 군/읍/면
-    basePriceM2 = 85000;
+    basePriceM2 = 145000;
   }
 
   // 지목별 배율 적용
@@ -202,7 +208,8 @@ export async function GET(request: NextRequest) {
 
   // 3. 국토교통부 공공데이터포털 개별공시지가 API 실시간 호출 시도
   let liveOfficialPrice: number | null = null;
-  let livePriceYear: string = '2024년';
+  let const currentYear = new Date().getFullYear();
+  let livePriceYear: string = `${currentYear}년`;
   let apiSuccess = false;
 
   const apiKey = process.env.DATA_GO_KR_API_KEY || DEFAULT_DATA_GO_KR_KEY;
@@ -224,7 +231,7 @@ export async function GET(request: NextRequest) {
             const price = parseFloat(item.pblntfPclnd || item.indvdLandPrice || item.price || 0);
             if (price > 0) {
               liveOfficialPrice = price;
-              livePriceYear = `${item.stdrYear || '2024'}년`;
+              livePriceYear = `${item.stdrYear || String(currentYear)}년`;
               apiSuccess = true;
               break;
             }
@@ -274,7 +281,7 @@ export async function GET(request: NextRequest) {
     source: apiSuccess ? 'GOV_API' : 'KAKAO_CALC',
     message: apiSuccess
       ? '국토교통부 공공데이터포털 개별공시지가 실시간 연동 성공'
-      : '국토교통부 기준연도(2024년) 지번 및 위치 기반 공시지가 산출 완료',
+      : '국토교통부 기준연도(2026년) 지번 및 위치 기반 공시지가 산출 완료',
   };
 
   return NextResponse.json(result);

@@ -129,7 +129,7 @@ export const LandForm: React.FC<LandFormProps> = ({ data, onChange }) => {
             <span>국토교통부 개별공시지가 정보</span>
           </label>
           <span className="text-[11px] text-slate-500">
-            기준년도: <span className="font-bold text-emerald-700">{data.officialPriceYear || '2024년'}</span>
+            기준년도: <span className="font-bold text-emerald-700">{data.officialPriceYear || '2026년'}</span>
           </span>
         </div>
 
@@ -160,7 +160,7 @@ export const LandForm: React.FC<LandFormProps> = ({ data, onChange }) => {
               type="text"
               value={data.officialPriceYear || ''}
               onChange={(e) => updateField('officialPriceYear', e.target.value)}
-              placeholder="예: 2024년"
+              placeholder="예: 2026년"
               className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
             />
           </div>

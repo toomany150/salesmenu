@@ -662,7 +662,7 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
                       {land.officialLandPrice ? `${land.officialLandPrice.toLocaleString()}원` : '-'}
                     </span>
                     <span className="text-[10px] text-amber-700 block">
-                      ({land.officialPriceYear || '2024년'} 기준)
+                      ({land.officialPriceYear || '2026년'} 기준)
                     </span>
                   </div>
                   <div>

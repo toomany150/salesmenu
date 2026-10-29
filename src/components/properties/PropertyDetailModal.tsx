@@ -2755,7 +2755,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       <span>💰 국토교통부 개별공시지가 정보</span>
                     </span>
                     <span className="text-[11px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded">
-                      기준년도: {land.officialPriceYear || '2024년'}
+                      기준년도: {land.officialPriceYear || '2026년'}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">

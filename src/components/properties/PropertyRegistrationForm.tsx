@@ -1502,62 +1502,64 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                      상세주소 확인 및 실시간 카카오 지도 위치
+                      {propertyType === 'LAND' ? '토지 소재지 실시간 카카오 지도 위치' : '상세주소 확인 및 실시간 카카오 지도 위치'}
                     </h4>
                     <span className="text-[11px] text-slate-500">
                       상단에서 입력한 주소의 위치가 지도에 실시간 표시됩니다.
                     </span>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-slate-700">
-                        상세주소 (동/호수/층)
-                      </label>
-                      {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
-                        <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                          🏢 집합건물 전유부
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 집합건물 전유부 빠른 선택 드롭다운 */}
-                    {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
-                      <div className="mb-1.5">
-                        <select
-                          value={ledgerData.unitList.some(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === detailAddress) ? detailAddress : ''}
-                          onChange={(e) => {
-                            if (!e.target.value) return;
-                            const found = ledgerData.unitList?.find(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === e.target.value);
-                            if (found) {
-                              handleSelectUnitFromLedger(found);
-                            }
-                          }}
-                          className="w-full text-xs font-bold px-2 py-1.5 bg-blue-50/70 border border-blue-300 rounded-lg text-blue-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                        >
-                          <option value="">▼ 호수 바로 선택 (동/호수/전용면적)</option>
-                          {ledgerData.unitList.map((u, i) => {
-                            const val = `${u.dong ? u.dong + ' ' : ''}${u.ho}`;
-                            const label = `${val} (${u.floor} / 전용 ${u.exclusiveArea}㎡ / ${u.ownerName || '소유자'})`;
-                            return (
-                              <option key={i} value={val}>{label}</option>
-                            );
-                          })}
-                        </select>
+                  {propertyType !== 'LAND' && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-slate-700">
+                          상세주소 (동/호수/층)
+                        </label>
+                        {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
+                          <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                            🏢 집합건물 전유부
+                          </span>
+                        )}
                       </div>
-                    )}
 
-                    <input
-                      type="text"
-                      value={detailAddress}
-                      onChange={(e) => handleDetailAddressChange(e.target.value)}
-                      placeholder="예: 101동 1304호 / 1층"
-                      className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-[48px]"
-                    />
-                    <p className="text-[10px] text-blue-600 mt-1 font-medium">
-                      💡 상단 대장 조회에서 동·호수를 클릭하거나 직접 입력 시 해당층수·대장상면적·주용도가 자동 반영됩니다.
-                    </p>
-                  </div>
+                      {/* 집합건물 전유부 빠른 선택 드롭다운 */}
+                      {ledgerData?.isCollectiveBuilding && ledgerData.unitList && ledgerData.unitList.length > 0 && (
+                        <div className="mb-1.5">
+                          <select
+                            value={ledgerData.unitList.some(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === detailAddress) ? detailAddress : ''}
+                            onChange={(e) => {
+                              if (!e.target.value) return;
+                              const found = ledgerData.unitList?.find(u => `${u.dong ? u.dong + ' ' : ''}${u.ho}` === e.target.value);
+                              if (found) {
+                                handleSelectUnitFromLedger(found);
+                              }
+                            }}
+                            className="w-full text-xs font-bold px-2 py-1.5 bg-blue-50/70 border border-blue-300 rounded-lg text-blue-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="">▼ 호수 바로 선택 (동/호수/전용면적)</option>
+                            {ledgerData.unitList.map((u, i) => {
+                              const val = `${u.dong ? u.dong + ' ' : ''}${u.ho}`;
+                              const label = `${val} (${u.floor} / 전용 ${u.exclusiveArea}㎡ / ${u.ownerName || '소유자'})`;
+                              return (
+                                <option key={i} value={val}>{label}</option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
+
+                      <input
+                        type="text"
+                        value={detailAddress}
+                        onChange={(e) => handleDetailAddressChange(e.target.value)}
+                        placeholder="예: 101동 1304호 / 1층"
+                        className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-[48px]"
+                      />
+                      <p className="text-[10px] text-blue-600 mt-1 font-medium">
+                        💡 상단 대장 조회에서 동·호수를 클릭하거나 직접 입력 시 해당층수·대장상면적·주용도가 자동 반영됩니다.
+                      </p>
+                    </div>
+                  )}
 
                   {/* 실시간 카카오 지도 임베드 (첨부한 두번째 형태) */}
                   <div className="mt-3">
