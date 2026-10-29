@@ -219,22 +219,32 @@ const DashboardContent: React.FC = () => {
         const cData = await custRes.json();
         if (Array.isArray(cData)) {
           cData.sort((a: any, b: any) => {
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
             const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
             const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
             const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
             const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
-            return tB - tA;
+            if (tB !== tA) return tB - tA;
+            const createdA = new Date(a.createdAt || 0).getTime();
+            const createdB = new Date(b.createdAt || 0).getTime();
+            return createdB - createdA;
           });
           setCustomers(cData);
           setCustomCustomers(cData);
         }
       } else if (localCustomCusts.length > 0) {
         localCustomCusts.sort((a: any, b: any) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
           const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
           const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
           const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
           const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
-          return tB - tA;
+          if (tB !== tA) return tB - tA;
+          const createdA = new Date(a.createdAt || 0).getTime();
+          const createdB = new Date(b.createdAt || 0).getTime();
+          return createdB - createdA;
         });
         setCustomers(localCustomCusts);
       }
@@ -451,15 +461,25 @@ const DashboardContent: React.FC = () => {
   const handleCustomerSaved = (savedCust: CustomerItem) => {
     saveCustomCustomer(savedCust);
     setCustomers((prev) => {
-      const filtered = prev.filter((c) => c.id !== savedCust.id);
+      // ID 일치 또는 동일 고객(이름+전화번호 일치) 기존 항목 제거하여 중복 생성 방지
+      const filtered = prev.filter((c) => {
+        if (c.id === savedCust.id) return false;
+        if (savedCust.name && savedCust.phone && c.name === savedCust.name && c.phone === savedCust.phone) return false;
+        return true;
+      });
       const next = [savedCust, ...filtered];
-      // [기능 4 & 5] 최근 등록된 일시(createdAt) 기준 맨처음 배치 + 중요 고객 최상단 고정
+      // 고객현황 정렬: 중요 고객 최상단 + 접수일자(receiptDate) 최신순
       return next.sort((a, b) => {
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
-        const timeA = new Date(a.createdAt || a.receiptDate || 0).getTime();
-        const timeB = new Date(b.createdAt || b.receiptDate || 0).getTime();
-        return timeB - timeA;
+        const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
+        const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
+        const dateA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
+        const dateB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        const createdA = new Date(a.createdAt || 0).getTime();
+        const createdB = new Date(b.createdAt || 0).getTime();
+        return createdB - createdA;
       });
     });
     fetchData();

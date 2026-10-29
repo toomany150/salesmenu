@@ -539,6 +539,24 @@ model LandDetail {
   landCategory           String?  // 지목 (전, 답, 대, 임야, 잡종지 등)
   roadAccess             String?  // 도로 접도 여부 (맹지, 4m접, 2차선접 등)
 
+  // 토지 방향 및 지세/조망/접도 세부 조건
+  roadDirection          String?  // 도로의 방향 (접도 조건) (북측 도로, 남측 도로 등)
+  roadWidth              String?  // 접한 도로 폭 (4m 미만, 4~6m, 8~10m, 12m 이상 등)
+  roadPavement           String?  // 도로 포장 상태 (아스콘 포장, 비포장 등)
+  viewDirection          String?  // 조망 열린 방향 (남향 조망, 동향 조망 등)
+  viewType               String?  // 조망/경관 유형 (바다/오션뷰, 리버뷰, 마운틴뷰 등)
+  viewDetails            String?  // 조망/경관 상세 설명
+  topography             String?  // 지세와 경사 방향 (평지, 남향 완경사 등)
+  landShape              String?  // 토지 형상 (정방형, 장방형, 부정형 등)
+
+  // 공시지가 및 토지대장 정보
+  officialLandPrice      Float?   // 개별공시지가 (원/㎡)
+  officialLandPricePerPyeong Float? // 평당 공시지가 (원/3.3㎡)
+  officialPriceYear      String?  // 공시지가 기준년도
+  landLedgerArea         Float?   // 토지대장 면적 (㎡)
+  landOwnership          String?  // 소유 구분
+  landUsePlan            String?  // 토지이용계획
+
   // 🚨 상담 체크리스트 (UI 고정 노출 항목)
   ordinancePermitted     String?  // 매수자가 원하는 건축물이 해당 용도지역 조례상 허용여부
   roadAccessConfirmed    String?  // 건축법상 진입도로(폭 4m 이상 등) 확보 여부

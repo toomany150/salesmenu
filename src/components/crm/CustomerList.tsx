@@ -142,16 +142,23 @@ export const CustomerList: React.FC<CustomerListProps> = ({
       );
     });
 
-    // [기능 4 & 5] 최근 등록일 기준으로 고객을 맨처음으로 배치 + 중요 고객 최상단(맨 처음) 고정
+    // 고객현황 정렬: 접수일(receiptDate) 기준으로 최근 접수일부터 표시 + 중요 고객 최상단 고정
     return filtered.sort((a, b) => {
       // 1순위: 중요 고객(isPinned) 최상단 고정
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
 
-      // 2순위: 실제 최근 등록된 일시(createdAt) 최신순으로 맨 처음 배치
-      const timeA = new Date(a.createdAt || a.receiptDate || 0).getTime();
-      const timeB = new Date(b.createdAt || b.receiptDate || 0).getTime();
-      return timeB - timeA;
+      // 2순위: 접수일자(receiptDate) 최신 내림차순
+      const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
+      const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
+      const dateA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
+      const dateB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+
+      // 3순위: 동일 접수일인 경우 최근 등록/수정일시(createdAt) 내림차순
+      const createdA = new Date(a.createdAt || 0).getTime();
+      const createdB = new Date(b.createdAt || 0).getTime();
+      return createdB - createdA;
     });
   }, [baseGroupCustomers, showFilterPanel, filteredFromPanel, currentUser, managerFilter, searchQuery]);
 

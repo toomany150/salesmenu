@@ -153,7 +153,16 @@ export function saveCustomCustomer(customer: CustomerItem): void {
   if (typeof window === 'undefined' || !customer) return;
   try {
     const list = getCustomCustomers();
-    const idx = list.findIndex((c) => c.id === customer.id);
+    const cleanPhone = customer.phone ? customer.phone.replace(/[^0-9]/g, '') : '';
+    const idx = list.findIndex((c) => {
+      if (c.id === customer.id) return true;
+      if (customer.name && cleanPhone && c.name === customer.name) {
+        const cCleanPhone = c.phone ? c.phone.replace(/[^0-9]/g, '') : '';
+        if (cCleanPhone && cCleanPhone === cleanPhone) return true;
+      }
+      return false;
+    });
+
     if (idx >= 0) {
       list[idx] = { ...list[idx], ...customer };
     } else {

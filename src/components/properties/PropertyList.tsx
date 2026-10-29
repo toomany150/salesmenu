@@ -534,7 +534,11 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                       <div className="p-4">
                         <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
                           <span className="font-mono">#{property.propertyNumber}</span>
-                          <span>{property.direction || '남향'} ({property.directionCriteria || '기준없음'})</span>
+                          <span>
+                            {property.propertyType === 'LAND'
+                              ? (property.landDetail?.roadDirection || property.direction || '도로접')
+                              : `${property.direction || '남향'} (${property.directionCriteria || '기준없음'})`}
+                          </span>
                         </div>
 
                         <h4 className="font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors text-sm line-clamp-1">
@@ -596,6 +600,45 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               }
                               return null;
                             })()}
+                          </div>
+                        )}
+
+                        {/* 토지 매물 전용 입지 뱃지 & 개별공시지가 정보 */}
+                        {(property.propertyType === 'LAND' || property.landDetail) && (
+                          <div className="mt-2 space-y-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                              {property.landDetail?.roadDirection && (
+                                <span className="px-2 py-0.5 rounded font-extrabold bg-blue-50 text-blue-800 border border-blue-200">
+                                  🛣️ {property.landDetail.roadDirection}
+                                </span>
+                              )}
+                              {property.landDetail?.viewDirection && (
+                                <span className="px-2 py-0.5 rounded font-extrabold bg-cyan-50 text-cyan-800 border border-cyan-200">
+                                  🌊 {property.landDetail.viewDirection}
+                                </span>
+                              )}
+                              {property.landDetail?.topography && (
+                                <span className="px-2 py-0.5 rounded font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                  ⛰️ {property.landDetail.topography}
+                                </span>
+                              )}
+                              {property.landDetail?.landCategory && (
+                                <span className="px-1.5 py-0.5 rounded font-bold bg-slate-100 text-slate-700">
+                                  지목: {property.landDetail.landCategory}
+                                </span>
+                              )}
+                            </div>
+
+                            {property.landDetail?.officialLandPrice ? (
+                              <div className="text-[11px] font-bold text-amber-900 bg-amber-50/80 px-2.5 py-1 rounded-md border border-amber-200 flex items-center justify-between">
+                                <span>
+                                  💰 공시지가: <strong>㎡당 {property.landDetail.officialLandPrice.toLocaleString()}원</strong>
+                                </span>
+                                <span className="text-[10px] text-amber-700 font-semibold">
+                                  (평당 약 {Math.round((property.landDetail.officialLandPricePerPyeong || property.landDetail.officialLandPrice * 3.305785) / 10000).toLocaleString()}만원)
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                         )}
 

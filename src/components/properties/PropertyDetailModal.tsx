@@ -2670,6 +2670,151 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
           )}
 
+          {/* 토지(임야/나대지) 상세 브리핑 및 입지 조건 (도로·조망·지세·공시지가) */}
+          {(property.propertyType === 'LAND' || property.landDetail) && (() => {
+            const land = (property.landDetail || {}) as any;
+            return (
+              <div className="p-4 rounded-xl bg-emerald-50/50 border-2 border-emerald-300 space-y-3.5 shadow-2xs">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                    <h4 className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🌱 토지 세부 스펙 및 입지 조건 (도로·조망·지세·공시지가)</span>
+                    </h4>
+                  </div>
+                  <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-200 text-emerald-900 rounded">
+                    토지 전문 중개 스펙
+                  </span>
+                </div>
+
+                {/* 1. 도로 접도 조건 & 조망 & 지세 3대 핵심 입지 지표 */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  {/* 도로의 방향 (접도 조건) */}
+                  <div className="p-3 bg-white rounded-xl border border-blue-200 shadow-2xs space-y-1">
+                    <span className="text-[11px] font-bold text-blue-900 block flex items-center justify-between">
+                      <span>🛣️ 도로 방향 (접도 조건)</span>
+                      <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-extrabold">
+                        {land.roadDirection ? '입력완료' : '기본'}
+                      </span>
+                    </span>
+                    <div className="font-extrabold text-slate-900 text-sm">
+                      {land.roadDirection || property.direction || '북측 도로 접 (일조권 유리)'}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      도로 폭: <strong className="text-slate-800">{land.roadWidth || '4~6m (차량교행가능)'}</strong>
+                    </div>
+                    {land.roadPavement && (
+                      <div className="text-[10px] text-slate-400">
+                        포장: {land.roadPavement}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 조망 방향과 경관 */}
+                  <div className="p-3 bg-white rounded-xl border border-cyan-200 shadow-2xs space-y-1">
+                    <span className="text-[11px] font-bold text-cyan-900 block flex items-center justify-between">
+                      <span>🌊 조망 방향과 경관 (뷰)</span>
+                      <span className="text-[10px] text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded font-extrabold">
+                        {land.viewDirection ? '열린조망' : '남향'}
+                      </span>
+                    </span>
+                    <div className="font-extrabold text-slate-900 text-sm">
+                      {land.viewDirection || '남향 조망 (영구 채광)'}
+                    </div>
+                    <div className="text-[11px] text-cyan-800 font-semibold">
+                      {land.viewType || '바다/오션뷰 또는 마운틴뷰'}
+                    </div>
+                    {land.viewDetails && (
+                      <div className="text-[10px] text-slate-500 italic">
+                        &quot;{land.viewDetails}&quot;
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 지세와 경사 방향 */}
+                  <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-1">
+                    <span className="text-[11px] font-bold text-emerald-900 block flex items-center justify-between">
+                      <span>⛰️ 지세와 경사 방향</span>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-extrabold">
+                        선호도 최상
+                      </span>
+                    </span>
+                    <div className="font-extrabold text-slate-900 text-sm">
+                      {land.topography || '남향 완경사 (일조/배수 최상)'}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      형상(모양): <strong className="text-slate-800">{land.landShape || '정방형 (정사각형)'}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. 국토교통부 개별공시지가 & 면적 정보 */}
+                <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-2xs">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-amber-100 mb-2">
+                    <span className="text-xs font-extrabold text-amber-950 flex items-center gap-1.5">
+                      <span>💰 국토교통부 개별공시지가 정보</span>
+                    </span>
+                    <span className="text-[11px] text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded">
+                      기준년도: {land.officialPriceYear || '2024년'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">개별공시지가 (㎡당)</span>
+                      <span className="font-extrabold text-amber-900 text-sm">
+                        {land.officialLandPrice ? `${land.officialLandPrice.toLocaleString()}원` : '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">평당 환산가 (3.3㎡)</span>
+                      <span className="font-extrabold text-amber-900 text-sm">
+                        {land.officialLandPricePerPyeong
+                          ? `약 ${Math.round(land.officialLandPricePerPyeong / 10000).toLocaleString()}만원`
+                          : (land.officialLandPrice ? `약 ${Math.round((land.officialLandPrice * 3.305785) / 10000).toLocaleString()}만원` : '-')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">지목 (토지 용도)</span>
+                      <span className="font-extrabold text-emerald-800 text-sm">
+                        {land.landCategory || '전 (밭)'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">용도지역</span>
+                      <span className="font-extrabold text-slate-800 text-sm">
+                        {land.zoningArea || property.zoningArea || '자연녹지지역'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. 체크리스트 상담/권리관계 확인사항 */}
+                {(land.ordinancePermitted || land.roadAccessConfirmed || land.surfaceRights || land.farmlandsCert || land.infrastructure) && (
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-1.5">
+                    <span className="font-bold text-slate-800 block text-[11px]">📋 토지 공법 및 권리분석 기록:</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                      {land.ordinancePermitted && (
+                        <div>• 조례상 건축허용: <strong className="text-slate-900">{land.ordinancePermitted}</strong></div>
+                      )}
+                      {land.roadAccessConfirmed && (
+                        <div>• 진입도로 확보: <strong className="text-slate-900">{land.roadAccessConfirmed}</strong></div>
+                      )}
+                      {land.surfaceRights && (
+                        <div>• 지상권/분묘기지권: <strong className="text-slate-900">{land.surfaceRights}</strong></div>
+                      )}
+                      {land.farmlandsCert && (
+                        <div>• 농취증/토지거래허가: <strong className="text-slate-900">{land.farmlandsCert}</strong></div>
+                      )}
+                      {land.infrastructure && (
+                        <div className="col-span-1 sm:col-span-2">• 기반시설(전기/수도): <strong className="text-slate-900">{land.infrastructure}</strong></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* 상담내용 및 매물 메모 (계정아이디 부여받은 자, 개업공인중개사, 관리자만 조회 가능한 대외비 보안 구역) */}
           {property.consultationNotes && currentUser && (currentUser.id || currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' || currentUser.name?.includes('개업공인중개사')) && (
             <div className="p-4 rounded-xl bg-purple-50/70 border-2 border-purple-200 shadow-2xs space-y-2">

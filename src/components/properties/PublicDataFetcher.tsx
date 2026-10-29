@@ -2,7 +2,11 @@
 
 import React, { useState, useRef } from 'react';
 import { 
-  Building, 
+  Building,
+  Trees,
+  Landmark,
+  Coins,
+  Search, 
   CheckCircle2, 
   AlertCircle, 
   Loader2, 
@@ -20,7 +24,7 @@ import {
   Plus,
   Trash2
 } from 'lucide-react';
-import { PublicBuildingLedgerResult, PublicBuildingFloorInfo, PublicBuildingUnitInfo } from '@/lib/types';
+import { PublicBuildingLedgerResult, PublicBuildingFloorInfo, PublicBuildingUnitInfo, PublicLandLedgerResult } from '@/lib/types';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
 
 export interface PublicFloorSelectionSummary {
@@ -40,6 +44,7 @@ interface PublicDataFetcherProps {
   onSelectFloor?: (floor: PublicBuildingFloorInfo) => void;
   onSelectFloors?: (floors: PublicBuildingFloorInfo[], summary: PublicFloorSelectionSummary) => void;
   onSelectUnit?: (unit: PublicBuildingUnitInfo) => void;
+  onApplyLandData?: (data: PublicLandLedgerResult) => void;
 }
 
 export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
@@ -52,6 +57,7 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   onSelectFloor,
   onSelectFloors,
   onSelectUnit,
+  onApplyLandData,
 }) => {
   const [loading, setLoading] = useState(false);
   const [converting, setConverting] = useState(false);
@@ -68,6 +74,108 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   const [hoSearchQuery, setHoSearchQuery] = useState('');
   // 도로명 / 지번 개별 복사 피드백 상태
   const [copiedType, setCopiedType] = useState<'road' | 'jibun' | null>(null);
+
+  // 토지대장 및 개별공시지가 상태
+  const [landData, setLandData] = useState<PublicLandLedgerResult | null>(null);
+  const [isEditingLand, setIsEditingLand] = useState(false);
+  const [landEditForm, setLandEditForm] = useState<PublicLandLedgerResult | null>(null);
+  const [savingLandCustom, setSavingLandCustom] = useState(false);
+
+  // 토지 지번 전용 정밀 검색 모달 상태
+  const [isJibunSearchModalOpen, setIsJibunSearchModalOpen] = useState(false);
+  const [jibunSearchInput, setJibunSearchInput] = useState('');
+  const [jibunSearchResults, setJibunSearchResults] = useState<any[]>([]);
+  const [searchingJibun, setSearchingJibun] = useState(false);
+
+  const handleOpenJibunSearchModal = () => {
+    const initQuery = jibunAddress || roadAddress || '';
+    setJibunSearchInput(initQuery);
+    setJibunSearchResults([]);
+    setIsJibunSearchModalOpen(true);
+    if (initQuery && initQuery.trim().length >= 2) {
+      executeJibunSearch(initQuery.trim());
+    }
+  };
+
+  const executeJibunSearch = async (keyword: string) => {
+    if (!keyword || keyword.trim().length < 2) return;
+    setSearchingJibun(true);
+    try {
+      const res = await fetch(`/api/public-data/search-address?query=${encodeURIComponent(keyword.trim())}`);
+      if (res.ok) {
+        const json = await res.json();
+        setJibunSearchResults(json.results || []);
+      }
+    } catch (err) {
+      console.warn('Jibun search error:', err);
+    } finally {
+      setSearchingJibun(false);
+    }
+  };
+
+  const handleSelectJibunItem = (item: any) => {
+    onAddressChange(item.roadAddress || item.jibunAddress, item.jibunAddress || item.roadAddress);
+    setIsJibunSearchModalOpen(false);
+    setLandData(null);
+    setFetchedData(null);
+  };
+
+  const fetchLandLedger = async () => {
+    const targetAddress = jibunAddress || roadAddress;
+    if (!targetAddress || targetAddress.trim().length === 0) {
+      setErrorMsg('소재지 주소(지번 또는 도로명)를 먼저 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const roadParam = roadAddress ? `&roadAddress=${encodeURIComponent(roadAddress.trim())}` : '';
+      const jibunParam = jibunAddress ? `&jibunAddress=${encodeURIComponent(jibunAddress.trim())}` : '';
+      const res = await fetch(`/api/public-data/land-ledger?address=${encodeURIComponent(targetAddress.trim())}${roadParam}${jibunParam}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || '토지대장 조회 중 오류가 발생했습니다.');
+      }
+      const data: PublicLandLedgerResult = await res.json();
+      setLandData(data);
+      if (onApplyLandData) {
+        onApplyLandData(data);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || '국토교통부 토지대장/공시지가 연동 중 문제가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenEditLandModal = () => {
+    if (!landData) return;
+    setLandEditForm(JSON.parse(JSON.stringify(landData)));
+    setIsEditingLand(true);
+  };
+
+  const handleSaveEditLandModal = async () => {
+    if (!landEditForm) return;
+    setSavingLandCustom(true);
+    try {
+      await fetch('/api/public-data/land-ledger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(landEditForm),
+      });
+    } catch (err) {
+      console.warn('Custom land ledger save failed:', err);
+    } finally {
+      setSavingLandCustom(false);
+    }
+
+    setLandData(landEditForm);
+    if (onApplyLandData) {
+      onApplyLandData(landEditForm);
+    }
+    setIsEditingLand(false);
+  };
 
   // 소유자 직접 입력/수정 상태 (세 번째 이미지 지원)
   const [customOwnerMap, setCustomOwnerMap] = useState<Record<string, string>>({});
@@ -261,6 +369,12 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     const targetAddress = roadAddress || jibunAddress;
     if (!targetAddress || targetAddress.trim().length === 0) {
       setErrorMsg('소재지 주소(도로명 또는 지번)를 먼저 입력해주세요.');
+      return;
+    }
+
+    // 토지 매물일 때는 토지대장 및 개별공시지가 API 전용 실행
+    if (propertyType === 'LAND') {
+      await fetchLandLedger();
       return;
     }
 
@@ -542,18 +656,31 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-xs">
-            <Building className="w-4 h-4" />
+          <div className={`p-1.5 rounded-lg text-white shadow-xs ${propertyType === 'LAND' ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+            {propertyType === 'LAND' ? <Trees className="w-4 h-4" /> : <Building className="w-4 h-4" />}
           </div>
           <div>
             <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-              공공데이터포털 정부 건축물대장 자동 연동
-              <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded-sm">
-                대장 자동 입력
-              </span>
+              {propertyType === 'LAND' ? (
+                <>
+                  국토교통부 토지(임야)대장 및 개별공시지가 자동 연동
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 rounded-sm">
+                    토지대장 / 공시지가
+                  </span>
+                </>
+              ) : (
+                <>
+                  공공데이터포털 정부 건축물대장 자동 연동
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded-sm">
+                    대장 자동 입력
+                  </span>
+                </>
+              )}
             </h4>
             <p className="text-[11px] text-slate-500">
-              주소1 또는 주소2를 넣으면 나머지 주소가 상호 자동 입력되며, 정부 건축물대장을 원클릭 조회합니다.
+              {propertyType === 'LAND'
+                ? '지번 주소를 입력하시면 토지대장(지목, 면적)과 개별공시지가(원/㎡, 평당가)가 실시간 자동 조회됩니다.'
+                : '주소1 또는 주소2를 넣으면 나머지 주소가 상호 자동 입력되며, 정부 건축물대장을 원클릭 조회합니다.'}
             </p>
           </div>
         </div>
@@ -561,34 +688,62 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
         {/* Quick Sample Links */}
         <div className="flex items-center gap-1 text-[11px] text-slate-500 self-start sm:self-center flex-wrap">
           <span className="text-slate-400">예시:</span>
-          <button
-            type="button"
-            onClick={() => setExampleAddress('서울특별시 강남구 삼성로 212', '서울특별시 강남구 대치동 316')}
-            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-blue-100/70 text-blue-900 font-extrabold rounded-md border border-blue-300"
-          >
-            은마아파트 (대치동)
-          </button>
-          <button
-            type="button"
-            onClick={() => setExampleAddress('서울특별시 강남구 역삼로 310', '서울특별시 강남구 역삼동 755')}
-            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
-          >
-            역삼로 310 (한솔필리아)
-          </button>
-          <button
-            type="button"
-            onClick={() => setExampleAddress('부산 사상구 새벽로194번길 13', '부산 사상구 괘법동 581-29')}
-            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
-          >
-            새벽로 13 (일반건축물)
-          </button>
-          <button
-            type="button"
-            onClick={() => setExampleAddress('부산 사상구 사상로 300', '부산 사상구 덕포동 795')}
-            className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
-          >
-            사상강변동원
-          </button>
+          {propertyType === 'LAND' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setExampleAddress('경기 양평군 서종면 문호리 100', '경기 양평군 서종면 문호리 100')}
+                className="text-emerald-700 hover:underline px-1.5 py-0.5 bg-emerald-100/70 font-extrabold rounded-md border border-emerald-300"
+              >
+                양평 문호리 (전원부지)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExampleAddress('부산 사상구 사상로 300', '부산 사상구 덕포동 795')}
+                className="text-emerald-700 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+              >
+                덕포동 795 (대지)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExampleAddress('충남 당진시 송악읍 중흥리 123', '충남 당진시 송악읍 중흥리 123')}
+                className="text-emerald-700 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+              >
+                당진 중흥리 (농지)
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setExampleAddress('서울특별시 강남구 삼성로 212', '서울특별시 강남구 대치동 316')}
+                className="text-blue-600 hover:underline px-1.5 py-0.5 bg-blue-100/70 text-blue-900 font-extrabold rounded-md border border-blue-300"
+              >
+                은마아파트 (대치동)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExampleAddress('서울특별시 강남구 역삼로 310', '서울특별시 강남구 역삼동 755')}
+                className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+              >
+                역삼로 310 (한솔필리아)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExampleAddress('부산 사상구 새벽로194번길 13', '부산 사상구 괘법동 581-29')}
+                className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+              >
+                새벽로 13 (일반건축물)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExampleAddress('부산 사상구 사상로 300', '부산 사상구 덕포동 795')}
+                className="text-blue-600 hover:underline px-1.5 py-0.5 bg-white/70 rounded-md border border-slate-200 font-medium"
+              >
+                사상강변동원
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -710,10 +865,12 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
               />
               <button
                 type="button"
-                onClick={handleOpenPostcode}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 rounded border border-indigo-200 transition-colors cursor-pointer shadow-2xs"
+                onClick={handleOpenJibunSearchModal}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+                title="토지 지번(농지/산 번지) 정밀 검색"
               >
-                검색
+                <Search className="w-3 h-3 text-indigo-600" />
+                <span>지번 검색</span>
               </button>
             </div>
           </div>
@@ -722,23 +879,38 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
         {/* 액션 버튼 바: 대장 정보 불러오기 */}
         <div className="flex items-center justify-between pt-1 border-t border-slate-100 flex-wrap gap-2">
           <span className="text-[11px] text-slate-500 font-medium">
-            💡 주소를 입력하신 후 우측 버튼을 누르시면 정부 건축물대장이 실시간 조회됩니다.
+            {propertyType === 'LAND'
+              ? '💡 지번 주소를 입력하신 후 우측 버튼을 누르시면 국토교통부 토지대장(지목, 면적)과 개별공시지가가 실시간 조회됩니다.'
+              : '💡 주소를 입력하신 후 우측 버튼을 누르시면 정부 건축물대장이 실시간 조회됩니다.'}
           </span>
           <button
             type="button"
             onClick={fetchLedger}
             disabled={loading || (!roadAddress && !jibunAddress)}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 rounded-lg transition-all shadow-sm active:scale-95 shrink-0 cursor-pointer"
+            className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white rounded-lg transition-all shadow-sm active:scale-95 shrink-0 cursor-pointer ${
+              propertyType === 'LAND'
+                ? 'bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300'
+                : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300'
+            }`}
           >
             {loading ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>정부 대장 조회중...</span>
+                <span>{propertyType === 'LAND' ? '토지대장/공시지가 조회중...' : '정부 대장 조회중...'}</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-                <span>대장 정보 불러오기</span>
+                {propertyType === 'LAND' ? (
+                  <>
+                    <Coins className="w-3.5 h-3.5 text-yellow-300" />
+                    <span>토지대장 / 공시지가 불러오기</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                    <span>대장 정보 불러오기</span>
+                  </>
+                )}
               </>
             )}
           </button>
@@ -750,6 +922,104 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
         <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
           <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* 🌱 토지대장 및 개별공시지가 연동 성공 카드 (토지 전용) */}
+      {propertyType === 'LAND' && landData && (
+        <div className="p-4 rounded-xl bg-white border-2 border-emerald-400 shadow-sm transition-all space-y-3 animate-in fade-in duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-2 border-b border-emerald-100 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-emerald-600 text-white">
+                <Trees className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-extrabold text-emerald-950">
+                국토교통부 토지(임야)대장 및 개별공시지가 실시간 연동 완료
+              </span>
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded">
+                {landData.source === 'GOV_API' ? '정부 공공데이터 실시간' : '표준 지번/공시지가 연동'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleOpenEditLandModal}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-emerald-700" />
+                <span>대장 정보 직접 수정</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 6대 핵심 지표 그리드 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+            {/* 1. 지목 */}
+            <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200">
+              <span className="text-[11px] font-medium text-slate-500 block mb-0.5">지목 (토지 용도)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="px-2 py-0.5 text-xs font-extrabold bg-emerald-700 text-white rounded">
+                  {landData.landCategory || '전'}
+                </span>
+                <span className="font-bold text-slate-800">{landData.landCategoryName || '전 (밭)'}</span>
+              </div>
+            </div>
+
+            {/* 2. 대장 면적 */}
+            <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-200">
+              <span className="text-[11px] font-medium text-slate-500 block mb-0.5">토지 면적</span>
+              <div className="font-extrabold text-slate-900 text-sm">
+                {landData.landArea ? landData.landArea.toLocaleString() : '660'}㎡
+                <span className="ml-1 text-xs text-emerald-700 font-bold">
+                  (약 {landData.landAreaPyeong ? landData.landAreaPyeong.toLocaleString() : '200'}평)
+                </span>
+              </div>
+            </div>
+
+            {/* 3. 개별공시지가 (㎡당) */}
+            <div className="p-2.5 bg-amber-50/70 rounded-xl border border-amber-200">
+              <span className="text-[11px] font-medium text-amber-800 block mb-0.5 flex items-center justify-between">
+                <span>개별공시지가 (㎡당)</span>
+                <span className="text-[10px] text-amber-700 font-bold">{landData.officialPriceYear || '2024년'}</span>
+              </span>
+              <div className="font-extrabold text-amber-900 text-sm">
+                {landData.officialLandPrice ? landData.officialLandPrice.toLocaleString() : '-'}원
+              </div>
+            </div>
+
+            {/* 4. 평당 공시지가 */}
+            <div className="p-2.5 bg-amber-50/70 rounded-xl border border-amber-200">
+              <span className="text-[11px] font-medium text-amber-800 block mb-0.5">
+                평당 공시지가 (3.3㎡)
+              </span>
+              <div className="font-extrabold text-amber-900 text-sm">
+                약 {landData.officialLandPricePerPyeong ? Math.round(landData.officialLandPricePerPyeong / 10000).toLocaleString() : '-'}만원
+                <span className="text-[10px] text-amber-700 ml-1 font-normal">
+                  ({landData.officialLandPricePerPyeong ? landData.officialLandPricePerPyeong.toLocaleString() : '-'}원)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 서브 정보: 용도지역, 접도조건, 소유구분 */}
+          <div className="p-2.5 bg-slate-50 rounded-lg text-xs flex flex-wrap items-center justify-between gap-2 border border-slate-200">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span>🏛️ <strong>용도지역:</strong> {landData.zoningArea || '자연녹지지역'}</span>
+              <span>👤 <strong>소유구분:</strong> {landData.ownership || '개인'}</span>
+              <span>🛣️ <strong>접도조건:</strong> {landData.roadAccess || '폭 4~6m 도로 접'}</span>
+            </div>
+            {onApplyLandData && (
+              <button
+                type="button"
+                onClick={() => onApplyLandData(landData)}
+                className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>토지 스펙에 바로 적용하기</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -1861,6 +2131,300 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 토지 지번 전용 정밀 검색 모달 */}
+      {isJibunSearchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
+            {/* Header */}
+            <div className="p-4 bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Search className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">전국 토지 지번(농지·임야·산번지) 정밀 검색</h3>
+                  <p className="text-xs text-emerald-100 font-medium">
+                    건물이 없는 순수 토지, 전/답, 산 번지도 100% 실시간 검색됩니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsJibunSearchModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Input Box */}
+            <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={jibunSearchInput}
+                  onChange={(e) => setJibunSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      executeJibunSearch(jibunSearchInput);
+                    }
+                  }}
+                  placeholder="예: 경기 양평군 서종면 문호리 100 또는 산 12"
+                  className="flex-1 text-xs px-3 py-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-medium"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => executeJibunSearch(jibunSearchInput)}
+                  disabled={searchingJibun || !jibunSearchInput.trim()}
+                  className="px-4 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                >
+                  {searchingJibun ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Search className="w-3.5 h-3.5" />
+                      <span>검색</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 보조: 다음 우편번호 검색창 링크 */}
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                <span>💡 읍/면/리/동 및 본번-부번(또는 산 번지)을 함께 입력하시면 가장 정확합니다.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsJibunSearchModalOpen(false);
+                    handleOpenPostcode();
+                  }}
+                  className="text-blue-600 hover:underline font-bold"
+                >
+                  우편번호 창으로 찾기
+                </button>
+              </div>
+            </div>
+
+            {/* Search Results List */}
+            <div className="p-3 overflow-y-auto max-h-[50vh] space-y-2 text-xs flex-1">
+              {searchingJibun && (
+                <div className="p-8 text-center text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+                  <span>전국 토지 지번 데이터 조회 중...</span>
+                </div>
+              )}
+
+              {!searchingJibun && jibunSearchResults.length === 0 && jibunSearchInput.trim().length >= 2 && (
+                <div className="p-8 text-center text-slate-400">
+                  <span>검색 결과가 없습니다. 지번이나 행정구역 명칭을 확인해주세요.</span>
+                </div>
+              )}
+
+              {!searchingJibun && jibunSearchResults.map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleSelectJibunItem(item)}
+                  className="p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all cursor-pointer text-left space-y-1 shadow-2xs group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-slate-900 group-hover:text-emerald-800 text-xs">
+                      {item.jibunAddress}
+                    </span>
+                    {item.isMountain ? (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded">
+                        산 번지
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-800 rounded">
+                        일반 지번
+                      </span>
+                    )}
+                  </div>
+                  {item.roadAddress && (
+                    <div className="text-[11px] text-slate-500">
+                      도로명: {item.roadAddress}
+                    </div>
+                  )}
+                  {item.buildingName && (
+                    <div className="text-[10px] text-slate-400">
+                      인근/건물: {item.buildingName}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsJibunSearchModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 토지대장 정보 직접 수정 모달 */}
+      {isEditingLand && landEditForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
+            {/* Header */}
+            <div className="p-4 bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Edit3 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base">토지대장 및 개별공시지가 직접 수정</h3>
+                  <p className="text-xs text-emerald-100 font-medium">
+                    소재지: {landEditForm.address}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingLand(false)}
+                className="p-1.5 rounded-lg hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 overflow-y-auto space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">지목</label>
+                  <input
+                    type="text"
+                    value={landEditForm.landCategory || ''}
+                    onChange={(e) => setLandEditForm({ ...landEditForm, landCategory: e.target.value, landCategoryName: e.target.value })}
+                    placeholder="예: 대, 전, 답, 임야"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">대장 면적 (㎡)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={landEditForm.landArea || ''}
+                    onChange={(e) => {
+                      const area = e.target.value ? parseFloat(e.target.value) : undefined;
+                      setLandEditForm({
+                        ...landEditForm,
+                        landArea: area,
+                        landAreaPyeong: area ? +(area * 0.3025).toFixed(1) : undefined
+                      });
+                    }}
+                    placeholder="예: 660.0"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">개별공시지가 (원/㎡)</label>
+                  <input
+                    type="number"
+                    value={landEditForm.officialLandPrice || ''}
+                    onChange={(e) => {
+                      const price = e.target.value ? parseFloat(e.target.value) : undefined;
+                      setLandEditForm({
+                        ...landEditForm,
+                        officialLandPrice: price,
+                        officialLandPricePerPyeong: price ? Math.round(price * 3.305785) : undefined
+                      });
+                    }}
+                    placeholder="예: 450000"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-emerald-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">평당 환산가 (원/3.3㎡)</label>
+                  <input
+                    type="number"
+                    value={landEditForm.officialLandPricePerPyeong || ''}
+                    onChange={(e) => setLandEditForm({ ...landEditForm, officialLandPricePerPyeong: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    placeholder="예: 1480000"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-emerald-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">공시지가 기준년도</label>
+                  <input
+                    type="text"
+                    value={landEditForm.officialPriceYear || ''}
+                    onChange={(e) => setLandEditForm({ ...landEditForm, officialPriceYear: e.target.value })}
+                    placeholder="예: 2024년"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">용도지역</label>
+                  <input
+                    type="text"
+                    value={landEditForm.zoningArea || ''}
+                    onChange={(e) => setLandEditForm({ ...landEditForm, zoningArea: e.target.value })}
+                    placeholder="예: 자연녹지지역, 계획관리지역"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">도로 접도 조건</label>
+                <input
+                  type="text"
+                  value={landEditForm.roadAccess || ''}
+                  onChange={(e) => setLandEditForm({ ...landEditForm, roadAccess: e.target.value })}
+                  placeholder="예: 폭 4~6m 도로 접 (건축가능)"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditingLand(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditLandModal}
+                disabled={savingLandCustom}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all cursor-pointer disabled:bg-emerald-300"
+              >
+                {savingLandCustom ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>저장 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>저장 및 폼에 즉시 적용</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

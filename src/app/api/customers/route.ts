@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         },
         demands: true,
       },
-      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }, { receiptDate: 'desc' }],
+      orderBy: [{ isPinned: 'desc' }, { receiptDate: 'desc' }, { createdAt: 'desc' }],
     });
 
     // 만약 DB가 비어있으면 초기 목데이터 자동 시딩
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
           properties: true,
           demands: true,
         },
-        orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ isPinned: 'desc' }, { receiptDate: 'desc' }, { createdAt: 'desc' }],
       });
     }
 
@@ -230,81 +230,184 @@ export async function POST(request: NextRequest) {
       if (u) validUserId = u.id;
     }
 
-    const customer = await prisma.customer.create({
-      data: {
-        name,
-        carrier: finalCarrier,
-        phone,
-        type,
-        subType: finalSubType,
-        group: finalGroup,
+    // 기존에 동일 ID 또는 동일 이름+전화번호를 가진 고객이 이미 존재하는지 확인하여 중복 생성 방지
+    const cleanName = name.trim();
+    const cleanPhone = phone.trim();
+    let existingCustomer = body.id ? await prisma.customer.findUnique({ where: { id: body.id }, include: { properties: true, demands: true } }) : null;
+    if (!existingCustomer && cleanName && cleanPhone) {
+      existingCustomer = await prisma.customer.findFirst({
+        where: { name: cleanName, phone: cleanPhone },
+        include: { properties: true, demands: true },
+      });
+    }
+
+    let customer: any;
+    if (existingCustomer) {
+      // 이미 존재하는 고객인 경우 새로 생성하지 않고 기존 고객 업데이트 (중복 방지)
+      customer = await prisma.customer.update({
+        where: { id: existingCustomer.id },
+        data: {
+          name: cleanName,
+          carrier: finalCarrier !== undefined ? finalCarrier : undefined,
+          phone: cleanPhone,
+          type: type || undefined,
+          subType: finalSubType || undefined,
+          group: finalGroup || undefined,
+          status: body.status || undefined,
+          isPinned: body.isPinned !== undefined ? Boolean(body.isPinned) : undefined,
+          receiptDate: body.receiptDate ? new Date(body.receiptDate) : undefined,
+          memo: memo !== undefined ? memo : undefined,
+          price: finalPrice !== undefined ? finalPrice : undefined,
+          negotiablePrice: finalNegoPrice !== undefined ? finalNegoPrice : undefined,
+          deposit: finalDeposit !== undefined ? finalDeposit : undefined,
+          negotiableDeposit: finalNegoDeposit !== undefined ? finalNegoDeposit : undefined,
+          monthlyRent: finalMonthlyRent !== undefined ? finalMonthlyRent : undefined,
+          negotiableMonthlyRent: finalNegoMonthlyRent !== undefined ? finalNegoMonthlyRent : undefined,
+          premium: finalPremium !== undefined ? finalPremium : undefined,
+          negotiablePremium: finalNegoPremium !== undefined ? finalNegoPremium : undefined,
+          transactionType: finalTxType !== undefined ? finalTxType : undefined,
+          managerName: managerName || undefined,
+          assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : undefined,
+        },
+        include: {
+          properties: true,
+          demands: true,
+        },
+      });
+
+      if (demand) {
+        const existingDemand = existingCustomer.demands && existingCustomer.demands.length > 0 ? existingCustomer.demands[0] : null;
+        const demandData: any = {
+          targetPropertyType: demand.targetPropertyType || 'APARTMENT',
+          targetTransactionType: demand.targetTransactionType || '매매',
+          targetRegion: demand.targetRegion?.trim() || null,
+          regionReason: demand.regionReason?.trim() || null,
+          minBudget: demand.minBudget ? parseFloat(demand.minBudget) : null,
+          maxBudget: demand.maxBudget ? parseFloat(demand.maxBudget) : null,
+          maxBudgetReason: demand.maxBudgetReason?.trim() || null,
+          targetPrice: demand.targetPrice ? parseFloat(demand.targetPrice) : null,
+          targetJeonse: demand.targetJeonse ? parseFloat(demand.targetJeonse) : null,
+          minDeposit: demand.minDeposit ? parseFloat(demand.minDeposit) : null,
+          maxDeposit: demand.maxDeposit ? parseFloat(demand.maxDeposit) : null,
+          minMonthlyRent: demand.minMonthlyRent ? parseFloat(demand.minMonthlyRent) : null,
+          maxMonthlyRent: demand.maxMonthlyRent ? parseFloat(demand.maxMonthlyRent) : null,
+          preferredFloor: demand.preferredFloor?.trim() || null,
+          preferredArea: demand.preferredArea ? parseFloat(demand.preferredArea) : null,
+          preferredAreaPy: demand.preferredAreaPy ? parseFloat(demand.preferredAreaPy) : null,
+          parkingRequirement: demand.parkingRequirement?.trim() || null,
+          moveInTiming: demand.moveInTiming?.trim() || null,
+          moveInReason: demand.moveInReason?.trim() || null,
+          residenceType: demand.residenceType?.trim() || null,
+          moveOutPlanDate: demand.moveOutPlanDate?.trim() || null,
+          jeonseContractPeriod: demand.jeonseContractPeriod?.trim() || null,
+          jeonseRemainingPeriod: demand.jeonseRemainingPeriod?.trim() || null,
+          jeonseRenewalClaimUsed: demand.jeonseRenewalClaimUsed?.trim() || null,
+          monthlyContractPeriod: demand.monthlyContractPeriod?.trim() || null,
+          monthlyRemainingPeriod: demand.monthlyRemainingPeriod?.trim() || null,
+          monthlyRenewalClaimUsed: demand.monthlyRenewalClaimUsed?.trim() || null,
+          loanRequirement: demand.loanRequirement?.trim() || null,
+          nonNegotiableCondition: demand.nonNegotiableCondition?.trim() || null,
+          negotiableCondition: demand.negotiableCondition?.trim() || null,
+          premiumLimit: demand.premiumLimit ? parseFloat(demand.premiumLimit) : null,
+          premiumReason: demand.premiumReason?.trim() || null,
+          minRequiredArea: demand.minRequiredArea ? parseFloat(demand.minRequiredArea) : null,
+          minRequiredAreaPy: demand.minRequiredAreaPy ? parseFloat(demand.minRequiredAreaPy) : null,
+          minAreaReason: demand.minAreaReason?.trim() || null,
+          previousVisitedProps: demand.previousVisitedProps?.trim() || null,
+          requirements: demand.requirements?.trim() || null,
+          status: 'ACTIVE',
+        };
+        if (existingDemand) {
+          await prisma.customerDemand.update({
+            where: { id: existingDemand.id },
+            data: demandData,
+          });
+        } else {
+          await prisma.customerDemand.create({
+            data: {
+              ...demandData,
+              customerId: existingCustomer.id,
+            },
+          });
+        }
+      }
+    } else {
+      customer = await prisma.customer.create({
+        data: {
+          name: cleanName,
+          carrier: finalCarrier,
+          phone: cleanPhone,
+          type,
+          subType: finalSubType,
+          group: finalGroup,
           status: body.status || 'ACTIVE',
-        isPinned: Boolean(body.isPinned),
+          isPinned: Boolean(body.isPinned),
           receiptDate: body.receiptDate ? new Date(body.receiptDate) : (body.createdAt ? new Date(body.createdAt) : new Date()),
-        memo,
-        price: finalPrice,
-        negotiablePrice: finalNegoPrice,
-        deposit: finalDeposit,
-        negotiableDeposit: finalNegoDeposit,
-        monthlyRent: finalMonthlyRent,
-        negotiableMonthlyRent: finalNegoMonthlyRent,
-        premium: finalPremium,
-        negotiablePremium: finalNegoPremium,
-        transactionType: finalTxType,
-        managerName: managerName || '사무실',
-        assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
-        createdById: validUserId,
-        creatorName: creatorName || null,
-        demands: demand
-          ? {
-              create: {
-                targetPropertyType: demand.targetPropertyType || 'APARTMENT',
-                targetTransactionType: demand.targetTransactionType || '매매',
-                targetRegion: demand.targetRegion?.trim() || null,
-                regionReason: demand.regionReason?.trim() || null,
-                minBudget: demand.minBudget ? parseFloat(demand.minBudget) : null,
-                maxBudget: demand.maxBudget ? parseFloat(demand.maxBudget) : null,
-                maxBudgetReason: demand.maxBudgetReason?.trim() || null,
-                targetPrice: demand.targetPrice ? parseFloat(demand.targetPrice) : null,
-                targetJeonse: demand.targetJeonse ? parseFloat(demand.targetJeonse) : null,
-                minDeposit: demand.minDeposit ? parseFloat(demand.minDeposit) : null,
-                maxDeposit: demand.maxDeposit ? parseFloat(demand.maxDeposit) : null,
-                minMonthlyRent: demand.minMonthlyRent ? parseFloat(demand.minMonthlyRent) : null,
-                maxMonthlyRent: demand.maxMonthlyRent ? parseFloat(demand.maxMonthlyRent) : null,
-                preferredFloor: demand.preferredFloor?.trim() || null,
-                preferredArea: demand.preferredArea ? parseFloat(demand.preferredArea) : null,
-                preferredAreaPy: demand.preferredAreaPy ? parseFloat(demand.preferredAreaPy) : null,
-                parkingRequirement: demand.parkingRequirement?.trim() || null,
-                moveInTiming: demand.moveInTiming?.trim() || null,
-                moveInReason: demand.moveInReason?.trim() || null,
-                residenceType: demand.residenceType?.trim() || null,
-                moveOutPlanDate: demand.moveOutPlanDate?.trim() || null,
-                jeonseContractPeriod: demand.jeonseContractPeriod?.trim() || null,
-                jeonseRemainingPeriod: demand.jeonseRemainingPeriod?.trim() || null,
-                jeonseRenewalClaimUsed: demand.jeonseRenewalClaimUsed?.trim() || null,
-                monthlyContractPeriod: demand.monthlyContractPeriod?.trim() || null,
-                monthlyRemainingPeriod: demand.monthlyRemainingPeriod?.trim() || null,
-                monthlyRenewalClaimUsed: demand.monthlyRenewalClaimUsed?.trim() || null,
-                loanRequirement: demand.loanRequirement?.trim() || null,
-                nonNegotiableCondition: demand.nonNegotiableCondition?.trim() || null,
-                negotiableCondition: demand.negotiableCondition?.trim() || null,
-                premiumLimit: demand.premiumLimit ? parseFloat(demand.premiumLimit) : null,
-                premiumReason: demand.premiumReason?.trim() || null,
-                minRequiredArea: demand.minRequiredArea ? parseFloat(demand.minRequiredArea) : null,
-                minRequiredAreaPy: demand.minRequiredAreaPy ? parseFloat(demand.minRequiredAreaPy) : null,
-                minAreaReason: demand.minAreaReason?.trim() || null,
-                previousVisitedProps: demand.previousVisitedProps?.trim() || null,
-                requirements: demand.requirements?.trim() || null,
-                status: 'ACTIVE',
-              },
-            }
-          : undefined,
-      },
-      include: {
-        properties: true,
-        demands: true,
-      },
-    });
+          memo,
+          price: finalPrice,
+          negotiablePrice: finalNegoPrice,
+          deposit: finalDeposit,
+          negotiableDeposit: finalNegoDeposit,
+          monthlyRent: finalMonthlyRent,
+          negotiableMonthlyRent: finalNegoMonthlyRent,
+          premium: finalPremium,
+          negotiablePremium: finalNegoPremium,
+          transactionType: finalTxType,
+          managerName: managerName || '사무실',
+          assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
+          createdById: validUserId,
+          creatorName: creatorName || null,
+          demands: demand
+            ? {
+                create: {
+                  targetPropertyType: demand.targetPropertyType || 'APARTMENT',
+                  targetTransactionType: demand.targetTransactionType || '매매',
+                  targetRegion: demand.targetRegion?.trim() || null,
+                  regionReason: demand.regionReason?.trim() || null,
+                  minBudget: demand.minBudget ? parseFloat(demand.minBudget) : null,
+                  maxBudget: demand.maxBudget ? parseFloat(demand.maxBudget) : null,
+                  maxBudgetReason: demand.maxBudgetReason?.trim() || null,
+                  targetPrice: demand.targetPrice ? parseFloat(demand.targetPrice) : null,
+                  targetJeonse: demand.targetJeonse ? parseFloat(demand.targetJeonse) : null,
+                  minDeposit: demand.minDeposit ? parseFloat(demand.minDeposit) : null,
+                  maxDeposit: demand.maxDeposit ? parseFloat(demand.maxDeposit) : null,
+                  minMonthlyRent: demand.minMonthlyRent ? parseFloat(demand.minMonthlyRent) : null,
+                  maxMonthlyRent: demand.maxMonthlyRent ? parseFloat(demand.maxMonthlyRent) : null,
+                  preferredFloor: demand.preferredFloor?.trim() || null,
+                  preferredArea: demand.preferredArea ? parseFloat(demand.preferredArea) : null,
+                  preferredAreaPy: demand.preferredAreaPy ? parseFloat(demand.preferredAreaPy) : null,
+                  parkingRequirement: demand.parkingRequirement?.trim() || null,
+                  moveInTiming: demand.moveInTiming?.trim() || null,
+                  moveInReason: demand.moveInReason?.trim() || null,
+                  residenceType: demand.residenceType?.trim() || null,
+                  moveOutPlanDate: demand.moveOutPlanDate?.trim() || null,
+                  jeonseContractPeriod: demand.jeonseContractPeriod?.trim() || null,
+                  jeonseRemainingPeriod: demand.jeonseRemainingPeriod?.trim() || null,
+                  jeonseRenewalClaimUsed: demand.jeonseRenewalClaimUsed?.trim() || null,
+                  monthlyContractPeriod: demand.monthlyContractPeriod?.trim() || null,
+                  monthlyRemainingPeriod: demand.monthlyRemainingPeriod?.trim() || null,
+                  monthlyRenewalClaimUsed: demand.monthlyRenewalClaimUsed?.trim() || null,
+                  loanRequirement: demand.loanRequirement?.trim() || null,
+                  nonNegotiableCondition: demand.nonNegotiableCondition?.trim() || null,
+                  negotiableCondition: demand.negotiableCondition?.trim() || null,
+                  premiumLimit: demand.premiumLimit ? parseFloat(demand.premiumLimit) : null,
+                  premiumReason: demand.premiumReason?.trim() || null,
+                  minRequiredArea: demand.minRequiredArea ? parseFloat(demand.minRequiredArea) : null,
+                  minRequiredAreaPy: demand.minRequiredAreaPy ? parseFloat(demand.minRequiredAreaPy) : null,
+                  minAreaReason: demand.minAreaReason?.trim() || null,
+                  previousVisitedProps: demand.previousVisitedProps?.trim() || null,
+                  requirements: demand.requirements?.trim() || null,
+                  status: 'ACTIVE',
+                },
+              }
+            : undefined,
+        },
+        include: {
+          properties: true,
+          demands: true,
+        },
+      });
+    }
 
     const ipAddress = 
       request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
@@ -370,10 +473,22 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '고객 ID가 필요합니다.' }, { status: 400 });
     }
 
-    const existingCust = await prisma.customer.findUnique({ where: { id } });
+    let existingCust = await prisma.customer.findUnique({ where: { id } });
+    if (!existingCust && name && phone) {
+      const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+      existingCust = await prisma.customer.findFirst({
+        where: {
+          name: name.trim(),
+          phone: cleanPhone,
+        },
+      });
+    }
+
     if (!existingCust) {
       return NextResponse.json({ error: '고객을 찾을 수 없습니다.' }, { status: 404 });
     }
+
+    const targetId = existingCust.id;
 
     // 권한 확인: 개업공인중개사(대표) 및 관리자(ADMIN)는 전체 수정 가능
     // 그 외 사용자는 본인이 작성/주담당이거나 추가지정 권한자(assignedAgents)에 포함되어야 함.
@@ -402,7 +517,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updated = await prisma.customer.update({
-      where: { id },
+      where: { id: targetId },
       data: {
         name: name || undefined,
         carrier: carrier !== undefined ? carrier : undefined,
@@ -410,9 +525,9 @@ export async function PUT(request: NextRequest) {
         type: type || undefined,
         subType: subType !== undefined ? subType : undefined,
         group: group || undefined,
-          status: body.status !== undefined ? body.status : undefined,
+        status: body.status !== undefined ? body.status : undefined,
         isPinned: body.isPinned !== undefined ? Boolean(body.isPinned) : undefined,
-          receiptDate: body.receiptDate !== undefined ? (body.receiptDate ? new Date(body.receiptDate) : null) : undefined,
+        receiptDate: body.receiptDate !== undefined ? (body.receiptDate ? new Date(body.receiptDate) : null) : undefined,
         memo: memo !== undefined ? memo : undefined,
         price: price !== undefined ? (price !== null ? parseFloat(price) : null) : undefined,
         negotiablePrice: negotiablePrice !== undefined ? (negotiablePrice !== null ? parseFloat(negotiablePrice) : null) : undefined,
@@ -434,7 +549,7 @@ export async function PUT(request: NextRequest) {
 
     if (demand) {
       const existingDemand = await prisma.customerDemand.findFirst({
-        where: { customerId: id },
+        where: { customerId: targetId },
       });
       const demandData: any = {
         targetPropertyType: demand.targetPropertyType || 'APARTMENT',
@@ -486,7 +601,7 @@ export async function PUT(request: NextRequest) {
         await prisma.customerDemand.create({
           data: {
             ...demandData,
-            customerId: id,
+            customerId: targetId,
           },
         });
       }

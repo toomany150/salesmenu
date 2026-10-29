@@ -492,6 +492,25 @@ export interface LandData {
   zoningArea?: string;
   landCategory?: string;
   roadAccess?: string;
+
+  // 토지 방향 및 지세/조망/접도 세부 스펙 (2번째 파일 대체 및 보강)
+  roadDirection?: string; // 도로의 방향 (접도 조건) (예: 북측 도로, 남측 도로 등)
+  roadWidth?: string; // 접한 도로 폭 (예: 4m 미만, 4~6m, 8~10m, 12m 이상 등)
+  roadPavement?: string; // 도로 포장 상태 (예: 아스콘 포장, 비포장(현황도로) 등)
+  viewDirection?: string; // 조망 열린 방향 (예: 남향 조망, 동향 조망, 파노라마 등)
+  viewType?: string; // 조망 및 경관 유형 (예: 바다/오션뷰, 리버뷰, 마운틴뷰 등)
+  viewDetails?: string; // 조망/경관 직접 설명 (예: "남향 바다 조망권 영구 확보")
+  topography?: string; // 지세와 경사 방향 (예: 평지, 남향 완경사, 동향 완경사 등)
+  landShape?: string; // 토지 형상 (예: 정방형, 장방형, 사다리꼴, 부정형 등)
+
+  // 공시지가 및 토지대장 정보
+  officialLandPrice?: number; // 개별공시지가 (원/㎡)
+  officialLandPricePerPyeong?: number; // 평당 공시지가 (원/3.3㎡)
+  officialPriceYear?: string; // 공시지가 기준년도 (예: 2024년)
+  landLedgerArea?: number; // 토지대장상 면적 (㎡)
+  landOwnership?: string; // 소유 구분 (개인, 법인, 국공유지 등)
+  landUsePlan?: string; // 토지이용계획
+
   // 체크리스트
   ordinancePermitted?: string;
   roadAccessConfirmed?: string;
@@ -826,3 +845,21 @@ export interface PublicBuildingLedgerResult {
 // 매물 및 고객의 수정 권한 판별 함수 (auth.ts와 통일)
 export { canEditItem } from './auth';
 
+
+// 토지(임야)대장 및 개별공시지가 공공데이터 조회 결과 인터페이스
+export interface PublicLandLedgerResult {
+  address: string;
+  pnu?: string;
+  landCategory?: string; // 지목 (예: 전, 답, 대, 임야, 잡종지)
+  landCategoryName?: string; // 지목명
+  landArea?: number; // 대장 면적 (㎡)
+  landAreaPyeong?: number; // 대장 면적 (평)
+  officialLandPrice?: number; // 개별공시지가 (원/㎡)
+  officialLandPricePerPyeong?: number; // 평당 공시지가 (원/3.3㎡)
+  officialPriceYear?: string; // 기준년도 (예: 2024)
+  ownership?: string; // 소유구분 (개인, 법인, 국유지, 시유지 등)
+  zoningArea?: string; // 용도지역 (예: 계획관리지역, 자연녹지지역 등)
+  roadAccess?: string; // 접도 여부 / 도로 조건
+  source?: 'GOV_API' | 'USER_CUSTOM' | 'KAKAO_CALC';
+  message?: string;
+}

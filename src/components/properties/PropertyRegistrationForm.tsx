@@ -823,6 +823,27 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   };
 
   // Handle apply data from government public data portal
+
+  // 국토교통부 토지대장 및 개별공시지가 연동 데이터 수신
+  const handleApplyLandData = (landResult: any) => {
+    setLandData((prev: any) => ({
+      ...prev,
+      landArea: landResult.landArea || prev.landArea,
+      landCategory: landResult.landCategory || prev.landCategory,
+      zoningArea: landResult.zoningArea || prev.zoningArea,
+      officialLandPrice: landResult.officialLandPrice || prev.officialLandPrice,
+      officialLandPricePerPyeong: landResult.officialLandPricePerPyeong || prev.officialLandPricePerPyeong,
+      officialPriceYear: landResult.officialPriceYear || prev.officialPriceYear,
+      roadAccess: landResult.roadAccess || prev.roadAccess,
+      landOwnership: landResult.ownership || prev.landOwnership,
+    }));
+    if (landResult.landArea && !landArea) {
+      setLandArea(landResult.landArea);
+    }
+    if (landResult.zoningArea && !zoningArea) {
+      setZoningArea(landResult.zoningArea);
+    }
+  };
   const handleApplyPublicData = (data: PublicBuildingLedgerResult) => {
     setLedgerData(data);
     if (data.landArea) setLandArea(data.landArea);
@@ -2677,77 +2698,411 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                   {/* ======================================================== */}
                   {/* 방향 8방위 버튼 칩 & 방향 기준 3옵션 */}
                   {/* ======================================================== */}
-                  <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3.5">
-                    
-                    {/* 8방위 버튼 칩 */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                          <Compass className="w-4 h-4 text-blue-600" />
-                          방향 (8방위 칩 선택) *
-                        </label>
-                        <span className="text-xs font-extrabold text-blue-600 bg-blue-100/80 px-2.5 py-1 rounded-md">
-                          현재 선택: {direction}
-                        </span>
+                  {propertyType === 'LAND' ? (
+                    <div className="p-4 bg-emerald-50/50 rounded-2xl border-2 border-emerald-300 space-y-4 shadow-2xs">
+                      {/* 토지 전용 헤더 */}
+                      <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-xs">
+                            <Compass className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-extrabold text-emerald-950 flex items-center gap-1.5">
+                              토지 필수 입지 및 환경 조건 (도로·조망·지세)
+                              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                                토지 가치 핵심 결정 요소
+                              </span>
+                            </h4>
+                            <p className="text-xs text-emerald-700">
+                              건축 인허가 가능 여부, 일조권 사선제한 완화, 토목공사 비용 및 프리미엄을 좌우하는 4대 필수 지표입니다.
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                        {DIRECTION_OPTIONS.map((d) => {
-                          const isSelected = direction === d;
-                          return (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => setDirection(d)}
-                              className={`py-2.5 px-1.5 text-xs sm:text-sm font-bold rounded-xl border transition-all text-center flex items-center justify-center ${
-                                isSelected
-                                  ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-500/20'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                              }`}
-                            >
-                              <span>{d}</span>
-                            </button>
-                          );
-                        })}
+                      {/* 1. 도로의 방향 (접도 조건) */}
+                      <div className="p-3.5 bg-white rounded-xl border border-emerald-200/90 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                            <span>1. 도로의 방향 (접도 조건) *</span>
+                          </label>
+                          <span className="text-[11px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                            선택: {landData.roadDirection || '미선택'}
+                          </span>
+                        </div>
+
+                        {/* 사용자 요청 설명문 */}
+                        <div className="p-2.5 bg-blue-50/60 rounded-lg border border-blue-100 text-[11px] text-blue-900 leading-relaxed">
+                          <p className="font-semibold mb-1">
+                            📌 <strong>토지가 어느 방향의 도로(북측 도로, 남측 도로 등)에 접해 있는지는</strong> 건축법상 도로 여부, 일조권 제한(북측 도로 인접 대지 완화 등), 차량 진출입 방향을 결정하는 핵심 요소입니다.
+                          </p>
+                          <p className="text-slate-600">
+                            예를 들어 <strong>&apos;북측 도로&apos;에 접한 땅</strong>은 건축 시 일조권 혜택(북측 원거리 이격)을 받아 건물을 더 높이 지을 수 있는 유리함이 생기기도 합니다.
+                          </p>
+                        </div>
+
+                        {/* 도로 접면 방향 칩 */}
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-600 block mb-1.5">도로 접면 방향 선택</span>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                            {[
+                              { label: '북측 도로 접', tip: '일조권 완화 유리 ⭐' },
+                              { label: '남측 도로 접', tip: '채광/일조 최상' },
+                              { label: '동측 도로 접', tip: '오전 채광' },
+                              { label: '서측 도로 접', tip: '오후 채광' },
+                              { label: '북동 코너 (각지)', tip: '가시성/접근성 우수' },
+                              { label: '남동 코너 (각지)', tip: '선호도 최고' },
+                              { label: '북서 코너 (각지)', tip: '통행량 우수' },
+                              { label: '남서 코너 (각지)', tip: '오후 일조' },
+                              { label: '양면 도로 (통과)', tip: '진출입 2곳 확보' },
+                              { label: '3면 이상 접도', tip: '대지 활용도 극대' },
+                              { label: '도로 미접 (맹지)', tip: '사도/진입로 확보필요' },
+                            ].map((item) => {
+                              const isSelected = landData.roadDirection === item.label;
+                              return (
+                                <button
+                                  key={item.label}
+                                  type="button"
+                                  onClick={() => {
+                                    setLandData({ ...landData, roadDirection: item.label });
+                                    setDirection(item.label.split(' ')[0]);
+                                  }}
+                                  className={`py-2 px-2 text-xs font-bold rounded-lg border transition-all text-left flex flex-col justify-between ${
+                                    isSelected
+                                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/20'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span>{item.label}</span>
+                                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                  </div>
+                                  <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                                    {item.tip}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 접한 도로 폭 및 포장 상태 */}
+                        <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-600 block mb-1">접한 도로 폭 (너비)</span>
+                            <div className="grid grid-cols-3 gap-1">
+                              {['4m 미만 (협소)', '4~6m (건축가능)', '8~10m (2차선)', '12~20m (중로)', '20m 이상 (대로)', '맹지'].map((w) => {
+                                const isSelected = landData.roadWidth === w;
+                                return (
+                                  <button
+                                    key={w}
+                                    type="button"
+                                    onClick={() => setLandData({ ...landData, roadWidth: w })}
+                                    className={`py-1.5 px-1 text-[11px] font-bold rounded-md border text-center transition-all ${
+                                      isSelected
+                                        ? 'bg-slate-900 text-white border-slate-900'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    {w}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-600 block mb-1">도로 포장 상태</span>
+                            <div className="grid grid-cols-2 gap-1">
+                              {['아스콘 포장도로', '콘크리트 포장', '비포장 (현황도로)', '지적도상 도로'].map((p) => {
+                                const isSelected = landData.roadPavement === p;
+                                return (
+                                  <button
+                                    key={p}
+                                    type="button"
+                                    onClick={() => setLandData({ ...landData, roadPavement: p })}
+                                    className={`py-1.5 px-1 text-[11px] font-bold rounded-md border text-center transition-all ${
+                                      isSelected
+                                        ? 'bg-slate-900 text-white border-slate-900'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    {p}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. 조망 방향과 경관 */}
+                      <div className="p-3.5 bg-white rounded-xl border border-emerald-200/90 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-cyan-600"></span>
+                            <span>2. 조망 방향과 경관 (뷰 View)</span>
+                          </label>
+                          <span className="text-[11px] font-extrabold text-cyan-800 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded">
+                            열린 조망: {landData.viewDirection || '남향 조망'}
+                          </span>
+                        </div>
+
+                        {/* 사용자 요청 설명문 */}
+                        <div className="p-2.5 bg-cyan-50/60 rounded-lg border border-cyan-100 text-[11px] text-cyan-950 leading-relaxed">
+                          <p className="font-semibold">
+                            🌊 <strong>바다, 강, 산, 공원 등 멋진 조망(뷰)이 어느 방향으로 열려 있는지가</strong> 토지의 가치와 가격을 크게 좌우합니다. (예: &quot;남향 바다 조망권&quot;, &quot;리버뷰 토지&quot; 등)
+                          </p>
+                        </div>
+
+                        {/* 조망 열린 방향 칩 */}
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-600 block mb-1">조망 열린 방향</span>
+                          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                            {['남향 조망', '남동향 조망', '동향 조망', '남서향 조망', '서향 조망', '북향 조망', '파노라마 360°'].map((v) => {
+                              const isSelected = landData.viewDirection === v;
+                              return (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => setLandData({ ...landData, viewDirection: v })}
+                                  className={`py-1.5 px-1 text-xs font-bold rounded-lg border text-center transition-all ${
+                                    isSelected
+                                      ? 'bg-cyan-700 text-white border-cyan-700 shadow-xs'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  {v}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 경관 종류 태그 칩 */}
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-600 block mb-1">멋진 경관 및 뷰 유형 (선택)</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              '남향 바다 조망권 (오션뷰)',
+                              '탁 트인 강 조망 (리버뷰)',
+                              '호수/저수지 뷰',
+                              '명산/마운틴 뷰',
+                              '숲세권/공원 뷰',
+                              '도심/시티 야경 뷰',
+                              '탁 트인 평야/골프장 뷰',
+                              '종일 일조량 풍부',
+                            ].map((tag) => {
+                              const isSelected = (landData.viewType || '').includes(tag);
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = landData.viewType || '';
+                                    const updated = current.includes(tag)
+                                      ? current.replace(tag, '').replace(/,\s*,/g, ',').trim()
+                                      : current ? `${current}, ${tag}` : tag;
+                                    setLandData({ ...landData, viewType: updated });
+                                  }}
+                                  className={`px-2.5 py-1 text-xs font-bold rounded-full border transition-all ${
+                                    isSelected
+                                      ? 'bg-cyan-100 text-cyan-900 border-cyan-400 ring-1 ring-cyan-400'
+                                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  {tag}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 조망 직접 설명란 */}
+                        <div>
+                          <input
+                            type="text"
+                            value={landData.viewDetails || ''}
+                            onChange={(e) => setLandData({ ...landData, viewDetails: e.target.value })}
+                            placeholder="조망 및 경관 상세 설명 (예: 남향 영구 바다 조망권 및 해질녘 낙조 감상 가능)"
+                            className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 3. 지세와 경사 방향 */}
+                      <div className="p-3.5 bg-white rounded-xl border border-emerald-200/90 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                            <span>3. 지세와 경사 방향 *</span>
+                          </label>
+                          <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                            지세: {landData.topography || '평지'}
+                          </span>
+                        </div>
+
+                        {/* 사용자 요청 설명문 */}
+                        <div className="p-2.5 bg-emerald-50/60 rounded-lg border border-emerald-100 text-[11px] text-emerald-950 leading-relaxed">
+                          <p className="font-semibold mb-1">
+                            ⛰️ <strong>땅이 어느 쪽으로 기울어져 있는지(경사 방향)에 따라</strong> 토목공사 비용과 배수 계획이 완전히 달라집니다.
+                          </p>
+                          <p className="text-slate-600">
+                            <strong>남향이나 동향으로 완만하게 경사진 땅</strong>이 일조와 배수에 유리해 선호도가 높습니다.
+                          </p>
+                        </div>
+
+                        {/* 지세 및 경사도 칩 */}
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-600 block mb-1">지세 및 경사 방향 선택</span>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                            {[
+                              { label: '평지', tip: '토목비용 최소화' },
+                              { label: '남향 완경사', tip: '일조/배수 최상 ⭐ 선호도 최고' },
+                              { label: '동향 완경사', tip: '오전 일조/배수 양호' },
+                              { label: '서향 완경사', tip: '오후 일조 양호' },
+                              { label: '완경사지', tip: '계단식 조망 건축 용이' },
+                              { label: '급경사지', tip: '옹벽/축대 토목 필요' },
+                              { label: '고지대 (전망형)', tip: '조망 탁월 / 일조 확보' },
+                              { label: '저지대/평탄지', tip: '배수 계획 확인 필요' },
+                            ].map((item) => {
+                              const isSelected = landData.topography === item.label;
+                              return (
+                                <button
+                                  key={item.label}
+                                  type="button"
+                                  onClick={() => setLandData({ ...landData, topography: item.label })}
+                                  className={`py-2 px-2 text-xs font-bold rounded-lg border transition-all text-left flex flex-col justify-between ${
+                                    isSelected
+                                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span>{item.label}</span>
+                                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                  </div>
+                                  <span className={`text-[10px] ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
+                                    {item.tip}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4. 토지 형상 (추가 실무 필수 항목) */}
+                      <div className="p-3 bg-white rounded-xl border border-emerald-200/90 shadow-2xs">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-slate-700"></span>
+                            <span>4. 토지 형상(모양) 및 필지 상태</span>
+                          </label>
+                          <span className="text-[11px] font-bold text-slate-600">
+                            형상: {landData.landShape || '정방형 (정사각형)'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                          {[
+                            { label: '정방형 (정사각형)', tip: '가장 이상적인 모양' },
+                            { label: '장방형 (직사각형)', tip: '건축 활용도 우수' },
+                            { label: '사다리꼴', tip: '무난한 배치 가능' },
+                            { label: '부정형 (불규칙)', tip: '경계측량 권장' },
+                            { label: '자루형 (깃대형)', tip: '진입로 입구 좁음' },
+                          ].map((item) => {
+                            const isSelected = landData.landShape === item.label;
+                            return (
+                              <button
+                                key={item.label}
+                                type="button"
+                                onClick={() => setLandData({ ...landData, landShape: item.label })}
+                                className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition-all text-center ${
+                                  isSelected
+                                    ? 'bg-slate-800 text-white border-slate-800'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                <div>{item.label}</div>
+                                <div className={`text-[10px] ${isSelected ? 'text-slate-200' : 'text-slate-400'}`}>{item.tip}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
+                  ) : (
+                    <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-3.5">
+                      
+                      {/* 8방위 버튼 칩 */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            <Compass className="w-4 h-4 text-blue-600" />
+                            방향 (8방위 칩 선택) *
+                          </label>
+                          <span className="text-xs font-extrabold text-blue-600 bg-blue-100/80 px-2.5 py-1 rounded-md">
+                            현재 선택: {direction}
+                          </span>
+                        </div>
 
-                    {/* 방향 기준 옵션 (토지: 진입도로 / 도로 접면 / 지세 기준 등 토지 전용 기준 제공) */}
-                    <div className="pt-3 border-t border-slate-200">
-                      <div className="flex flex-wrap items-center justify-between gap-1 mb-2">
-                        <label className="text-sm font-bold text-slate-800">
-                          방향 기준 옵션
-                        </label>
-                        <span className="text-xs text-slate-500">
-                          {propertyType === 'LAND'
-                            ? '(토지 매물: 진입도로 기준 / 도로 접면 기준 / 지세 기준 자동세팅)'
-                            : '(아파트·주택: 거실 창문 / 상가·공장·사무실: 주출입구 / 토지: 진입도로 기준)'}
-                        </span>
+                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                          {DIRECTION_OPTIONS.map((d) => {
+                            const isSelected = direction === d;
+                            return (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setDirection(d)}
+                                className={`py-2.5 px-1.5 text-xs sm:text-sm font-bold rounded-xl border transition-all text-center flex items-center justify-center ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-500/20'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                                }`}
+                              >
+                                <span>{d}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                        {(DIRECTION_CRITERIA_BY_PROPERTY_TYPE[propertyType] || DIRECTION_CRITERIA_OPTIONS).map((crit) => {
-                          const isSelected = directionCriteria === crit;
-                          return (
-                            <button
-                              key={crit}
-                              type="button"
-                              onClick={() => handleDirectionCriteriaChange(crit)}
-                              className={`py-2.5 px-2 text-xs sm:text-sm font-bold rounded-xl border transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
-                                isSelected
-                                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-blue-500/20'
-                                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                              }`}
-                            >
-                              {isSelected && <Check className="w-4 h-4 text-blue-400 stroke-[3]" />}
-                              <span>{crit}</span>
-                            </button>
-                          );
-                        })}
+                      {/* 방향 기준 옵션 */}
+                      <div className="pt-3 border-t border-slate-200">
+                        <div className="flex flex-wrap items-center justify-between gap-1 mb-2">
+                          <label className="text-sm font-bold text-slate-800">
+                            방향 기준 옵션
+                          </label>
+                          <span className="text-xs text-slate-500">
+                            (아파트·주택: 거실 창문 / 상가·공장·사무실: 주출입구)
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                          {(DIRECTION_CRITERIA_BY_PROPERTY_TYPE[propertyType] || DIRECTION_CRITERIA_OPTIONS).map((crit) => {
+                            const isSelected = directionCriteria === crit;
+                            return (
+                              <button
+                                key={crit}
+                                type="button"
+                                onClick={() => handleDirectionCriteriaChange(crit)}
+                                className={`py-2.5 px-2 text-xs sm:text-sm font-bold rounded-xl border transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-blue-500/20'
+                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                }`}
+                              >
+                                {isSelected && <Check className="w-4 h-4 text-blue-400 stroke-[3]" />}
+                                <span>{crit}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
+
                     </div>
-
-                  </div>
+                  )}
 
                 {/* 6. 7가지 매물 세부 폼 (동적 렌더링 - 주택 폼에 에어컨/풀옵션 보강됨) */}
                 <div>

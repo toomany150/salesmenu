@@ -511,12 +511,18 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
 
             {/* 방향 */}
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 block">방향 (기준)</span>
+              <span className="text-[11px] text-slate-500 block">
+                {property.propertyType === 'LAND' ? '도로 접면 방향' : '방향 (기준)'}
+              </span>
               <span className="font-bold text-slate-900 text-sm">
-                {property.direction || '남향'}
+                {property.propertyType === 'LAND'
+                  ? (property.landDetail?.roadDirection || property.direction || '도로접')
+                  : (property.direction || '남향')}
               </span>
               <span className="text-[10px] text-slate-400 block mt-0.5">
-                {property.directionCriteria || '주출입구 기준'}
+                {property.propertyType === 'LAND'
+                  ? (property.landDetail?.roadWidth || '접도조건')
+                  : (property.directionCriteria || '주출입구 기준')}
               </span>
             </div>
 
@@ -593,6 +599,97 @@ export const CustomerPropertyBriefing: React.FC<CustomerPropertyBriefingProps> =
             </div>
           </div>
         </div>
+
+        {/* 토지(임야/나대지) 입지 및 공시지가 브리핑 리포트 */}
+        {(property.propertyType === 'LAND' || property.landDetail) && (() => {
+          const land = (property.landDetail || {}) as any;
+          return (
+            <div className="bg-emerald-50/50 rounded-2xl p-5 sm:p-6 shadow-sm border-2 border-emerald-300 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-emerald-200">
+                <h2 className="text-sm font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2.5 h-4 rounded-full bg-emerald-600"></span>
+                  🌱 토지 입지 조건 및 공시지가 브리핑 (도로·조망·지세·형상)
+                </h2>
+                <span className="px-2.5 py-1 text-xs font-black bg-emerald-600 text-white rounded-lg shadow-2xs">
+                  토지 가치 핵심 분석
+                </span>
+              </div>
+
+              {/* 3대 입지 지표 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3.5 bg-white rounded-xl border border-blue-200 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-blue-900 block">🛣️ 도로의 방향 (접도 조건)</span>
+                  <div className="font-extrabold text-slate-900 text-sm">
+                    {land.roadDirection || property.direction || '북측 도로 접'}
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    폭: <strong>{land.roadWidth || '4~6m'}</strong> {land.roadPavement ? `(${land.roadPavement})` : ''}
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-white rounded-xl border border-cyan-200 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-cyan-900 block">🌊 조망 방향과 경관 (뷰)</span>
+                  <div className="font-extrabold text-slate-900 text-sm">
+                    {land.viewDirection || '남향 조망'}
+                  </div>
+                  <div className="text-[11px] text-cyan-800 font-semibold truncate">
+                    {land.viewType || '바다/산/공원 조망'}
+                  </div>
+                  {land.viewDetails && (
+                    <div className="text-[10px] text-slate-500 italic truncate">
+                      {land.viewDetails}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3.5 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-emerald-900 block">⛰️ 지세 및 경사 방향</span>
+                  <div className="font-extrabold text-slate-900 text-sm">
+                    {land.topography || '남향 완경사'}
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    형상: <strong>{land.landShape || '정방형'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* 공시지가 및 지목/용도지역 */}
+              <div className="p-3.5 bg-white rounded-xl border border-amber-300 shadow-2xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">개별공시지가 (㎡당)</span>
+                    <span className="font-extrabold text-amber-900 text-sm">
+                      {land.officialLandPrice ? `${land.officialLandPrice.toLocaleString()}원` : '-'}
+                    </span>
+                    <span className="text-[10px] text-amber-700 block">
+                      ({land.officialPriceYear || '2024년'} 기준)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">평당 환산 공시지가</span>
+                    <span className="font-extrabold text-amber-900 text-sm">
+                      {land.officialLandPricePerPyeong
+                        ? `약 ${Math.round(land.officialLandPricePerPyeong / 10000).toLocaleString()}만원`
+                        : (land.officialLandPrice ? `약 ${Math.round((land.officialLandPrice * 3.305785) / 10000).toLocaleString()}만원` : '-')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">지목 (토지 용도)</span>
+                    <span className="font-extrabold text-emerald-800 text-sm">
+                      {land.landCategory || '전 (밭)'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">용도지역</span>
+                    <span className="font-extrabold text-slate-800 text-sm">
+                      {land.zoningArea || property.zoningArea || '자연녹지지역'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 5. 상가/사무실 맞춤 추가 스펙 (안내용) */}
         {property.storeDetail && (
