@@ -1498,18 +1498,6 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </span>
               </div>
             </div>
-
-            {/* 특징 및 핵심 요약 */}
-            {(property.consultationNotes || property.buildingRegisterUse || property.storeDetail?.operationPeriod) && (
-              <div className="px-3 py-2 bg-indigo-50/70 rounded-xl border border-indigo-100 text-xs text-indigo-950 flex items-start gap-1.5 shadow-2xs">
-                <span className="font-bold shrink-0 text-indigo-700">💡 핵심요약:</span>
-                <span className="font-medium line-clamp-2">
-                  {property.storeDetail?.operationPeriod ? `운영: ${property.storeDetail.operationPeriod} · ` : ''}
-                  {property.buildingRegisterUse ? `주용도: ${property.buildingRegisterUse} · ` : ''}
-                  {property.consultationNotes ? property.consultationNotes.slice(0, 80) : '정상 등록 매물'}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* ======================================================== */}

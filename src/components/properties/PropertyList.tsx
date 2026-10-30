@@ -16,7 +16,8 @@ import {
   Camera,
   ImageIcon,
   Copy,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   PropertyItem, 
@@ -240,6 +241,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                 const statusInfo = STATUS_LABELS[property.status] || { label: property.status, color: 'bg-slate-100 text-slate-800' };
                 const isSelected = highlightedPropertyId === property.id;
                 const hasImages = property.images && property.images.length > 0;
+                const isContracted = property.status === 'CONTRACTED';
 
                 return (
                   <div
@@ -248,10 +250,12 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                       setHighlightedPropertyId(property.id);
                       onSelectProperty(property);
                     }}
-                    className={`bg-white rounded-xl border p-3.5 transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20'
-                        : 'border-slate-200 hover:border-blue-300 hover:shadow-xs'
+                    className={`rounded-xl border p-3.5 transition-all cursor-pointer relative overflow-hidden ${
+                      isContracted
+                        ? 'bg-rose-50/20 border-rose-200 hover:border-rose-400 hover:shadow-xs'
+                        : isSelected
+                        ? 'bg-white border-blue-500 shadow-md ring-2 ring-blue-500/20'
+                        : 'bg-white border-slate-200 hover:border-blue-300 hover:shadow-xs'
                     }`}
                   >
                     <div className="flex gap-3">
@@ -275,6 +279,15 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             <span className="text-[10px] mt-0.5 font-medium">사진없음</span>
                           </div>
                         )}
+
+                        {/* 판매완료 썸네일 오버레이 */}
+                        {isContracted && (
+                          <div className="absolute inset-0 bg-black/50 backdrop-blur-2xs flex items-center justify-center z-10 p-1 pointer-events-none">
+                            <span className="bg-rose-600 text-white text-[11px] font-black px-2 py-0.5 rounded shadow-md border border-rose-300 tracking-wider">
+                              판매완료
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Content */}
@@ -293,9 +306,10 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               <span className="px-1.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-800 shrink-0">
                                 {property.transactionType}
                               </span>
-                              {property.status === 'CONTRACTED' && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-rose-600 text-white shadow-2xs shrink-0">
-                                  ✓ 판매완료
+                              {isContracted && (
+                                <span className="px-2 py-0.5 text-[11px] font-black rounded-md bg-rose-600 text-white shadow-xs shrink-0 flex items-center gap-0.5 border border-rose-300 animate-pulse">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>판매완료</span>
                                 </span>
                               )}
                             </div>
@@ -304,14 +318,23 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             </span>
                           </div>
 
-                          <h4 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1">
-                            {property.apartmentDetail?.complexName ||
-                             property.storeDetail?.storeName ||
-                             property.officeDetail?.officeName ||
-                             property.factoryWarehouseDetail?.companyName ||
-                             property.landDetail?.companyName ||
-                             property.address}
-                          </h4>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className={`font-black text-xs sm:text-sm line-clamp-1 ${
+                              isContracted ? 'text-slate-800' : 'text-slate-900'
+                            }`}>
+                              {property.apartmentDetail?.complexName ||
+                               property.storeDetail?.storeName ||
+                               property.officeDetail?.officeName ||
+                               property.factoryWarehouseDetail?.companyName ||
+                               property.landDetail?.companyName ||
+                               property.address}
+                            </h4>
+                            {isContracted && (
+                              <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
+                                [판매완료]
+                              </span>
+                            )}
+                          </div>
 
                           <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
                             <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
@@ -528,6 +551,16 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                         <span className={`absolute top-2.5 right-2.5 px-2 py-0.5 text-[11px] font-semibold rounded-full border bg-white/90 backdrop-blur-xs ${statusInfo.color}`}>
                           {statusInfo.label}
                         </span>
+
+                        {/* 판매완료 카드 뷰 오버레이 스탬프 */}
+                        {isContracted && (
+                          <div className="absolute inset-0 bg-black/45 backdrop-blur-2xs flex items-center justify-center z-10 pointer-events-none">
+                            <div className="border-2 border-dashed border-rose-400 bg-rose-600/95 text-white font-black px-4 py-1.5 rounded-xl text-sm sm:text-base tracking-widest shadow-xl flex items-center gap-1.5 animate-pulse">
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>[ 판 매 완 료 ]</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Card Content */}
@@ -541,14 +574,21 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                           </span>
                         </div>
 
-                        <h4 className="font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors text-sm line-clamp-1">
-                          {property.apartmentDetail?.complexName ||
-                           property.storeDetail?.storeName ||
-                           property.officeDetail?.officeName ||
-                           property.factoryWarehouseDetail?.companyName ||
-                           property.landDetail?.companyName ||
-                           property.address}
-                        </h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors text-sm line-clamp-1">
+                            {property.apartmentDetail?.complexName ||
+                             property.storeDetail?.storeName ||
+                             property.officeDetail?.officeName ||
+                             property.factoryWarehouseDetail?.companyName ||
+                             property.landDetail?.companyName ||
+                             property.address}
+                          </h4>
+                          {isContracted && (
+                            <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
+                              [판매완료]
+                            </span>
+                          )}
+                        </div>
 
                         <p className="text-xs text-slate-600 flex items-center gap-1 mt-1 truncate">
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
