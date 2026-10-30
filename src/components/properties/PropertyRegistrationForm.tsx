@@ -18,7 +18,8 @@ import {
   UserCheck,
   Lock,
   DollarSign,
-  Calendar
+  Calendar,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   PropertyType, 
@@ -192,6 +193,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         // Edit Mode
         setPropertyType(initialData.propertyType || 'APARTMENT');
         setPropertyNumber(initialData.propertyNumber || '');
+        setStatus(initialData.status || 'AVAILABLE');
         setReceiptDate(initialData.receiptDate ? initialData.receiptDate.substring(0, 10) : new Date().toISOString().substring(0, 10));
         setTransactionType(
           initialData.propertyType === 'STORE' && initialData.transactionType === '전세'
@@ -435,6 +437,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setIsAddingAgent(false);
         setNewAgentInput('');
         setTransactionType('매매');
+        setStatus('AVAILABLE');
         setRoadAddress('');
         setJibunAddress('');
         setAddress('');
@@ -2348,6 +2351,42 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     </div>
                   </div>
                 </div>
+
+                  {/* 매물 거래 상태 (진행중 / 판매완료 / 보류) */}
+                  <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                        <span>매물 거래 상태 *</span>
+                      </label>
+                      <span className="text-xs font-semibold text-slate-500">
+                        (매물이 판매되면 &apos;판매완료&apos;를 선택하세요)
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {[
+                        { val: 'AVAILABLE', label: '🟢 접수/진행중', activeClass: 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500/20' },
+                        { val: 'CONTRACTED', label: '🔴 판매완료', activeClass: 'bg-rose-600 text-white border-rose-600 shadow-md ring-2 ring-rose-500/20' },
+                        { val: 'HOLD', label: '🟡 보류', activeClass: 'bg-amber-500 text-white border-amber-500 shadow-md ring-2 ring-amber-500/20' },
+                      ].map((s) => {
+                        const isSelected = status === s.val;
+                        return (
+                          <button
+                            key={s.val}
+                            type="button"
+                            onClick={() => setStatus(s.val as PropertyStatus)}
+                            className={`py-2.5 text-xs sm:text-sm font-black rounded-xl border transition-all text-center cursor-pointer ${
+                              isSelected
+                                ? s.activeClass
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   {/* 거래유형 (상가점포는 전세 제외하고 매매 / 월세만 노출) */}
                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">

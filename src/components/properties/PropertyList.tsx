@@ -295,7 +295,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               </span>
                               {property.status === 'CONTRACTED' && (
                                 <span className="px-1.5 py-0.5 text-[10px] font-black rounded-md bg-rose-600 text-white shadow-2xs shrink-0">
-                                  ✓ 계약완료
+                                  ✓ 판매완료
                                 </span>
                               )}
                             </div>

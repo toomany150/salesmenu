@@ -32,7 +32,9 @@ import {
   Upload,
   Plus,
   Loader2,
-  Star
+  Star,
+  RotateCcw,
+  FileText
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -928,6 +930,36 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     setTouchStartX(null);
   };
 
+  // 판매완료 / 진행중 상태 원클릭 변경 핸들러
+  const handleToggleStatus = async (newStatus: any) => {
+    if (!property || !onPropertyUpdated) return;
+    const isSelling = newStatus === 'CONTRACTED';
+    const actionLabel = isSelling ? '판매완료' : (STATUS_LABELS[newStatus as keyof typeof STATUS_LABELS]?.label || newStatus);
+    const confirmMsg = isSelling
+      ? `[${titleName || property.address}] 매물을 '판매완료' 처리하시겠습니까?\n(매물장 및 상세화면에 '판매완료'로 표시됩니다)`
+      : `매물 상태를 '${actionLabel}'(으)로 변경하시겠습니까?`;
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    const updatedProperty: PropertyItem = {
+      ...property,
+      status: newStatus,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await fetch('/api/properties', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedProperty),
+      });
+    } catch (err) {
+      console.error('Failed to sync property status to server:', err);
+    }
+
+    onPropertyUpdated(updatedProperty);
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -939,9 +971,34 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             <span className="px-2 py-0.5 text-xs font-bold rounded-lg bg-blue-600 text-white shadow-xs shrink-0">
               {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
             </span>
-            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border shrink-0 ${statusInfo.color}`}>
-              {statusInfo.label}
-            </span>
+
+            {/* 거래 상태: 권한자 직접 변경 드롭다운 또는 뱃지 */}
+            {canEdit && onPropertyUpdated ? (
+              <select
+                value={property.status}
+                onChange={(e) => handleToggleStatus(e.target.value)}
+                className={`px-2 py-0.5 text-xs font-extrabold rounded-full border cursor-pointer outline-hidden transition-all shadow-2xs ${
+                  property.status === 'CONTRACTED'
+                    ? 'bg-rose-100 text-rose-800 border-rose-400 ring-2 ring-rose-400/40 font-black'
+                    : property.status === 'AVAILABLE'
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : property.status === 'HOLD'
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-slate-100 text-slate-800 border-slate-300'
+                }`}
+                title="클릭하여 매물 상태를 '판매완료' 등으로 즉시 변경할 수 있습니다"
+              >
+                <option value="AVAILABLE">🟢 접수/진행중</option>
+                <option value="CONTRACTED">🔴 판매완료</option>
+                <option value="HOLD">🟡 보류</option>
+                <option value="CANCELLED">⚪ 취소</option>
+              </select>
+            ) : (
+              <span className={`px-2 py-0.5 text-xs font-bold rounded-full border shrink-0 ${statusInfo.color}`}>
+                {property.status === 'CONTRACTED' ? '판매완료' : statusInfo.label}
+              </span>
+            )}
+
             <span className="font-mono text-xs font-bold text-slate-500 shrink-0">
               #{property.propertyNumber}
             </span>
@@ -969,7 +1026,32 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           {/* 우측 조작 버튼 그룹: 모바일에서 절대 줄바꿈되거나 세로로 찌그러지지 않도록 shrink-0 및 whitespace-nowrap 적용 */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0 flex-wrap">
+            {/* 판매완료 원클릭 토글 버튼 */}
+            {canEdit && onPropertyUpdated && (
+              property.status !== 'CONTRACTED' ? (
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus('CONTRACTED')}
+                  title="이 매물이 판매(계약)되었을 때 '판매완료'로 즉시 변경합니다"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 active:scale-95 rounded-lg transition-all shadow-xs whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>판매완료 처리</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus('AVAILABLE')}
+                  title="판매완료 상태를 해제하고 '접수/진행중'으로 복원합니다"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 active:scale-95 rounded-lg transition-all shadow-2xs whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>진행중으로 복원</span>
+                </button>
+              )
+            )}
+
             {/* 수정 버튼: 대표 또는 지정 권한자만 가능 */}
             {onEditProperty && (
               canEdit ? (
@@ -1068,7 +1150,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   {property.status === 'CONTRACTED' ? (
                     <span className="text-xs font-black px-2.5 py-1 rounded-md bg-rose-600 text-white border border-rose-300 shadow-xs flex items-center gap-1 animate-pulse">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      ✓ 계약완료
+                      ✓ 판매완료
                     </span>
                   ) : (
                     <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md ${
@@ -1274,6 +1356,194 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </div>
           </div>
 
+          {/* ======================================================== */}
+          {/* 📋 매물요약 (매물장에 등록된 핵심 정보 한눈에 요약) */}
+          {/* ======================================================== */}
+          <div className="p-4 bg-linear-to-br from-indigo-50/70 via-white to-slate-50 rounded-2xl border-2 border-indigo-200/90 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between pb-2.5 border-b border-indigo-100 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-2xs">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-indigo-950 flex items-center gap-1.5">
+                    매물요약
+                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
+                      #{property.propertyNumber}
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    매물장에 등록된 주요 핵심 제원 및 거래 조건 요약입니다.
+                  </p>
+                </div>
+              </div>
+
+              {/* 거래 상태 배지 & 접수일자 */}
+              <div className="flex items-center gap-1.5">
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-black border shadow-2xs ${
+                  property.status === 'CONTRACTED'
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : property.status === 'AVAILABLE'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-amber-500 text-white border-amber-500'
+                }`}>
+                  {property.status === 'CONTRACTED' ? '🔴 판매완료' : (STATUS_LABELS[property.status]?.label || property.status)}
+                </span>
+                {(property.receiptDate || property.createdAt) && (
+                  <span className="text-xs text-slate-600 font-bold bg-white px-2 py-1 rounded-md border border-slate-200 shadow-2xs">
+                    접수: {property.receiptDate ? property.receiptDate.slice(0, 10) : property.createdAt?.slice(0, 10)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* 매물 핵심 8대 요약 그리드 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              {/* 1. 매물종류 / 거래유형 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">매물종류 / 유형</span>
+                <span className="font-black text-slate-900 text-sm">
+                  {PROPERTY_TYPE_LABELS[property.propertyType]} · {property.transactionType}
+                </span>
+              </div>
+
+              {/* 2. 금액 조건 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">
+                  {property.transactionType === '매매' ? '매매가' : '보증금 / 월세'}
+                </span>
+                <span className="font-black text-indigo-950 text-sm">
+                  {property.transactionType === '매매' ? (
+                    property.price ? `${Number(property.price).toLocaleString()}만원` : '-'
+                  ) : (
+                    `${property.deposit ? Number(property.deposit).toLocaleString() : '0'}만 / ${property.monthlyRent ? Number(property.monthlyRent).toLocaleString() : '0'}만원`
+                  )}
+                  {property.negotiablePrice !== undefined && (
+                    <span className="text-[10px] text-emerald-700 ml-1 font-bold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                      절충가능
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* 3. 권리금 또는 대출금 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">
+                  {property.propertyType === 'STORE' ? '권리금' : '대출 / 융자금'}
+                </span>
+                <span className="font-extrabold text-amber-900 text-sm">
+                  {property.propertyType === 'STORE' ? (
+                    property.isNoPremium ? '무권리' : (property.premium ? `${Number(property.premium).toLocaleString()}만원` : (property.storeDetail?.premium ? `${property.storeDetail.premium}만원` : '권리금 없음'))
+                  ) : (
+                    property.collateral || '융자 없음'
+                  )}
+                </span>
+              </div>
+
+              {/* 4. 면적 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">
+                  {property.propertyType === 'LAND' ? '토지면적' : '실평수 (전용면적)'}
+                </span>
+                <span className="font-extrabold text-emerald-950 text-sm">
+                  {property.propertyType === 'LAND' ? (
+                    `${property.landArea || property.landDetail?.landArea || '-'}㎡ (약 ${property.landArea ? (property.landArea * 0.3025).toFixed(1) : (property.landDetail?.landArea ? (property.landDetail.landArea * 0.3025).toFixed(1) : '-')}평)`
+                  ) : (
+                    `${actualAreaVal ? actualAreaVal + '㎡' : '-'} (약 ${actualAreaPyeong || '-'}평)`
+                  )}
+                </span>
+              </div>
+
+              {/* 5. 층수 및 위치 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">
+                  {property.propertyType === 'LAND' ? '지목 / 용도지역' : '해당층 / 총층'}
+                </span>
+                <span className="font-bold text-slate-800">
+                  {property.propertyType === 'LAND' ? (
+                    `${property.landDetail?.landCategory || '-'} · ${property.landDetail?.zoningArea || property.zoningArea || '-'}`
+                  ) : (
+                    property.floorText || `${property.floorCount ? property.floorCount + '층' : '-'} / ${property.underFloorCount ? '지하 ' + property.underFloorCount + '층' : '지상'}`
+                  )}
+                </span>
+              </div>
+
+              {/* 6. 관리비 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">관리비</span>
+                <span className="font-bold text-slate-800 truncate block">
+                  {maintenanceFeeSummary}
+                </span>
+              </div>
+
+              {/* 7. 방향 및 도로/입지 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">
+                  {property.propertyType === 'LAND' ? '접도 방향 / 조망' : '방향 (기준)'}
+                </span>
+                <span className="font-bold text-slate-800 truncate block">
+                  {property.propertyType === 'LAND' ? (
+                    property.landDetail?.roadDirection ? `${property.landDetail.roadDirection} 도로` : (property.direction || '기본 정보')
+                  ) : (
+                    `${property.direction || '-'} ${property.directionCriteria ? '(' + property.directionCriteria + ')' : ''}`
+                  )}
+                </span>
+              </div>
+
+              {/* 8. 입주가능일 */}
+              <div className="p-2.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">입주가능일</span>
+                <span className="font-bold text-slate-800 truncate block">
+                  {property.isImmediateAvailable ? '즉시 입주 가능' : (property.availableDate ? property.availableDate.slice(0, 10) : (property.isNegotiableDate ? '입주일 협의' : '협의'))}
+                </span>
+              </div>
+            </div>
+
+            {/* 특징 및 핵심 요약 */}
+            {(property.consultationNotes || property.buildingRegisterUse || property.storeDetail?.operationPeriod) && (
+              <div className="px-3 py-2 bg-indigo-50/70 rounded-xl border border-indigo-100 text-xs text-indigo-950 flex items-start gap-1.5 shadow-2xs">
+                <span className="font-bold shrink-0 text-indigo-700">💡 핵심요약:</span>
+                <span className="font-medium line-clamp-2">
+                  {property.storeDetail?.operationPeriod ? `운영: ${property.storeDetail.operationPeriod} · ` : ''}
+                  {property.buildingRegisterUse ? `주용도: ${property.buildingRegisterUse} · ` : ''}
+                  {property.consultationNotes ? property.consultationNotes.slice(0, 80) : '정상 등록 매물'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ======================================================== */}
+          {/* 🔒 상담내용 (2번째 첨부파일: 3번째 파일 밑 위치, 명칭 "상담내용") */}
+          {/* ======================================================== */}
+          <div className="p-4 rounded-xl bg-purple-50/80 border-2 border-purple-200/90 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-purple-600" />
+                <span>🔒 상담내용</span>
+              </h4>
+              <span className="text-[10px] font-extrabold text-purple-700 bg-purple-100 px-2 py-0.5 rounded border border-purple-200">
+                중개사/관리자 전용
+              </span>
+            </div>
+
+            <div className="p-3 bg-white rounded-lg border border-purple-100 shadow-2xs">
+              {property.consultationNotes ? (
+                <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed font-semibold">
+                  {property.consultationNotes}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 italic">
+                  등록된 상담내용 및 비공개 메모가 없습니다. [수정] 버튼을 눌러 상담내용을 기록할 수 있습니다.
+                </p>
+              )}
+            </div>
+
+            <p className="text-[11px] text-purple-700 font-semibold flex items-center gap-1">
+              <span>※</span>
+              <span>이 상담내용은 카카오톡이나 문자, 고객 브리핑 링크 전송 시 절대로 포함되지 않으며 외부 고객에게 노출되지 않습니다.</span>
+            </p>
+          </div>
+
           {/* Quick Share Action Row: [📞 전화걸기] [💬 문자로 전송] [🟡 카톡 공유] */}
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-2.5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1411,12 +1681,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   }}
                 />
                 
-                {/* 계약완료 워터마크 이미지 스탬프 오버레이 */}
+                {/* 판매완료 워터마크 이미지 스탬프 오버레이 */}
                 {property.status === 'CONTRACTED' && (
                   <div className="absolute inset-0 bg-black/45 flex items-center justify-center pointer-events-none z-10">
                     <div className="border-4 border-dashed border-red-500 bg-red-950/85 text-white font-black px-6 py-2.5 rounded-2xl text-2xl sm:text-3xl tracking-widest transform -rotate-12 shadow-2xl backdrop-blur-xs flex items-center gap-3">
                       <span className="w-3.5 h-3.5 rounded-full bg-red-500 animate-ping"></span>
-                      <span>[ 계 약 완 료 ]</span>
+                      <span>[ 판 매 완 료 ]</span>
                     </div>
                   </div>
                 )}
@@ -1874,7 +2144,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 )}
                 {property.status === 'CONTRACTED' && (
                   <div className="border-2 border-dashed border-rose-600 bg-rose-100 text-rose-800 font-black px-4 py-1.5 rounded-lg text-sm tracking-wider shadow-xs transform rotate-[-2deg]">
-                    [ 계 약 완 료 ]
+                    [ 판 매 완 료 ]
                   </div>
                 )}
               </div>
@@ -2814,27 +3084,6 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               </div>
             );
           })()}
-
-          {/* 상담내용 및 매물 메모 (계정아이디 부여받은 자, 개업공인중개사, 관리자만 조회 가능한 대외비 보안 구역) */}
-          {property.consultationNotes && currentUser && (currentUser.id || currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' || currentUser.name?.includes('개업공인중개사')) && (
-            <div className="p-4 rounded-xl bg-purple-50/70 border-2 border-purple-200 shadow-2xs space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-purple-600" />
-                  <span>🔒 상담내용 및 매물 메모 (내부 대외비·비공개)</span>
-                </h4>
-                <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
-                  중개사/관리자 전용
-                </span>
-              </div>
-              <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed font-medium bg-white p-3 rounded-lg border border-purple-100">
-                {property.consultationNotes}
-              </p>
-              <p className="text-[11px] text-purple-700 font-semibold">
-                ※ 이 메모는 카카오톡이나 문자, 고객 브리핑 링크 전송 시 절대로 포함되지 않으며 외부 고객에게 노출되지 않습니다.
-              </p>
-            </div>
-          )}
 
         </div>
 

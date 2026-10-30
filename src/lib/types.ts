@@ -61,7 +61,7 @@ export type PropertyStatus = 'AVAILABLE' | 'CONTRACTED' | 'HOLD' | 'CANCELLED';
 
 export const STATUS_LABELS: Record<PropertyStatus, { label: string; color: string }> = {
   AVAILABLE: { label: '접수/진행중', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-  CONTRACTED: { label: '계약완료', color: 'bg-rose-100 text-rose-800 border-rose-300' },
+  CONTRACTED: { label: '판매완료', color: 'bg-rose-100 text-rose-800 border-rose-300' },
   HOLD: { label: '보류', color: 'bg-amber-100 text-amber-800 border-amber-300' },
   CANCELLED: { label: '취소', color: 'bg-slate-100 text-slate-800 border-slate-300' },
 };

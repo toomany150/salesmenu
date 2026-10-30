@@ -579,7 +579,7 @@ const DashboardContent: React.FC = () => {
                         </span>
                         {contractedPropertiesCount > 0 && (
                           <span className="text-[11px] font-extrabold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded border border-rose-300">
-                            ✓ 계약완료 {contractedPropertiesCount}
+                            ✓ 판매완료 {contractedPropertiesCount}
                           </span>
                         )}
                       </div>
