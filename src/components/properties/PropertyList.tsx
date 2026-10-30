@@ -39,6 +39,7 @@ interface PropertyListProps {
   onSelectProperty: (property: PropertyItem) => void;
   onOpenNewProperty: () => void;
   onEditProperty?: (property: PropertyItem) => void;
+  onPropertyUpdated?: (property: PropertyItem) => void;
 }
 
 export const PropertyList: React.FC<PropertyListProps> = ({
@@ -47,6 +48,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   onSelectProperty,
   onOpenNewProperty,
   onEditProperty,
+  onPropertyUpdated,
 }) => {
   const { currentUser } = useAuth();
   const [filtered, setFiltered] = useState<PropertyItem[]>(properties);
@@ -54,6 +56,38 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [viewMode, setViewMode] = useState<'SPLIT' | 'GRID' | 'MAP'>('SPLIT');
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | undefined>();
   const [sharingProperty, setSharingProperty] = useState<PropertyItem | null>(null);
+
+  // 매물 목록 카드에서 원클릭으로 판매완료/진행중 상태를 즉시 토글하는 핸들러
+  const handleQuickToggleStatus = async (e: React.MouseEvent, property: PropertyItem, targetStatus: any) => {
+    e.stopPropagation();
+    if (!onPropertyUpdated) return;
+    const isSelling = targetStatus === 'CONTRACTED';
+    const actionLabel = isSelling ? '판매완료' : (STATUS_LABELS[targetStatus as keyof typeof STATUS_LABELS]?.label || targetStatus);
+    const title = property.apartmentDetail?.complexName || property.storeDetail?.storeName || property.propertyNumber || property.address;
+    const confirmMsg = isSelling
+      ? `[${title}] 매물을 '판매완료' 처리하시겠습니까?\n(매물장 카드에 '판매완료'가 표시됩니다)`
+      : `[${title}] 매물 상태를 '${actionLabel}'(으)로 변경하시겠습니까?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    const updated: PropertyItem = {
+      ...property,
+      status: targetStatus,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await fetch('/api/properties', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+    } catch (err) {
+      console.error('Failed to update status on server:', err);
+    }
+
+    onPropertyUpdated(updated);
+  };
 
   // 최근 등록된 일시(createdAt 또는 receiptDate) 기준 최신순 내림차순 정렬 (최신 등록 매물이 맨 처음)
   const sortedFiltered = React.useMemo(() => {
@@ -408,6 +442,30 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             )}
                           </div>
                           <div className="flex items-center gap-2">
+                            {/* 카드에서 바로 판매완료/진행중 원클릭 상태 전환 버튼 */}
+                            {canEditItem(currentUser, property) && onPropertyUpdated && (
+                              !isContracted ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleQuickToggleStatus(e, property, 'CONTRACTED')}
+                                  title="클릭 시 즉시 '판매완료'로 표시됩니다"
+                                  className="text-[11px] font-black text-rose-700 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-300 rounded px-2 py-0.5 transition-all shadow-2xs flex items-center gap-1 active:scale-95 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>판매완료</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleQuickToggleStatus(e, property, 'AVAILABLE')}
+                                  title="판매완료를 해제하고 '진행중'으로 복원합니다"
+                                  className="text-[10px] font-bold text-emerald-800 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-300 rounded px-1.5 py-0.5 transition-all shadow-2xs flex items-center gap-0.5 active:scale-95 cursor-pointer"
+                                >
+                                  <span>진행중 복원</span>
+                                </button>
+                              )
+                            )}
+
                             {onEditProperty && canEditItem(currentUser, property) && (
                               <button
                                 type="button"
@@ -759,6 +817,21 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             className="p-1.5 rounded-lg text-slate-600 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 border border-slate-200 transition-colors"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {/* 그리드 뷰 판매완료 원클릭 버튼 */}
+                        {canEditItem(currentUser, property) && onPropertyUpdated && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleQuickToggleStatus(e, property, isContracted ? 'AVAILABLE' : 'CONTRACTED')}
+                            title={isContracted ? "진행중으로 복원" : "판매완료로 변경"}
+                            className={`px-2 py-1 rounded-md text-[10px] font-black border transition-all cursor-pointer ${
+                              isContracted
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-600 hover:text-white'
+                                : 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-600 hover:text-white'
+                            }`}
+                          >
+                            {isContracted ? '진행복원' : '판매완료'}
                           </button>
                         )}
                       </div>

@@ -499,6 +499,20 @@ const DashboardContent: React.FC = () => {
     scrollToDetail();
   };
 
+  const handlePropertyUpdated = (updated: PropertyItem) => {
+    setSelectedProperty((prev) => (prev && (prev.id === updated.id || prev.propertyNumber === updated.propertyNumber) ? updated : prev));
+    setProperties((prev) => {
+      const idx = prev.findIndex((p) => p.id === updated.id || p.propertyNumber === updated.propertyNumber);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = updated;
+        return next;
+      }
+      return [updated, ...prev];
+    });
+    saveCustomProperty(updated);
+  };
+
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 pb-16">
       
@@ -940,6 +954,7 @@ const DashboardContent: React.FC = () => {
                 onSelectProperty={(p) => setSelectedProperty(p)}
                 onOpenNewProperty={handleOpenNewProperty}
                 onEditProperty={handleOpenEditProperty}
+                onPropertyUpdated={handlePropertyUpdated}
               />
             </div>
           )}
@@ -1026,19 +1041,7 @@ const DashboardContent: React.FC = () => {
         isOpen={!!currentUser && !!selectedProperty}
         onClose={() => setSelectedProperty(null)}
         onEditProperty={handleOpenEditProperty}
-        onPropertyUpdated={(updated) => {
-          setSelectedProperty(updated);
-          setProperties((prev) => {
-            const idx = prev.findIndex((p) => p.id === updated.id || p.propertyNumber === updated.propertyNumber);
-            if (idx >= 0) {
-              const next = [...prev];
-              next[idx] = updated;
-              return next;
-            }
-            return [updated, ...prev];
-          });
-          saveCustomProperty(updated);
-        }}
+        onPropertyUpdated={handlePropertyUpdated}
         onPropertyDeleted={(deletedId) => {
           setProperties((prev) => prev.filter((p) => p.id !== deletedId && p.propertyNumber !== deletedId));
           setSelectedProperty(null);
