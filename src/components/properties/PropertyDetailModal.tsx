@@ -36,7 +36,7 @@ import {
   RotateCcw,
   FileText
 } from 'lucide-react';
-import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS } from '@/lib/types';
+import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS, getPropertyDisplayName } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
 import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
 import { useAuth } from '../auth/AuthContext';
@@ -320,11 +320,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const actualAreaPyeong = actualAreaVal ? (actualAreaVal * 0.3025).toFixed(1) : null;
 
   const titleName =
-    property.apartmentDetail?.complexName ||
-    property.storeDetail?.storeName ||
-    property.officeDetail?.officeName ||
-    property.factoryWarehouseDetail?.companyName ||
-    property.landDetail?.companyName ||
+    getPropertyDisplayName(property) ||
     property.propertyNumber ||
     `${PROPERTY_TYPE_LABELS[property.propertyType]} 매물`;
 

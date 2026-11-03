@@ -863,3 +863,66 @@ export interface PublicLandLedgerResult {
   source?: 'GOV_API' | 'USER_CUSTOM' | 'KAKAO_CALC';
   message?: string;
 }
+
+/**
+ * 매물 목록 및 상세 화면용 대표 명칭 헬퍼 함수
+ * - 아파트 매물의 경우 사용자의 가독성을 위해 "아파트명 옆에 아파트명 크기로 동과 호수"를 함께 표시 (예: "괘법2차 한신아파트 207동 204호")
+ * - 기타 매물의 경우 상호명, 건물명, 회사명, 도로명/지번 순으로 대표 명칭 반환
+ */
+export function getPropertyDisplayName(property: PropertyItem | null | undefined): string {
+  if (!property) return '';
+
+  if (property.propertyType === 'APARTMENT') {
+    const complex = property.apartmentDetail?.complexName?.trim() || property.address?.trim() || '아파트';
+
+    // 1) apartmentDetail.buildingNo, unitNo 우선 확인
+    const bNo = property.apartmentDetail?.buildingNo?.trim();
+    const uNo = property.apartmentDetail?.unitNo?.trim();
+    let dongHo = '';
+    if (bNo || uNo) {
+      const d = bNo ? (bNo.endsWith('동') ? bNo : `${bNo}동`) : '';
+      const h = uNo ? (uNo.endsWith('호') ? uNo : `${uNo}호`) : '';
+      dongHo = `${d} ${h}`.trim();
+    }
+
+    // 2) detailAddress 확인 (예: "207동 204호", "104동 1801호", "113동 3304호" 등)
+    if (!dongHo && property.detailAddress) {
+      const match = property.detailAddress.match(/(\d+\s*동(?:\s*\d+\s*호)?|\d+\s*호)/);
+      if (match) {
+        dongHo = match[0].trim();
+      } else {
+        dongHo = property.detailAddress.trim();
+      }
+    }
+
+    // 3) roadAddress 또는 address 끝에 있는 동/호수 매칭 (예: "...운산로 22 207동 204호")
+    if (!dongHo) {
+      const full = `${property.roadAddress || ''} ${property.address || ''}`;
+      const match = full.match(/(\d+\s*동\s*\d+\s*호|\d+\s*동|\d+\s*호)/);
+      if (match) {
+        dongHo = match[0].trim();
+      }
+    }
+
+    // 이미 complex 명칭에 해당 동/호수가 그대로 포함되어 있지 않다면 병합
+    if (dongHo) {
+      const cleanDongHo = dongHo.replace(/\s+/g, ' ');
+      if (!complex.includes(cleanDongHo)) {
+        return `${complex} ${cleanDongHo}`.trim();
+      }
+    }
+    return complex;
+  }
+
+  return (
+    property.storeDetail?.storeName ||
+    property.officeDetail?.officeName ||
+    property.factoryWarehouseDetail?.companyName ||
+    property.landDetail?.companyName ||
+    property.apartmentDetail?.complexName ||
+    property.address ||
+    property.propertyNumber ||
+    '매물'
+  );
+}
+

@@ -23,7 +23,8 @@ import {
   PropertyItem, 
   CustomerItem,
   PROPERTY_TYPE_LABELS, 
-  STATUS_LABELS 
+  STATUS_LABELS,
+  getPropertyDisplayName
 } from '@/lib/types';
 import { exportPropertiesToExcel } from '@/lib/excelExport';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -356,12 +357,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             <h4 className={`font-black text-xs sm:text-sm line-clamp-1 ${
                               isContracted ? 'text-slate-800' : 'text-slate-900'
                             }`}>
-                              {property.apartmentDetail?.complexName ||
-                               property.storeDetail?.storeName ||
-                               property.officeDetail?.officeName ||
-                               property.factoryWarehouseDetail?.companyName ||
-                               property.landDetail?.companyName ||
-                               property.address}
+                              {getPropertyDisplayName(property)}
                             </h4>
                             {isContracted && (
                               <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
@@ -634,12 +630,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
 
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className="font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors text-sm line-clamp-1">
-                            {property.apartmentDetail?.complexName ||
-                             property.storeDetail?.storeName ||
-                             property.officeDetail?.officeName ||
-                             property.factoryWarehouseDetail?.companyName ||
-                             property.landDetail?.companyName ||
-                             property.address}
+                            {getPropertyDisplayName(property)}
                           </h4>
                           {isContracted && (
                             <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
