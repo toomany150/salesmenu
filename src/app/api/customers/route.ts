@@ -230,13 +230,26 @@ export async function POST(request: NextRequest) {
       if (u) validUserId = u.id;
     }
 
-    // 기존에 동일 ID 또는 동일 이름+전화번호를 가진 고객이 이미 존재하는지 확인하여 중복 생성 방지
+    // 기존에 동일 ID 또는 동일 전화번호(하이픈 유무 무관)를 가진 고객이 이미 존재하는지 확인하여 중복 생성 방지
     const cleanName = name.trim();
     const cleanPhone = phone.trim();
+    const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
     let existingCustomer = body.id ? await prisma.customer.findUnique({ where: { id: body.id }, include: { properties: true, demands: true } }) : null;
-    if (!existingCustomer && cleanName && cleanPhone) {
+    if (!existingCustomer && phoneDigits && phoneDigits.length >= 8) {
+      const phoneVariants = Array.from(new Set([
+        cleanPhone,
+        phoneDigits,
+        phoneDigits.length === 11 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}` : '',
+        phoneDigits.length === 10 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}` : '',
+      ])).filter(Boolean);
+
       existingCustomer = await prisma.customer.findFirst({
-        where: { name: cleanName, phone: cleanPhone },
+        where: {
+          OR: [
+            { phone: { in: phoneVariants } },
+            ...(cleanName ? [{ name: cleanName, phone: { in: phoneVariants } }] : []),
+          ],
+        },
         include: { properties: true, demands: true },
       });
     }

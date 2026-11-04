@@ -1045,8 +1045,22 @@ export async function PUT(request: NextRequest) {
       const custPremium = customerInput.premium !== undefined ? customerInput.premium : (storePremiumVal ? parseFloat(storePremiumVal) : undefined);
 
       if (customerInput.phone?.trim()) {
+        const rawPhone = customerInput.phone.trim();
+        const phoneDigits = rawPhone.replace(/[^0-9]/g, '');
+        const phoneVariants = Array.from(new Set([
+          rawPhone,
+          phoneDigits,
+          phoneDigits.length === 11 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}` : '',
+          phoneDigits.length === 10 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}` : '',
+        ])).filter(Boolean);
+
         const existingCust = await prisma.customer.findFirst({
-          where: { phone: customerInput.phone.trim() },
+          where: {
+            OR: [
+              ...(finalCustomerId ? [{ id: finalCustomerId }] : []),
+              { phone: { in: phoneVariants } },
+            ],
+          },
         });
         if (existingCust) {
           await prisma.customer.update({
@@ -1119,8 +1133,22 @@ export async function PUT(request: NextRequest) {
       }
 
       if (finalOwnerPhone && finalOwnerPhone.trim()) {
+        const rawOwnerPhone = finalOwnerPhone.trim();
+        const ownerPhoneDigits = rawOwnerPhone.replace(/[^0-9]/g, '');
+        const ownerPhoneVariants = Array.from(new Set([
+          rawOwnerPhone,
+          ownerPhoneDigits,
+          ownerPhoneDigits.length === 11 ? `${ownerPhoneDigits.slice(0, 3)}-${ownerPhoneDigits.slice(3, 7)}-${ownerPhoneDigits.slice(7)}` : '',
+          ownerPhoneDigits.length === 10 ? `${ownerPhoneDigits.slice(0, 3)}-${ownerPhoneDigits.slice(3, 6)}-${ownerPhoneDigits.slice(6)}` : '',
+        ])).filter(Boolean);
+
         const existingOwnerCust = await prisma.customer.findFirst({
-          where: { phone: finalOwnerPhone.trim() },
+          where: {
+            OR: [
+              ...(finalOwnerCustomerId ? [{ id: finalOwnerCustomerId }] : []),
+              { phone: { in: ownerPhoneVariants } },
+            ],
+          },
         });
         if (existingOwnerCust) {
           finalOwnerCustomerId = existingOwnerCust.id;

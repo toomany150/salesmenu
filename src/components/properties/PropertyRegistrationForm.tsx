@@ -1090,7 +1090,16 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         autoCustomerSubType = '임대인';
       }
 
-      const custId = `cust-${Date.now()}`;
+      // [스마트폰 수정 시 중복 등록 방지 핵심]:
+      // 1) 매물 수정 모드(isEditMode)이고 기존 매물에 고객 ID가 연결되어 있는 경우
+      // 2) 또는 전체 고객 목록 중 전화번호 숫자(하이픈 제거)가 일치하는 기존 고객이 있는 경우
+      // 새로 ID를 만들지 않고 기존 고객 ID를 그대로 유지하여 중복 등록 원천 차단!
+      const cleanPhoneDigits = customerPhone.replace(/[^0-9]/g, '');
+      const existingMatch = (isEditMode && (initialData?.customerId || initialData?.customer?.id))
+        ? allCustomers.find((c) => c.id === (initialData?.customerId || initialData?.customer?.id))
+        : (cleanPhoneDigits.length >= 8 ? allCustomers.find((c) => (c.phone ? c.phone.replace(/[^0-9]/g, '') : '') === cleanPhoneDigits) : null);
+
+      const custId: string = existingMatch?.id || (isEditMode ? (initialData?.customerId || initialData?.customer?.id || `cust-${Date.now()}`) : `cust-${Date.now()}`);
       const newCustomerItem: CustomerItem = {
         id: custId,
         name: customerName.trim() || '접수 의뢰고객',
@@ -1172,7 +1181,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
     if (!ownerSameAsCustomer) {
       if (ownerCustomerMode === 'DIRECT' && (ownerName.trim() || ownerPhone.trim())) {
-        const ownerCustId = `cust-owner-${Date.now()}`;
+        const cleanOwnerDigits = ownerPhone.replace(/[^0-9]/g, '');
+        const existingOwnerMatch = (isEditMode && initialData?.ownerCustomerId)
+          ? allCustomers.find((c) => c.id === initialData.ownerCustomerId)
+          : (cleanOwnerDigits.length >= 8 ? allCustomers.find((c) => (c.phone ? c.phone.replace(/[^0-9]/g, '') : '') === cleanOwnerDigits) : null);
+
+        const ownerCustId: string = existingOwnerMatch?.id || (isEditMode ? (initialData?.ownerCustomerId || `cust-owner-${Date.now()}`) : `cust-owner-${Date.now()}`);
         const newOwnerItem: CustomerItem = {
           id: ownerCustId,
           name: ownerName.trim() || '등기부 소유자',

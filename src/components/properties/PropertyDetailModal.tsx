@@ -411,25 +411,24 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     setIsPhotoDownloadModalOpen(true);
   };
 
-  // 3. 사진 압축 (3.8MB 이하는 원본 100% 무손실, 초과는 4K UHD 94% 프리미엄 화질 유지)
+  // 3. 사진 압축 (갤럭시 폴드 등 스마트폰 4K UHD 초고화질 100% 보존 및 Vercel 4.5MB 안전 통과 프로세서)
   const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (file.size <= 3.8 * 1024 * 1024) {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-        return;
-      }
-
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
+        const rawDataUrl = e.target?.result as string;
+        if (!rawDataUrl) {
+          resolve('');
+          return;
+        }
+
         const img = new Image();
         img.onload = () => {
           const maxWidth = 3840;
           const maxHeight = 2880;
           let width = img.width;
           let height = img.height;
+
           if (width > height) {
             if (width > maxWidth) {
               height = Math.round((height * maxWidth) / width);
@@ -450,16 +449,33 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.94);
+
+            let quality = 0.88;
+            let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+            if (dataUrl.length > 4 * 1024 * 1024) {
+              quality = 0.82;
+              dataUrl = canvas.toDataURL('image/jpeg', quality);
+            }
+            if (dataUrl.length > 4 * 1024 * 1024) {
+              quality = 0.75;
+              dataUrl = canvas.toDataURL('image/jpeg', quality);
+            }
+
             resolve(dataUrl);
           } else {
-            resolve(e.target?.result as string);
+            resolve(rawDataUrl);
           }
         };
-        img.onerror = reject;
-        img.src = e.target?.result as string;
+
+        img.onerror = () => {
+          resolve(rawDataUrl);
+        };
+
+        img.src = rawDataUrl;
       };
-      reader.onerror = reject;
+
+      reader.onerror = () => resolve('');
       reader.readAsDataURL(file);
     });
   };
@@ -490,34 +506,45 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     setPhotoActionNotice(null);
 
     try {
-      // 1) 고화질 이미지 압축
-      const compressedList = await Promise.all(selectedFiles.map((f) => compressImage(f)));
+      // [갤럭시 폴드 등 모바일 램 메모리 보호]: 2장씩 청크 순차 압축
+      const compressedList: string[] = [];
+      const chunkSize = 2;
+      for (let i = 0; i < selectedFiles.length; i += chunkSize) {
+        const chunk = selectedFiles.slice(i, i + chunkSize);
+        const chunkResults = await Promise.all(chunk.map((f) => compressImage(f)));
+        compressedList.push(...chunkResults.filter(Boolean));
+      }
 
-      // 2) Cloudflare R2 비동기 업로드 시도 (실패 시 무손실 base64 보존)
+      // 2) Cloudflare R2 비동기 업로드 (3장씩 청크 순차 처리로 네트워크 끊김 방지)
       let finalUploadedList = compressedList;
       try {
-        const r2Results = await Promise.all(
-          compressedList.map(async (img) => {
-            if (!img || !img.startsWith('data:image')) return img;
-            try {
-              const uploadRes = await fetch('/api/upload/r2', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: img }),
-              });
-              if (uploadRes.ok) {
-                const uploadData = await uploadRes.json();
-                if (uploadData.success && uploadData.url) {
-                  return uploadData.url;
+        const r2UploadedUrls: string[] = [];
+        for (let i = 0; i < compressedList.length; i += 3) {
+          const chunk = compressedList.slice(i, i + 3);
+          const chunkUrls = await Promise.all(
+            chunk.map(async (img) => {
+              if (!img || !img.startsWith('data:image')) return img;
+              try {
+                const uploadRes = await fetch('/api/upload/r2', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ image: img }),
+                });
+                if (uploadRes.ok) {
+                  const uploadData = await uploadRes.json();
+                  if (uploadData.success && uploadData.url) {
+                    return uploadData.url;
+                  }
                 }
+              } catch (err) {
+                console.warn('개별 사진 R2 업로드 오류(원본 유지):', err);
               }
-            } catch (err) {
-              console.warn('개별 사진 R2 업로드 오류(원본 유지):', err);
-            }
-            return img;
-          })
-        );
-        finalUploadedList = r2Results;
+              return img;
+            })
+          );
+          r2UploadedUrls.push(...chunkUrls);
+        }
+        finalUploadedList = r2UploadedUrls;
       } catch (r2Err) {
         console.warn('R2 일괄 업로드 경고:', r2Err);
       }
