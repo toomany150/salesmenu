@@ -1056,6 +1056,38 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     setSubmitting(true);
     setErrorMsg(null);
 
+    // [Vercel 4.5MB 초과 및 매물 등록 실패 원천 차단 핵심]:
+    // 등록/저장 직전, images 중 아직 data:image/ 상태인 Base64 이미지가 남아있다면
+    // 개별적으로 Cloudflare R2에 1장씩 올려서 영구 URL로 변환한 후 전송합니다.
+    let safeImages = [...images];
+    if (images.some((img) => typeof img === 'string' && img.startsWith('data:image/'))) {
+      try {
+        const converted = await Promise.all(
+          images.map(async (img) => {
+            if (typeof img !== 'string' || !img.startsWith('data:image/')) return img;
+            try {
+              const r2Res = await fetch('/api/upload/r2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: img }),
+              });
+              if (r2Res.ok) {
+                const r2Data = await r2Res.json();
+                if (r2Data.success && r2Data.url) return r2Data.url;
+              }
+            } catch (singleErr) {
+              console.warn('Submit 시점 R2 개별 변환 경고:', singleErr);
+            }
+            return img;
+          })
+        );
+        safeImages = converted;
+        setImages(converted);
+      } catch (err) {
+        console.warn('Submit R2 일괄 변환 경고:', err);
+      }
+    }
+
     // Ensure coordinates
     let finalLat = latitude;
     let finalLng = longitude;
@@ -1252,7 +1284,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       roadAddress: roadAddress.trim() || undefined,
       jibunAddress: jibunAddress.trim() || undefined,
       detailAddress: detailAddress.trim() || undefined,
-      images: images.length > 0 ? images : undefined,
+      images: safeImages.length > 0 ? safeImages : undefined,
       latitude: finalLat,
       longitude: finalLng,
       direction,

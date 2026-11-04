@@ -167,8 +167,14 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
           uploadedUrls.push(...chunkUrls);
         }
 
-        // R2 공개 URL로 완벽 교체 (초고화질 원본 영구 보존)
-        const finalImages = [...images, ...uploadedUrls];
+        // R2 공개 URL로 1:1 완벽 교체 (중복 방지 및 초고화질 원본 영구 보존)
+        const replaceMap = new Map<string, string>();
+        processedList.forEach((raw, idx) => {
+          if (uploadedUrls[idx] && uploadedUrls[idx] !== raw) {
+            replaceMap.set(raw, uploadedUrls[idx]);
+          }
+        });
+        const finalImages = currentListWithProcessed.map((img) => replaceMap.get(img) || img);
         onChange(finalImages);
       } catch (uploadErr) {
         console.warn('R2 백그라운드 업로드 실패:', uploadErr);
@@ -265,9 +271,20 @@ export const PropertyImageUploader: React.FC<PropertyImageUploaderProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/*"
         onChange={(e) => handleFiles(e.target.files)}
-        className="hidden"
+        style={{
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          padding: 0,
+          margin: '-1px',
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          borderWidth: 0,
+          opacity: 0,
+        }}
       />
 
       {errorNotice && (

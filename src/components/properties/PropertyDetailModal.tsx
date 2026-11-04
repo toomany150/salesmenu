@@ -3294,9 +3294,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/*"
         onChange={(e) => handleUploadPhotos(e.target.files)}
-        className="hidden"
+        style={{
+          position: 'absolute',
+          width: '1px',
+          height: '1px',
+          padding: 0,
+          margin: '-1px',
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          borderWidth: 0,
+          opacity: 0,
+        }}
       />
     </div>
   );
