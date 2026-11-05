@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, password, name, phone, isActive, canAccessAllData, adminUser } = body;
+    const { id, password, name, role, phone, isActive, canAccessAllData, adminUser } = body;
     const headerRole = request.headers.get('x-user-role');
 
     const isAuthorizedAdmin = 
@@ -161,11 +161,21 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '수정할 사용자 ID가 필요합니다.' }, { status: 400 });
     }
 
+    const targetUser = await prisma.user.findUnique({ where: { id } });
+    if (!targetUser) {
+      return NextResponse.json({ error: '사용자를 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    if (targetUser.username === 'admin' && role && role !== 'ADMIN') {
+      return NextResponse.json({ error: '원조 대표 관리자 계정의 권한은 변경할 수 없습니다.' }, { status: 400 });
+    }
+
     const updated = await prisma.user.update({
       where: { id },
       data: {
         ...(name ? { name: name.trim() } : {}),
         ...(password ? { password: password.trim() } : {}),
+        ...(role ? { role: role === 'ADMIN' ? 'ADMIN' : 'AGENT' } : {}),
         ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
         ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
         ...(canAccessAllData !== undefined ? { canAccessAllData: Boolean(canAccessAllData) } : {}),
@@ -196,8 +206,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     const target = await prisma.user.findUnique({ where: { id } });
-    if (target?.role === 'ADMIN') {
-      return NextResponse.json({ error: '대표 관리자 계정은 삭제할 수 없습니다.' }, { status: 400 });
+    if (target?.username === 'admin') {
+      return NextResponse.json({ error: '대표 관리자 원본 계정은 삭제할 수 없습니다.' }, { status: 400 });
     }
 
     await prisma.user.delete({ where: { id } });

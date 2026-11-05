@@ -182,17 +182,73 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
         addCustomAgent(newName.trim());
       }
 
-      setUserMsg({ type: 'success', text: `[${newName}] 소공 계정이 성공적으로 발급되었습니다!${newCanAccessAllData ? ' (전체 데이터 특별 권한 부여됨)' : ''}` });
+      setUserMsg({ 
+        type: 'success', 
+        text: `[${newName}] 계정이 성공적으로 발급되었습니다! ${newRole === 'ADMIN' ? '(👑 대표급 전체 관리 권한 부여됨)' : (newCanAccessAllData ? '(⭐ 전체 데이터 특별 권한 부여됨)' : '')}` 
+      });
       setNewUsername('');
       setNewPassword('1234');
       setNewName('');
       setNewPhone('');
+      setNewRole('AGENT');
       setNewCanAccessAllData(false);
       fetchUsers();
     } catch (err: any) {
       setUserMsg({ type: 'error', text: err.message || '계정 생성 중 오류가 발생했습니다.' });
     } finally {
       setIsCreatingUser(false);
+    }
+  };
+
+  // 대표처럼 모든 권한(ADMIN) 부여/회수 핸들러
+  const handleToggleAdminRole = async (userToUpdate: UserItem) => {
+    const isCurrentlyAdmin = userToUpdate.role === 'ADMIN';
+    const nextRole = isCurrentlyAdmin ? 'AGENT' : 'ADMIN';
+    const confirmMsg = !isCurrentlyAdmin
+      ? `'${userToUpdate.name}' 중개사에게 [대표와 동일한 모든 권한 (전체 매물·고객 열람/수정/삭제/사진관리 등 마스터 권한)]을 부여하시겠습니까?`
+      : `'${userToUpdate.name}' 중개사의 [대표급 관리 권한]을 회수하고 일반 소속공인중개사 권한으로 전환하시겠습니까?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'ADMIN',
+        },
+        body: JSON.stringify({
+          id: userToUpdate.id,
+          role: nextRole,
+          canAccessAllData: nextRole === 'ADMIN' ? true : userToUpdate.canAccessAllData,
+          adminUser: currentUser || { id: 'usr-admin', name: '개업공인중개사 (대표)', role: 'ADMIN' },
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || '권한 변경에 실패했습니다.');
+        return;
+      }
+
+      // 로컬 스토리지 계정 정보 동기화
+      try {
+        const storedUsersRaw = localStorage.getItem('cham_custom_users');
+        if (storedUsersRaw) {
+          const list = JSON.parse(storedUsersRaw);
+          const updated = list.map((u: any) => 
+            u.id === userToUpdate.id 
+              ? { ...u, role: nextRole, canAccessAllData: nextRole === 'ADMIN' ? true : u.canAccessAllData } 
+              : u
+          );
+          localStorage.setItem('cham_custom_users', JSON.stringify(updated));
+        }
+      } catch (e) {}
+
+      fetchUsers();
+      alert(`'${userToUpdate.name}' 중개사의 권한이 성공적으로 변경되었습니다.`);
+    } catch (err) {
+      alert('권한 변경 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -656,19 +712,52 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
                       </button>
                     </div>
 
-                    <div className="sm:col-span-2 md:col-span-5 flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={newCanAccessAllData}
-                          onChange={(e) => setNewCanAccessAllData(e.target.checked)}
-                          className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-                        />
-                        <span className="text-indigo-950">⭐ 특별 권한 부여 (소속직원이지만 전체 매물 및 고객 데이터 열람 허용)</span>
-                      </label>
-                      <span className="text-[11px] text-slate-500">
-                        * 미선택 시 기본 규칙(본인이 올린 물건/고객 + 사무실 공용 물건만 접근)이 적용됩니다.
-                      </span>
+                    <div className="sm:col-span-2 md:col-span-5 flex flex-col gap-2 pt-2 border-t border-slate-200">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        {/* 1. 대표처럼 모든 권한 부여 옵션 (사용자 신규 요청) */}
+                        <label className={`flex items-center gap-2 cursor-pointer text-xs font-black px-3.5 py-2 rounded-xl border transition-all ${
+                          newRole === 'ADMIN'
+                            ? 'bg-purple-50 text-purple-900 border-purple-400 shadow-xs ring-2 ring-purple-400/20'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={newRole === 'ADMIN'}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setNewRole(isChecked ? 'ADMIN' : 'AGENT');
+                              if (isChecked) {
+                                setNewCanAccessAllData(true);
+                              }
+                            }}
+                            className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                          />
+                          <span className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-purple-700 font-extrabold flex items-center gap-1">
+                              👑 대표처럼 모든 권한 부여
+                            </span>
+                            <span className="text-[11px] font-medium text-purple-700">
+                              (대표와 100% 동일: 전체 매물·고객 열람/수정/삭제/사진관리 등 마스터 권한)
+                            </span>
+                          </span>
+                        </label>
+
+                        {/* 2. 전체 데이터 열람 특별 권한 (열람만 허용) */}
+                        {newRole !== 'ADMIN' && (
+                          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 bg-white px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={newCanAccessAllData}
+                              onChange={(e) => setNewCanAccessAllData(e.target.checked)}
+                              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                            />
+                            <span className="text-indigo-950">⭐ 전체 데이터 열람 특별 권한 (열람만 전체 허용, 수정/삭제는 본인·공용만)</span>
+                          </label>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 pl-1">
+                        * 옵션 미선택 시 기본 규칙(본인이 올린 물건/고객 + 사무실 공용 물건만 접근)이 적용됩니다.
+                      </p>
                     </div>
                   </form>
                 </div>
@@ -682,21 +771,32 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {users.map((u) => {
-                      const isUserAdmin = u.role === 'ADMIN';
+                      const isMainAdmin = u.username === 'admin';
+                      const hasAdminRights = u.role === 'ADMIN';
 
                       return (
                         <div
                           key={u.id}
-                          className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex flex-col justify-between"
+                          className={`p-4 rounded-2xl bg-white border transition-all shadow-2xs flex flex-col justify-between ${
+                            isMainAdmin 
+                              ? 'border-purple-200 bg-linear-to-b from-purple-50/20 to-white' 
+                              : (hasAdminRights ? 'border-amber-300 bg-linear-to-b from-amber-50/30 to-white' : 'border-slate-200')
+                          }`}
                         >
                           <div className="flex items-start justify-between">
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-extrabold text-sm text-slate-900">{u.name}</span>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  isUserAdmin ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                                  isMainAdmin 
+                                    ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                                    : (hasAdminRights 
+                                        ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold flex items-center gap-1' 
+                                        : 'bg-blue-100 text-blue-800')
                                 }`}>
-                                  {isUserAdmin ? '👑 대표/관리자' : '👤 소속공인중개사'}
+                                  {isMainAdmin 
+                                    ? '👑 대표/관리자' 
+                                    : (hasAdminRights ? '👑 대표급 관리자' : '👤 소속공인중개사')}
                                 </span>
                               </div>
                               <div className="text-xs text-slate-500 font-mono mt-1">
@@ -706,7 +806,7 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
 
                             <div className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="활성 계정"></span>
-                              {!isUserAdmin && (
+                              {!isMainAdmin && (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteUser(u)}
@@ -719,32 +819,56 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
                             </div>
                           </div>
 
-                          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2 text-xs">
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-500">{u.phone || '연락처 미등록'}</span>
+                          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2.5 text-xs">
+                            <div className="flex items-center justify-between gap-1 flex-wrap">
+                              <span className="text-slate-500 font-mono">{u.phone || '연락처 미등록'}</span>
                               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                                isUserAdmin 
+                                isMainAdmin 
                                   ? 'bg-purple-50 text-purple-700 border border-purple-200' 
-                                  : (u.canAccessAllData 
-                                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
-                                      : 'bg-slate-100 text-slate-600 border border-slate-200')
+                                  : (hasAdminRights 
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-300 font-black' 
+                                      : (u.canAccessAllData 
+                                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
+                                          : 'bg-slate-100 text-slate-600 border border-slate-200'))
                               }`}>
-                                {isUserAdmin ? '👑 전체 관리 권한' : (u.canAccessAllData ? '⭐ 전체 데이터 접근 (특별 권한)' : '🔒 본인+공용 전용')}
+                                {isMainAdmin 
+                                  ? '👑 전체 관리 권한' 
+                                  : (hasAdminRights 
+                                      ? '👑 대표급 전체 관리 권한 (모든 권한)' 
+                                      : (u.canAccessAllData ? '⭐ 전체 데이터 열람 (특별 권한)' : '🔒 본인+공용 전용'))}
                               </span>
                             </div>
-                            {!isUserAdmin && (
-                              <div className="flex justify-end pt-1">
+
+                            {!isMainAdmin && (
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap pt-1 border-t border-slate-50">
+                                {/* 1. 대표급 전체 권한 부여/회수 원클릭 버튼 */}
                                 <button
                                   type="button"
-                                  onClick={() => handleToggleAccessAllData(u)}
-                                  className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all ${
-                                    u.canAccessAllData
-                                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                                      : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-300 shadow-2xs'
+                                  onClick={() => handleToggleAdminRole(u)}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                    hasAdminRights
+                                      ? 'bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-slate-700 border-slate-300'
+                                      : 'bg-purple-600 hover:bg-purple-700 text-white border-purple-600 shadow-xs'
                                   }`}
+                                  title={hasAdminRights ? '대표급 관리 권한 회수' : '대표와 동일하게 모든 권한 즉시 부여'}
                                 >
-                                  {u.canAccessAllData ? '🔒 기본 권한(본인+공용만)으로 전환' : '⭐ 전체 데이터 특별 권한 부여'}
+                                  <span>{hasAdminRights ? '👤 일반 소공 권한으로 전환' : '👑 대표처럼 모든 권한 부여'}</span>
                                 </button>
+
+                                {/* 2. 전체 데이터 열람 특별 권한 전환 버튼 (대표 권한이 아닐 때만 노출) */}
+                                {!hasAdminRights && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleAccessAllData(u)}
+                                    className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                                      u.canAccessAllData
+                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-300'
+                                    }`}
+                                  >
+                                    {u.canAccessAllData ? '🔒 기본 권한 전환' : '⭐ 전체 열람 권한'}
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
