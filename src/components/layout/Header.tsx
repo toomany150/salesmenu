@@ -36,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   onGoHome,
 }) => {
   const { currentUser, login, logout } = useAuth();
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const isAdmin = currentUser?.role === 'ADMIN' || Boolean(currentUser?.canAccessAllData) || Boolean(currentUser?.name?.includes('대표')) || Boolean(currentUser?.name?.includes('개업공인중개사'));
 
   // Inline Agent Login form state
   const [agentId, setAgentId] = useState('');

@@ -984,20 +984,46 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // 권한 확인: 개업공인중개사(대표) 및 관리자(ADMIN)는 전체 수정 가능
-    // 그 외 사용자는 본인이 작성/주담당이거나 추가지정 권한자(assignedAgents)에 포함되어야 함.
-    if (currentUser && currentUser.role !== 'ADMIN' && !currentUser.name?.includes('개업공인중개사')) {
-      const isCreator = existingProp.createdById && existingProp.createdById === currentUser.id;
-      const isManager = existingProp.managerName && existingProp.managerName === currentUser.name;
+    // 권한 확인: 개업공인중개사(대표) 및 관리자(ADMIN), 전체 접근 권한자는 모든 매물 수정 가능
+    const headerRole = request.headers.get('x-user-role');
+    const headerUserId = request.headers.get('x-user-id');
+    const headerCanAccessAll = request.headers.get('x-user-can-access-all');
+
+    const isMasterAdmin = 
+      headerRole === 'ADMIN' || 
+      headerCanAccessAll === 'true' ||
+      currentUser?.role === 'ADMIN' || 
+      currentUser?.canAccessAllData ||
+      currentUser?.name?.includes('개업공인중개사') ||
+      currentUser?.name?.includes('대표');
+
+    let isDbMaster = false;
+    const effectiveUserId = headerUserId || currentUser?.id;
+    if (!isMasterAdmin && effectiveUserId) {
+      try {
+        const u = await prisma.user.findUnique({
+          where: { id: effectiveUserId },
+          select: { role: true, canAccessAllData: true, name: true },
+        });
+        if (u && (u.role === 'ADMIN' || u.canAccessAllData || u.name?.includes('대표') || u.name?.includes('개업공인중개사'))) {
+          isDbMaster = true;
+        }
+      } catch {}
+    }
+
+    if (!isMasterAdmin && !isDbMaster) {
+      const effectiveUserName = currentUser?.name;
+      const isCreator = existingProp.createdById && existingProp.createdById === effectiveUserId;
+      const isManager = existingProp.managerName && effectiveUserName && (existingProp.managerName === effectiveUserName || existingProp.managerName.includes(effectiveUserName));
       let isAssigned = false;
-      if (existingProp.assignedAgents) {
+      if (existingProp.assignedAgents && effectiveUserName) {
         try {
           const parsed = JSON.parse(existingProp.assignedAgents);
-          if (Array.isArray(parsed) && (parsed.includes(currentUser.name) || parsed.includes('사무실(공용)') || parsed.includes('사무실'))) {
+          if (Array.isArray(parsed) && (parsed.includes(effectiveUserName) || parsed.includes('사무실(공용)') || parsed.includes('사무실'))) {
             isAssigned = true;
           }
         } catch {
-          if (existingProp.assignedAgents.includes(currentUser.name) || existingProp.assignedAgents.includes('사무실(공용)')) {
+          if (existingProp.assignedAgents.includes(effectiveUserName) || existingProp.assignedAgents.includes('사무실(공용)')) {
             isAssigned = true;
           }
         }
@@ -1782,9 +1808,26 @@ export async function DELETE(request: NextRequest) {
       userName = decodeURIComponent(rawUserName);
     } catch (e) {}
 
-    if (userRole !== 'ADMIN') {
+    let isAuthorized = 
+      userRole === 'ADMIN' || 
+      userName.includes('대표') || 
+      userName.includes('개업공인중개사');
+
+    if (!isAuthorized && userId) {
+      try {
+        const u = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { role: true, canAccessAllData: true, name: true },
+        });
+        if (u && (u.role === 'ADMIN' || u.canAccessAllData || u.name?.includes('대표') || u.name?.includes('개업공인중개사'))) {
+          isAuthorized = true;
+        }
+      } catch {}
+    }
+
+    if (!isAuthorized) {
       return NextResponse.json(
-        { error: '매물 삭제 권한은 개업공인중개사(대표)에게만 있습니다. 소속공인중개사는 삭제할 수 없습니다.' },
+        { error: '매물 삭제 권한은 개업공인중개사(대표) 및 전체 관리 권한자에게만 있습니다.' },
         { status: 403 }
       );
     }

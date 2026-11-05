@@ -29,8 +29,8 @@ interface AdminLogModalProps {
 }
 
 export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, login, addCustomAgent, removeCustomAgent } = useAuth();
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const { currentUser, login, addCustomAgent, removeCustomAgent, refreshUserSession } = useAuth();
+  const isAdmin = currentUser?.role === 'ADMIN' || Boolean(currentUser?.canAccessAllData) || Boolean(currentUser?.name?.includes('대표')) || Boolean(currentUser?.name?.includes('개업공인중개사'));
 
   const [activeTab, setActiveTab] = useState<'LOGS' | 'USERS' | 'PASSWORD'>('LOGS');
 
@@ -243,8 +243,23 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
           );
           localStorage.setItem('cham_custom_users', JSON.stringify(updated));
         }
+
+        // 현재 로그인된 사용자가 본인인 경우 즉시 세션 동기화
+        const myStoredRaw = localStorage.getItem('cham_real_estate_user');
+        if (myStoredRaw) {
+          const myUser = JSON.parse(myStoredRaw);
+          if (myUser && (myUser.id === userToUpdate.id || myUser.username === userToUpdate.username)) {
+            const updatedMyUser = {
+              ...myUser,
+              role: nextRole,
+              canAccessAllData: nextRole === 'ADMIN' ? true : userToUpdate.canAccessAllData,
+            };
+            localStorage.setItem('cham_real_estate_user', JSON.stringify(updatedMyUser));
+          }
+        }
       } catch (e) {}
 
+      await refreshUserSession();
       fetchUsers();
       alert(`'${userToUpdate.name}' 중개사의 권한이 성공적으로 변경되었습니다.`);
     } catch (err) {
@@ -255,7 +270,7 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
   const handleToggleAccessAllData = async (userToUpdate: UserItem) => {
     const nextVal = !userToUpdate.canAccessAllData;
     const confirmMsg = nextVal
-      ? `'${userToUpdate.name}' 중개사에게 [모든 매물 및 고객 데이터 전체 접근 특별 권한]을 부여하시겠습니까?`
+      ? `'${userToUpdate.name}' 중개사에게 [모든 매물 및 고객 데이터 전체 접근 특별 권한 (열람/수정 전면 허용)]을 부여하시겠습니까?`
       : `'${userToUpdate.name}' 중개사의 권한을 [본인 등록/담당 및 사무실 공용 물건만 접근]으로 변경하시겠습니까?`;
 
     if (!confirm(confirmMsg)) return;
@@ -288,8 +303,22 @@ export const AdminLogModal: React.FC<AdminLogModalProps> = ({ isOpen, onClose })
           const updated = list.map((u: any) => u.id === userToUpdate.id ? { ...u, canAccessAllData: nextVal } : u);
           localStorage.setItem('cham_custom_users', JSON.stringify(updated));
         }
+
+        // 현재 로그인된 사용자가 본인인 경우 즉시 세션 동기화
+        const myStoredRaw = localStorage.getItem('cham_real_estate_user');
+        if (myStoredRaw) {
+          const myUser = JSON.parse(myStoredRaw);
+          if (myUser && (myUser.id === userToUpdate.id || myUser.username === userToUpdate.username)) {
+            const updatedMyUser = {
+              ...myUser,
+              canAccessAllData: nextVal,
+            };
+            localStorage.setItem('cham_real_estate_user', JSON.stringify(updatedMyUser));
+          }
+        }
       } catch (e) {}
 
+      await refreshUserSession();
       fetchUsers();
     } catch (err) {
       alert('권한 변경 처리 중 오류가 발생했습니다.');

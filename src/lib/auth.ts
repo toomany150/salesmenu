@@ -123,20 +123,25 @@ export function canAccessItem(
 
 /**
  * 고객 연락처 열람 권한 판별 (사용자 지정 보안 규칙)
- * 1. 개업공인중개사(대표): 모든 매물 및 고객등록장의 고객 연락처 열람 가능
+ * 1. 개업공인중개사(대표) / 관리자(ADMIN) / 전체 데이터 접근 권한자: 모든 매물 및 고객등록장의 고객 연락처 열람 가능
  * 2. 소속공인중개사(계정 추가자):
  *    - 자기가 등록한 매물 고객연락처와 고객등록장의 고객 연락처 열람 가능
  *    - 사무실로 분류된 연락처만 열람 가능
  * 3. 이외 다른 사람(개업공인중개사/타계정추가한자)이 등록한 연락처는 열람 불가능 (마스킹 처리 및 통화버튼 제한)
  */
 export function canViewCustomerContact(
-  user: { id: string; name: string; role: UserRole } | null,
+  user: { id: string; name: string; role: UserRole; canAccessAllData?: boolean } | null,
   item: { managerName?: string; assignedAgents?: string[]; createdById?: string; [key: string]: any } | null | undefined
 ): boolean {
   if (!user || !item) return false;
 
-  // 1. 개업공인중개사 (대표) / 관리자는 모든 고객 연락처 열람 가능
-  if (user.role === 'ADMIN' || user.name.includes('개업공인중개사') || user.name.includes('대표')) {
+  // 1. 개업공인중개사 (대표) / 관리자(ADMIN) / 전체 접근 특별 권한자는 모든 고객 연락처 열람 가능
+  if (
+    user.role === 'ADMIN' || 
+    Boolean(user.canAccessAllData) || 
+    user.name?.includes('개업공인중개사') || 
+    user.name?.includes('대표')
+  ) {
     return true;
   }
 
@@ -173,7 +178,7 @@ export function canViewCustomerContact(
 
 /**
  * 수정 권한 판별
- * - 개업공인중개사(대표) / 관리자(ADMIN): 모든 매물/고객 수정 가능
+ * - 개업공인중개사(대표) / 관리자(ADMIN) / 전체 데이터 접근 특별 권한자: 모든 매물/고객 수정 가능
  * - 권한을 부여받은 사람:
  *   1) 주 담당자(managerName === user.name)
  *   2) 추가 지정 권한자 목록에 포함된 사람(assignedAgents.includes(user.name))
@@ -182,16 +187,21 @@ export function canViewCustomerContact(
  * - 그 외 사용자: 수정 불가 (조회만 가능)
  */
 export function canEditItem(
-  user: { id: string; name: string; role: UserRole } | null,
+  user: { id: string; name: string; role: UserRole; canAccessAllData?: boolean } | null,
   item: { managerName?: string; assignedAgents?: string[]; createdById?: string } | null | undefined
 ): boolean {
   if (!user || !item) return false;
-  // 1. 개업공인중개사(대표) 및 관리자
-  if (user.role === 'ADMIN' || user.name.includes('개업공인중개사') || user.name.includes('대표')) {
+  // 1. 개업공인중개사(대표) 및 관리자(ADMIN), 또는 전체 접근 특별 권한자(canAccessAllData)
+  if (
+    user.role === 'ADMIN' || 
+    Boolean(user.canAccessAllData) || 
+    user.name?.includes('개업공인중개사') || 
+    user.name?.includes('대표')
+  ) {
     return true;
   }
   // 2. 주 담당자
-  if (item.managerName && item.managerName === user.name) {
+  if (item.managerName && (item.managerName === user.name || item.managerName.includes(user.name))) {
     return true;
   }
   // 3. 추가 지정 권한자 목록
@@ -208,10 +218,15 @@ export function canEditItem(
 
 /**
  * 삭제 권한 판별
- * - 오직 관리자(ADMIN)만 삭제 가능
+ * - 개업공인중개사(대표), 관리자(ADMIN), 또는 전체 권한자
  */
 export function canDeleteItem(
-  user: { role: UserRole } | null
+  user: { role: UserRole; canAccessAllData?: boolean; name?: string } | null
 ): boolean {
-  return !!user && user.role === 'ADMIN';
+  return !!user && (
+    user.role === 'ADMIN' || 
+    Boolean(user.canAccessAllData) || 
+    Boolean(user.name?.includes('개업공인중개사')) || 
+    Boolean(user.name?.includes('대표'))
+  );
 }

@@ -14,6 +14,7 @@ interface AuthContextType {
   addCustomAgent: (name: string) => void;
   removeCustomAgent: (name: string) => void;
   loginAsDefaultAdmin: () => void;
+  refreshUserSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   availableAgents: ['개업공인중개사 (대표)'],
   addCustomAgent: () => {},
   removeCustomAgent: () => {},
+  refreshUserSession: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -137,25 +139,97 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (e) {}
 
-    // 서버에서 활성 사용자 목록 가져와 합치기 (대표가 추가한 계정 전체 포함)
-    fetch('/api/users')
-      .then((res) => res.json())
-      .then((users: UserItem[]) => {
-        if (Array.isArray(users) && users.length > 0) {
-          const validAgentNames = users
-            .filter((u) => u.isActive)
-            .map((u) => (u.role === 'ADMIN' ? '개업공인중개사 (대표)' : u.name));
-          const unique = Array.from(new Set(['개업공인중개사 (대표)', ...customAgents, ...validAgentNames]));
-          setAvailableAgents(unique);
-        } else {
+    // 서버에서 활성 사용자 목록 가져와 합치기 및 현재 로그인 세션 권한 실시간 동기화
+    const syncWithServer = () => {
+      fetch('/api/users')
+        .then((res) => res.json())
+        .then((users: UserItem[]) => {
+          if (Array.isArray(users) && users.length > 0) {
+            const validAgentNames = users
+              .filter((u) => u.isActive)
+              .map((u) => (u.role === 'ADMIN' ? '개업공인중개사 (대표)' : u.name));
+            const unique = Array.from(new Set(['개업공인중개사 (대표)', ...customAgents, ...validAgentNames]));
+            setAvailableAgents(unique);
+
+            // [핵심 해결: 권한 동기화]
+            // 새로고침 시 로컬스토리지에 캐시된 사용자의 role 및 canAccessAllData를 서버 DB 최신 값으로 자동 갱신
+            try {
+              const storedRaw = localStorage.getItem('cham_real_estate_user');
+              if (storedRaw) {
+                const currentStored = JSON.parse(storedRaw);
+                if (currentStored && (currentStored.id || currentStored.username)) {
+                  const matched = users.find(
+                    (u) => 
+                      (currentStored.id && u.id === currentStored.id) ||
+                      (currentStored.username && u.username.toLowerCase() === currentStored.username.toLowerCase())
+                  );
+                  if (matched) {
+                    const refreshed: UserItem = {
+                      ...currentStored,
+                      id: matched.id,
+                      username: matched.username,
+                      name: matched.name,
+                      role: matched.role,
+                      phone: matched.phone || null,
+                      isActive: matched.isActive,
+                      canAccessAllData: Boolean(matched.canAccessAllData),
+                    };
+                    setCurrentUser(refreshed);
+                    localStorage.setItem('cham_real_estate_user', JSON.stringify(refreshed));
+                  }
+                }
+              }
+            } catch (syncErr) {
+              console.warn('Session sync warning:', syncErr);
+            }
+          } else {
+            setAvailableAgents(Array.from(new Set(['개업공인중개사 (대표)', ...customAgents])));
+          }
+        })
+        .catch((err) => {
+          console.warn('Could not load user list:', err);
           setAvailableAgents(Array.from(new Set(['개업공인중개사 (대표)', ...customAgents])));
-        }
-      })
-      .catch((err) => {
-        console.warn('Could not load user list:', err);
-        setAvailableAgents(Array.from(new Set(['개업공인중개사 (대표)', ...customAgents])));
-      });
+        });
+    };
+
+    syncWithServer();
   }, []);
+
+  const refreshUserSession = async () => {
+    try {
+      const res = await fetch('/api/users');
+      const users: UserItem[] = await res.json();
+      if (Array.isArray(users) && users.length > 0) {
+        const storedRaw = localStorage.getItem('cham_real_estate_user');
+        if (storedRaw) {
+          const currentStored = JSON.parse(storedRaw);
+          if (currentStored && (currentStored.id || currentStored.username)) {
+            const matched = users.find(
+              (u) =>
+                (currentStored.id && u.id === currentStored.id) ||
+                (currentStored.username && u.username.toLowerCase() === currentStored.username.toLowerCase())
+            );
+            if (matched) {
+              const refreshed: UserItem = {
+                ...currentStored,
+                id: matched.id,
+                username: matched.username,
+                name: matched.name,
+                role: matched.role,
+                phone: matched.phone || null,
+                isActive: matched.isActive,
+                canAccessAllData: Boolean(matched.canAccessAllData),
+              };
+              setCurrentUser(refreshed);
+              localStorage.setItem('cham_real_estate_user', JSON.stringify(refreshed));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to refresh user session:', e);
+    }
+  };
 
   const login = async (username: string, password?: string): Promise<{ success: boolean; error?: string }> => {
     const cleanUsername = String(username).trim();
@@ -284,6 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         availableAgents,
         addCustomAgent,
         removeCustomAgent,
+        refreshUserSession,
       }}
     >
       {children}
