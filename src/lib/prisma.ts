@@ -115,15 +115,8 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
  */
 let isInitializingSchema = false;
 
-export async function ensureDatabaseSchema(): Promise<void> {
-  // PostgreSQL (Supabase 클라우드)는 이미 모든 스키마/컬럼이 완벽하게 구축되어 있습니다.
-  // DDL(ALTER TABLE) 실행 시 테이블에 AccessExclusiveLock이 걸려 쿼리가 수 분간 멈추는 현상을 원천 차단합니다.
-  if (!activeDbUrl.startsWith('file:')) {
-    globalForPrisma.dbInitialized = true;
-    return;
-  }
-
-  if (globalForPrisma.dbInitialized || isInitializingSchema) {
+export async function ensureDatabaseSchema(force = false): Promise<void> {
+  if (!force && (globalForPrisma.dbInitialized || isInitializingSchema)) {
     return;
   }
   isInitializingSchema = true;
@@ -307,12 +300,14 @@ export async function ensureDatabaseSchema(): Promise<void> {
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "purchasePrice" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "currentMarketPrice" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "marketPriceBasis" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerSameAsCustomer" BOOLEAN DEFAULT true;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerCustomerId" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerName" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerPhone" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerCarrier" TEXT;`,
+        `ALTER TABLE "ApartmentDetail" ADD COLUMN IF NOT EXISTS "pyeongType" TEXT;`,
       ];
-      for (const q of pgQueries) {
-        try {
-          await prisma.$executeRawUnsafe(q);
-        } catch (e) {}
-      }
+      await Promise.allSettled(pgQueries.map(q => prisma.$executeRawUnsafe(q)));
     }
 
     globalForPrisma.dbInitialized = true;

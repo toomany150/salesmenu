@@ -157,19 +157,42 @@ export async function GET(request: NextRequest) {
       whereClause.status = status;
     }
 
-    let properties = await prisma.property.findMany({
-      where: whereClause,
-      include: {
-        customer: true,
-        apartmentDetail: true,
-        houseDetail: true,
-        storeDetail: true,
-        officeDetail: true,
-        factoryWarehouseDetail: true,
-        landDetail: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    let properties: any[] = [];
+    try {
+      properties = await prisma.property.findMany({
+        where: whereClause,
+        include: {
+          customer: true,
+          apartmentDetail: true,
+          houseDetail: true,
+          storeDetail: true,
+          officeDetail: true,
+          factoryWarehouseDetail: true,
+          landDetail: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (queryErr: any) {
+      if (queryErr?.code === 'P2022') {
+        console.warn('[Self-Healing] Detected missing DB column, re-running schema self-healing and retrying...');
+        await ensureDatabaseSchema(true);
+        properties = await prisma.property.findMany({
+          where: whereClause,
+          include: {
+            customer: true,
+            apartmentDetail: true,
+            houseDetail: true,
+            storeDetail: true,
+            officeDetail: true,
+            factoryWarehouseDetail: true,
+            landDetail: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+      } else {
+        throw queryErr;
+      }
+    }
 
     // 만약 DB가 비어있으면 초기 목데이터 자동 시딩
     if (properties.length === 0 && !search) {
