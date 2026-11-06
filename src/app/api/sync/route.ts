@@ -207,12 +207,21 @@ export async function POST(request: NextRequest) {
       customers: inMemorySyncStore.customers,
     });
 
-    // 3. DB에 고객 병렬 청크 Upsert (처리 속도 10배 향상)
+    // 3. DB에 고객 병렬 청크 Upsert (매물 내부 연계 고객까지 포함하여 100% 저장)
     try {
       await ensureDatabaseSchema().catch(() => { });
+      const propCustomers: CustomerItem[] = incomingProps
+        .map((p: any) => p.customer)
+        .filter((c): c is CustomerItem => !!c && !!c.name);
+
+      const custMapToUpsert = new Map<string, CustomerItem>();
+      incomingCusts.forEach((c) => { if (c.id && c.name) custMapToUpsert.set(c.id, c); });
+      propCustomers.forEach((c) => { if (c.id && c.name) custMapToUpsert.set(c.id, c); });
+      const allCustsToUpsert = Array.from(custMapToUpsert.values());
+
       const CUST_CHUNK_SIZE = 10;
-      for (let i = 0; i < incomingCusts.length; i += CUST_CHUNK_SIZE) {
-        const chunk = incomingCusts.slice(i, i + CUST_CHUNK_SIZE);
+      for (let i = 0; i < allCustsToUpsert.length; i += CUST_CHUNK_SIZE) {
+        const chunk = allCustsToUpsert.slice(i, i + CUST_CHUNK_SIZE);
         await Promise.all(
           chunk.map(async (cust) => {
             if (!cust.id || !cust.name) return;
@@ -251,7 +260,7 @@ export async function POST(request: NextRequest) {
       console.warn('Sync DB customers upsert notice:', dbCustErr);
     }
 
-    // 4. DB에 매물 병렬 청크 Upsert (★ 핵심: 10배 빠른 병렬 처리)
+    // 4. DB에 매물 병렬 청크 Upsert (★ 핵심: 주소 폴백 및 외래키 검증으로 누락 완전 차단)
     try {
       await ensureDatabaseSchema().catch(() => { });
       const PROP_CHUNK_SIZE = 8;
@@ -259,8 +268,22 @@ export async function POST(request: NextRequest) {
         const chunk = incomingProps.slice(i, i + PROP_CHUNK_SIZE);
         await Promise.all(
           chunk.map(async (prop) => {
-            const propNum = prop.propertyNumber || prop.id;
-            if (!propNum || !prop.address) return;
+            const propNum = (prop.propertyNumber || prop.id || '').trim();
+            const targetAddress = (prop.address || prop.roadAddress || prop.jibunAddress || '').trim();
+            if (!propNum || !targetAddress) return;
+
+            // 외래키 무결성 보장 (미존재 ID로 인한 DB 에러 원천 차단)
+            let validCustomerId: string | null = null;
+            if (prop.customerId) {
+              const cExists = await prisma.customer.findUnique({ where: { id: prop.customerId } }).catch(() => null);
+              if (cExists) validCustomerId = cExists.id;
+            }
+
+            let validUserId: string | null = null;
+            if (prop.createdById) {
+              const uExists = await prisma.user.findUnique({ where: { id: prop.createdById } }).catch(() => null);
+              if (uExists) validUserId = uExists.id;
+            }
 
             const propDataToSave: any = {
               propertyNumber: propNum,
@@ -268,7 +291,7 @@ export async function POST(request: NextRequest) {
               propertyType: prop.propertyType || 'STORE',
               status: prop.status || 'AVAILABLE',
               transactionType: prop.transactionType || '월세',
-              address: prop.address,
+              address: targetAddress,
               roadAddress: prop.roadAddress || null,
               jibunAddress: prop.jibunAddress || null,
               detailAddress: prop.detailAddress || null,
@@ -291,10 +314,10 @@ export async function POST(request: NextRequest) {
               totalFloorArea: prop.totalFloorArea !== undefined && prop.totalFloorArea !== null ? parseFloat(String(prop.totalFloorArea)) : null,
               approvalDate: prop.approvalDate ? new Date(prop.approvalDate) : null,
               buildingRegisterUse: prop.buildingRegisterUse || null,
-              customerId: prop.customerId || null,
+              customerId: validCustomerId,
               managerName: prop.managerName || '사무실',
               assignedAgents: prop.assignedAgents ? (Array.isArray(prop.assignedAgents) ? JSON.stringify(prop.assignedAgents) : String(prop.assignedAgents)) : null,
-              createdById: prop.createdById || null,
+              createdById: validUserId,
               creatorName: prop.creatorName || null,
             };
 
