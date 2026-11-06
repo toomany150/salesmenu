@@ -219,7 +219,11 @@ const DashboardContent: React.FC = () => {
       if (custRes.ok) {
         const cData = await custRes.json();
         if (Array.isArray(cData)) {
-          cData.sort((a: any, b: any) => {
+          const serverCustKeys = new Set(cData.map((c: any) => c.id));
+          const unsyncedCusts = localCustomCusts.filter((c) => !serverCustKeys.has(c.id));
+          const mergedCusts = [...unsyncedCusts, ...cData];
+
+          mergedCusts.sort((a: any, b: any) => {
             if (a.isPinned && !b.isPinned) return -1;
             if (!a.isPinned && b.isPinned) return 1;
             const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
@@ -231,8 +235,16 @@ const DashboardContent: React.FC = () => {
             const createdB = new Date(b.createdAt || 0).getTime();
             return createdB - createdA;
           });
-          setCustomers(cData);
-          setCustomCustomers(cData);
+          setCustomers(mergedCusts);
+          setCustomCustomers(mergedCusts);
+
+          if (unsyncedCusts.length > 0) {
+            fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ properties: [], customers: unsyncedCusts }),
+            }).catch(() => {});
+          }
         }
       } else if (localCustomCusts.length > 0) {
         localCustomCusts.sort((a: any, b: any) => {
@@ -253,17 +265,20 @@ const DashboardContent: React.FC = () => {
       if (propRes.ok) {
         const pData = await propRes.json();
         if (Array.isArray(pData)) {
-          pData.sort((a: any, b: any) => {
+          // 서버 DB에 없는 로컬 미동기화 매물도 화면에서 삭제되지 않고 절대 보존
+          const serverPropKeys = new Set(pData.map((p: any) => p.id || p.propertyNumber));
+          const unsyncedProps = localCustomProps.filter((p) => !serverPropKeys.has(p.id) && !serverPropKeys.has(p.propertyNumber));
+          const mergedProps = [...unsyncedProps, ...pData];
+
+          mergedProps.sort((a: any, b: any) => {
             const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
             const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
             return tB - tA;
           });
-          setProperties(pData);
-          setCustomProperties(pData);
+          setProperties(mergedProps);
+          setCustomProperties(mergedProps);
 
-          // 서버 DB에 없는 로컬 미동기화 매물이 있을 때만 비동기 백그라운드 전송 (중복 146건 전송 차단으로 0.3초 초고속 유지)
-          const serverPropKeys = new Set(pData.map((p: any) => p.id || p.propertyNumber));
-          const unsyncedProps = localCustomProps.filter((p) => !serverPropKeys.has(p.id) && !serverPropKeys.has(p.propertyNumber));
+          // 미동기화 매물이 있으면 백그라운드에서 즉시 서버 DB로 자동 업로드 (모든 기기에 공유)
           if (unsyncedProps.length > 0) {
             fetch('/api/sync', {
               method: 'POST',

@@ -114,19 +114,29 @@ export function getDeletedPropertyIds(): string[] {
 
 /**
  * 서버 최신 매물 목록으로 로컬 캐시 동기화
- * (모든 매물의 메타데이터가 100% 안전하게 로컬에 보존되어 다음 접속 시에도 0ms 즉시 온전한 개수로 렌더링)
+ * (로컬에만 존재하는 미동기화 신규 매물은 절대 삭제하지 않고 안전 병합하여 데이터 영구 보존)
  */
 export function setCustomProperties(list: PropertyItem[]): void {
   if (typeof window === 'undefined' || !Array.isArray(list)) return;
   try {
+    const localList = getCustomProperties();
+    const serverKeys = new Set(list.map((p) => p.id || p.propertyNumber));
+    // 로컬에만 존재하는 미동기화 매물 추출 (절대 소실 방지)
+    const localOnly = localList.filter((p) => !serverKeys.has(p.id) && !serverKeys.has(p.propertyNumber));
+    const mergedList = [...localOnly, ...list];
+
     // 1차 시도: 썸네일 포함 경량화 목록 저장
-    const sanitized = list.map((p) => sanitizePropertyForStorage(p, true));
+    const sanitized = mergedList.map((p) => sanitizePropertyForStorage(p, true));
     localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(sanitized));
   } catch (err) {
     console.warn('Quota exceeded with thumbnails, falling back to pure metadata cache:', err);
     try {
+      const localList = getCustomProperties();
+      const serverKeys = new Set(list.map((p) => p.id || p.propertyNumber));
+      const localOnly = localList.filter((p) => !serverKeys.has(p.id) && !serverKeys.has(p.propertyNumber));
+      const mergedList = [...localOnly, ...list];
       // 2차 시도: 이미지 완전 제외 순수 메타데이터로 100% 저장 보장 (수백 개 매물도 수십 KB로 저장 가능)
-      const pureMeta = list.map((p) => sanitizePropertyForStorage(p, false));
+      const pureMeta = mergedList.map((p) => sanitizePropertyForStorage(p, false));
       localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(pureMeta));
     } catch (fallbackErr) {
       console.error('Failed to set custom properties to localStorage:', fallbackErr);
@@ -208,11 +218,16 @@ export function getDeletedCustomerIds(): string[] {
 
 /**
  * 서버 최신 고객 목록으로 로컬 캐시 동기화
+ * (로컬에만 존재하는 미동기화 신규 고객은 절대 삭제하지 않고 안전 병합)
  */
 export function setCustomCustomers(list: CustomerItem[]): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_CUSTOM_CUSTOMERS, JSON.stringify(list));
+    const localList = getCustomCustomers();
+    const serverKeys = new Set(list.map((c) => c.id));
+    const localOnly = localList.filter((c) => !serverKeys.has(c.id));
+    const mergedList = [...localOnly, ...list];
+    localStorage.setItem(STORAGE_CUSTOM_CUSTOMERS, JSON.stringify(mergedList));
   } catch (err) {
     console.error('Failed to set custom customers to localStorage:', err);
   }
