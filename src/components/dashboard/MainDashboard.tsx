@@ -167,6 +167,15 @@ const DashboardContent: React.FC = () => {
       (c) => !deletedCustIds.includes(c.id)
     );
 
+    // ⚡ [자동 실시간 클라우드 동기화]: 혹시 로컬 브라우저에만 저장된 신규 매물/고객이 있다면 백그라운드에서 즉시 서버 DB로 자동 업로드 병합
+    if (localCustomProps.length > 0 || localCustomCusts.length > 0) {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ properties: localCustomProps, customers: localCustomCusts }),
+      }).catch(() => {});
+    }
+
     // 소속공인중개사(AGENT) 중 특별 권한이 없는 경우 로컬 캐시도 본인+공용으로 제한
     let filteredLocalProps = localCustomProps;
     let filteredLocalCusts = localCustomCusts;
@@ -304,10 +313,23 @@ const DashboardContent: React.FC = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, [currentUser, loading, fetchData]);
 
-  // ⚡ 원클릭 즉시 동기화 핸들러 (모든 PC·스마트폰 실시간 즉시 연동)
+  // ⚡ 원클릭 즉시 동기화 상태
   const [isInstantSyncing, setIsInstantSyncing] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
+  // ⚡ 모든 기기(PC1, PC2, PC3, 스마트폰) 간 실시간 무인 자동 동기화 (15초 주기 백그라운드 자동 갱신)
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(() => {
+      // 폼 입력 중이거나 모달 창이 열려 있을 때는 화면 깜빡임 방지를 위해 갱신 생략
+      if (!isPropertyRegOpen && !isCustomerRegOpen && !editingProperty && !editingCustomer && !isInstantSyncing) {
+        fetchData();
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [currentUser, isPropertyRegOpen, isCustomerRegOpen, editingProperty, editingCustomer, isInstantSyncing, fetchData]);
+
+  // ⚡ 원클릭 즉시 동기화 핸들러 (모든 PC·스마트폰 실시간 즉시 연동)
   const handleInstantSync = async () => {
     if (!currentUser) {
       alert('동기화는 중개사 로그인 후 이용 가능합니다. 먼저 로그인해 주세요.');
