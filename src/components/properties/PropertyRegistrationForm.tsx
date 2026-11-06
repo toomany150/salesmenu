@@ -3208,7 +3208,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     />
                   )}
                   {propertyType === 'HOUSE' && (
-                    <HouseForm data={houseData} onChange={setHouseData} />
+                    <HouseForm 
+                      data={houseData} 
+                      onChange={setHouseData} 
+                      transactionType={transactionType} 
+                      ledgerData={ledgerData} 
+                    />
                   )}
                   {propertyType === 'STORE' && (
                     <StoreForm data={storeData} onChange={setStoreData} transactionType={transactionType} ledgerData={ledgerData} hideSector6={true} />

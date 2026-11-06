@@ -64,8 +64,21 @@ function formatPropertyOutput(p: any, options: { fullPhotos?: boolean } = { full
     premium: premVal,
     negotiablePremium: negoPremVal,
     isNoPremium: isNoPrem,
+    houseDetail: p.houseDetail ? {
+      ...p.houseDetail,
+      leaseStatusList: p.houseDetail.leaseStatusList
+        ? (typeof p.houseDetail.leaseStatusList === 'string'
+            ? (() => { try { return JSON.parse(p.houseDetail.leaseStatusList); } catch { return []; } })()
+            : p.houseDetail.leaseStatusList)
+        : undefined,
+    } : undefined,
     storeDetail: p.storeDetail ? {
       ...p.storeDetail,
+      leaseStatusList: p.storeDetail.leaseStatusList
+        ? (typeof p.storeDetail.leaseStatusList === 'string'
+            ? (() => { try { return JSON.parse(p.storeDetail.leaseStatusList); } catch { return []; } })()
+            : p.storeDetail.leaseStatusList)
+        : undefined,
       monthlyRentVat: isRentVat,
       premium: premVal,
       negotiablePremium: negoPremVal,
@@ -197,13 +210,19 @@ export async function GET(request: NextRequest) {
               create: {
                 ...p.houseDetail,
                 approvalDate: p.houseDetail.approvalDate ? new Date(p.houseDetail.approvalDate) : null,
-              } 
+                leaseStatusList: (p.houseDetail as any).leaseStatusList 
+                  ? (typeof (p.houseDetail as any).leaseStatusList === 'string' ? (p.houseDetail as any).leaseStatusList : JSON.stringify((p.houseDetail as any).leaseStatusList))
+                  : null,
+              } as any
             } : undefined,
             storeDetail: p.storeDetail ? { 
               create: {
                 ...p.storeDetail,
                 approvalDate: p.storeDetail.approvalDate ? new Date(p.storeDetail.approvalDate) : null,
-              } 
+                leaseStatusList: (p.storeDetail as any).leaseStatusList 
+                  ? (typeof (p.storeDetail as any).leaseStatusList === 'string' ? (p.storeDetail as any).leaseStatusList : JSON.stringify((p.storeDetail as any).leaseStatusList))
+                  : null,
+              } as any
             } : undefined,
             officeDetail: p.officeDetail ? { 
               create: {
@@ -669,6 +688,9 @@ export async function POST(request: NextRequest) {
                   roomCount: (houseDetail.roomCount !== undefined && houseDetail.roomCount !== null && houseDetail.roomCount !== '') ? parseInt(houseDetail.roomCount, 10) : null,
                   bathroomCount: (houseDetail.bathroomCount !== undefined && houseDetail.bathroomCount !== null && houseDetail.bathroomCount !== '') ? parseInt(houseDetail.bathroomCount, 10) : null,
                   currentLeaseStatus: houseDetail.currentLeaseStatus || null,
+                  leaseStatusList: houseDetail.leaseStatusList
+                    ? (typeof houseDetail.leaseStatusList === 'string' ? houseDetail.leaseStatusList : JSON.stringify(houseDetail.leaseStatusList))
+                    : null,
                   parkingCount: (houseDetail.parkingCount !== undefined && houseDetail.parkingCount !== null && houseDetail.parkingCount !== '') ? parseInt(houseDetail.parkingCount, 10) : null,
                   maintenanceFeeCommon: (houseDetail.maintenanceFeeCommon !== undefined && houseDetail.maintenanceFeeCommon !== null && houseDetail.maintenanceFeeCommon !== '') ? parseFloat(houseDetail.maintenanceFeeCommon) : null,
                   maintenanceFeeWater: (houseDetail.maintenanceFeeWater !== undefined && houseDetail.maintenanceFeeWater !== null && houseDetail.maintenanceFeeWater !== '') ? parseFloat(houseDetail.maintenanceFeeWater) : null,
@@ -747,6 +769,9 @@ export async function POST(request: NextRequest) {
                   monthlyRevenue: storeDetail.monthlyRevenue ? parseFloat(storeDetail.monthlyRevenue) : null,
                   equipmentStatus: storeDetail.equipmentStatus,
                   fireInspectionCert: storeDetail.fireInspectionCert,
+                  leaseStatusList: storeDetail.leaseStatusList
+                    ? (typeof storeDetail.leaseStatusList === 'string' ? storeDetail.leaseStatusList : JSON.stringify(storeDetail.leaseStatusList))
+                    : null,
                 },
               }
             : undefined,
@@ -1344,6 +1369,9 @@ export async function PUT(request: NextRequest) {
                     roomCount: (houseDetail.roomCount !== undefined && houseDetail.roomCount !== null && houseDetail.roomCount !== '') ? parseInt(houseDetail.roomCount, 10) : null,
                     bathroomCount: (houseDetail.bathroomCount !== undefined && houseDetail.bathroomCount !== null && houseDetail.bathroomCount !== '') ? parseInt(houseDetail.bathroomCount, 10) : null,
                     currentLeaseStatus: houseDetail.currentLeaseStatus || null,
+                    leaseStatusList: houseDetail.leaseStatusList !== undefined
+                      ? (houseDetail.leaseStatusList ? (typeof houseDetail.leaseStatusList === 'string' ? houseDetail.leaseStatusList : JSON.stringify(houseDetail.leaseStatusList)) : null)
+                      : null,
                     parkingCount: (houseDetail.parkingCount !== undefined && houseDetail.parkingCount !== null && houseDetail.parkingCount !== '') ? parseInt(houseDetail.parkingCount, 10) : null,
                     maintenanceFeeCommon: (houseDetail.maintenanceFeeCommon !== undefined && houseDetail.maintenanceFeeCommon !== null && houseDetail.maintenanceFeeCommon !== '') ? parseFloat(houseDetail.maintenanceFeeCommon) : null,
                     maintenanceFeeWater: (houseDetail.maintenanceFeeWater !== undefined && houseDetail.maintenanceFeeWater !== null && houseDetail.maintenanceFeeWater !== '') ? parseFloat(houseDetail.maintenanceFeeWater) : null,
@@ -1363,6 +1391,9 @@ export async function PUT(request: NextRequest) {
                     roomCount: (houseDetail.roomCount !== undefined && houseDetail.roomCount !== null && houseDetail.roomCount !== '') ? parseInt(houseDetail.roomCount, 10) : null,
                     bathroomCount: (houseDetail.bathroomCount !== undefined && houseDetail.bathroomCount !== null && houseDetail.bathroomCount !== '') ? parseInt(houseDetail.bathroomCount, 10) : null,
                     currentLeaseStatus: houseDetail.currentLeaseStatus || null,
+                    leaseStatusList: houseDetail.leaseStatusList !== undefined
+                      ? (houseDetail.leaseStatusList ? (typeof houseDetail.leaseStatusList === 'string' ? houseDetail.leaseStatusList : JSON.stringify(houseDetail.leaseStatusList)) : null)
+                      : null,
                     parkingCount: (houseDetail.parkingCount !== undefined && houseDetail.parkingCount !== null && houseDetail.parkingCount !== '') ? parseInt(houseDetail.parkingCount, 10) : null,
                     maintenanceFeeCommon: (houseDetail.maintenanceFeeCommon !== undefined && houseDetail.maintenanceFeeCommon !== null && houseDetail.maintenanceFeeCommon !== '') ? parseFloat(houseDetail.maintenanceFeeCommon) : null,
                     maintenanceFeeWater: (houseDetail.maintenanceFeeWater !== undefined && houseDetail.maintenanceFeeWater !== null && houseDetail.maintenanceFeeWater !== '') ? parseFloat(houseDetail.maintenanceFeeWater) : null,
@@ -1444,6 +1475,9 @@ export async function PUT(request: NextRequest) {
                     monthlyRevenue: storeDetail.monthlyRevenue ? parseFloat(storeDetail.monthlyRevenue) : null,
                     equipmentStatus: storeDetail.equipmentStatus,
                     fireInspectionCert: storeDetail.fireInspectionCert,
+                    leaseStatusList: storeDetail.leaseStatusList
+                      ? (typeof storeDetail.leaseStatusList === 'string' ? storeDetail.leaseStatusList : JSON.stringify(storeDetail.leaseStatusList))
+                      : null,
                   },
                   update: {
                     storeName: storeDetail.storeName,
@@ -1510,6 +1544,9 @@ export async function PUT(request: NextRequest) {
                     monthlyRevenue: storeDetail.monthlyRevenue !== undefined ? (storeDetail.monthlyRevenue ? parseFloat(storeDetail.monthlyRevenue) : null) : undefined,
                     equipmentStatus: storeDetail.equipmentStatus,
                     fireInspectionCert: storeDetail.fireInspectionCert,
+                    leaseStatusList: storeDetail.leaseStatusList
+                      ? (typeof storeDetail.leaseStatusList === 'string' ? storeDetail.leaseStatusList : JSON.stringify(storeDetail.leaseStatusList))
+                      : null,
                   },
                 },
               }

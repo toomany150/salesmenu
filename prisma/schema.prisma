@@ -331,6 +331,7 @@ model HouseDetail {
   roomCount             Int?     // 방수
   bathroomCount         Int?     // 욕실수
   currentLeaseStatus    String?  // 현재 임대현황 (보증금/월세 구성 등)
+  leaseStatusList       String?  // 층별/호수별 임대차 현황 (JSON 배열 문자열)
   parkingCount          Int?     // 가능주차대수
 
   // 비용 및 시설
@@ -420,6 +421,7 @@ model StoreDetail {
   monthlyRevenue             Float?   // 월매출 (만원)
   equipmentStatus            String?  // 비품체크 (인수불가/렌탈 품목 목록)
   fireInspectionCert         String?  // 소방필증 (완비증명서 구비 여부)
+  leaseStatusList            String?  // 매매 시 층별/호수별 임대차 현황 (JSON 배열 문자열)
 }
 
 // 4) 사무실 세부 정보 & 🚨 상담 체크리스트

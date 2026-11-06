@@ -47,17 +47,86 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
     onChange({ ...data, leaseStatusList: nextList });
   };
 
-  const addLeaseItem = (floorHoDefault = '') => {
+  const addLeaseItem = (floorHoDefault = '', insertAfterIndex?: number) => {
     const newItem: StoreLeaseUnitItem = {
       id: `lease-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       floorHo: floorHoDefault || `${leaseList.length + 1}층`,
+      tenantName: '',
       contractStartDate: '',
       evictionPossible: '명도 가능',
       deposit: undefined,
       monthlyRent: undefined,
       isVacant: false,
     };
-    onChange({ ...data, leaseStatusList: [...leaseList, newItem] });
+    if (insertAfterIndex !== undefined && insertAfterIndex >= 0) {
+      const nextList = [...leaseList];
+      nextList.splice(insertAfterIndex + 1, 0, newItem);
+      onChange({ ...data, leaseStatusList: nextList });
+    } else {
+      onChange({ ...data, leaseStatusList: [...leaseList, newItem] });
+    }
+  };
+
+  // 1층에 여러 점포(임대인)를 넣을 수 있는 전용 추가 버튼 핸들러
+  const handleAddFirstFloorUnit = () => {
+    const firstFloorItems = leaseList.filter((item) => 
+      item.floorHo.includes('1층') || /^10\d/.test(item.floorHo) || item.floorHo.startsWith('1-')
+    );
+    const count = firstFloorItems.length + 1;
+    const defaultName = count === 1 ? '1층 1호' : `1층 ${count}호 점포`;
+    
+    let insertIdx = -1;
+    for (let i = leaseList.length - 1; i >= 0; i--) {
+      if (leaseList[i].floorHo.includes('1층') || /^10\d/.test(leaseList[i].floorHo) || leaseList[i].floorHo.startsWith('1-')) {
+        insertIdx = i;
+        break;
+      }
+    }
+    
+    const newItem: StoreLeaseUnitItem = {
+      id: `lease-1f-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      floorHo: defaultName,
+      tenantName: '',
+      contractStartDate: '',
+      evictionPossible: '명도 가능',
+      deposit: undefined,
+      monthlyRent: undefined,
+      isVacant: false,
+    };
+
+    if (insertIdx >= 0) {
+      const next = [...leaseList];
+      next.splice(insertIdx + 1, 0, newItem);
+      onChange({ ...data, leaseStatusList: next });
+    } else {
+      onChange({ ...data, leaseStatusList: [newItem, ...leaseList] });
+    }
+  };
+
+  // 특정 행과 같은 층 점포/호실을 바로 아래에 추가하는 핸들러
+  const handleAddSameFloorUnit = (index: number) => {
+    const current = leaseList[index];
+    const floorText = current.floorHo.trim();
+    const match = floorText.match(/^(지하\s*\d+층|\d+층|옥탑\d*층?|\S+층|\S+호)/);
+    const prefix = match ? match[0] : floorText;
+    
+    const sameCount = leaseList.filter((item) => item.floorHo.includes(prefix)).length + 1;
+    const defaultName = `${prefix} 점포 ${sameCount}`;
+
+    const newItem: StoreLeaseUnitItem = {
+      id: `lease-same-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      floorHo: defaultName,
+      tenantName: '',
+      contractStartDate: '',
+      evictionPossible: current.evictionPossible || '명도 가능',
+      deposit: undefined,
+      monthlyRent: undefined,
+      isVacant: false,
+    };
+
+    const next = [...leaseList];
+    next.splice(index + 1, 0, newItem);
+    onChange({ ...data, leaseStatusList: next });
   };
 
   const removeLeaseItem = (index: number) => {
@@ -85,6 +154,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
         generated.push({
           id: `ledger-unit-${idx}-${Date.now()}`,
           floorHo: `${u.dong ? u.dong + ' ' : ''}${u.ho || u.floor || (idx + 1) + '호'}`,
+          tenantName: u.owner || '',
           contractStartDate: '',
           evictionPossible: '명도 가능',
           deposit: undefined,
@@ -97,6 +167,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
         generated.push({
           id: `ledger-floor-${idx}-${Date.now()}`,
           floorHo: `${f.floor} (${f.mainUse || '점포'})`,
+          tenantName: '',
           contractStartDate: '',
           evictionPossible: '명도 가능',
           deposit: undefined,
@@ -636,7 +707,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {ledgerData && (
                 <button
                   type="button"
@@ -648,13 +719,23 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                   <span>대장 층/호수 불러오기</span>
                 </button>
               )}
+              {/* [사용자 요청]: 1층에 2~3개 점포가 입점할 수 있을 때 여러 임대인/점포를 추가하는 전용 버튼 */}
+              <button
+                type="button"
+                onClick={handleAddFirstFloorUnit}
+                title="1층에 여러 점포/임대인이 입점한 경우 클릭하여 1층 호실을 추가합니다"
+                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-2xs flex items-center gap-1 transition-all cursor-pointer ring-1 ring-emerald-400"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>🏢 + 1층 점포(임대인) 추가</span>
+              </button>
               <button
                 type="button"
                 onClick={() => addLeaseItem()}
                 className="px-2.5 py-1.5 rounded-lg bg-white border border-indigo-300 hover:bg-indigo-50 text-indigo-800 text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>호실 추가</span>
+                <span>일반 호실 추가</span>
               </button>
             </div>
           </div>
@@ -664,18 +745,27 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
               <div className="p-6 rounded-xl border-2 border-dashed border-indigo-200 bg-indigo-50/30 text-center space-y-2">
                 <p className="text-sm font-bold text-slate-700">등록된 층별·호수별 임대차 내역이 없습니다.</p>
                 <p className="text-xs text-slate-500">
-                  상단의 [대장 층/호수 불러오기]를 누르시거나 [+ 호실 추가] 버튼을 눌러 각 호실의 보증금 및 월세를 입력해주세요.
+                  상단의 [대장 층/호수 불러오기]를 누르시거나 1층에 여러 점포가 입점한 경우 [+ 1층 점포(임대인) 추가]를 눌러주세요.
                 </p>
-                <div className="pt-2 flex justify-center gap-2">
+                <div className="pt-2 flex flex-wrap justify-center gap-2">
                   {ledgerData && (
                     <button
                       type="button"
                       onClick={handleLoadFromLedger}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-xs hover:bg-indigo-700 cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-xs hover:bg-indigo-700 cursor-pointer flex items-center gap-1"
                     >
-                      🏛️ 건축물대장 층별 목록 일괄 불러오기
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>🏛️ 건축물대장 층별 목록 일괄 불러오기</span>
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={handleAddFirstFloorUnit}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-xs hover:bg-emerald-700 cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>🏢 + 1층 점포(임대인) 추가</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => addLeaseItem('1층')}
@@ -692,12 +782,14 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
-                        <th className="py-2.5 px-3 min-w-[120px]">층 · 호수 *</th>
-                        <th className="py-2.5 px-3 min-w-[130px]">계약 시작일</th>
-                        <th className="py-2.5 px-3 min-w-[120px]">명도 가능 여부</th>
-                        <th className="py-2.5 px-3 min-w-[110px]">임차보증금 (만원)</th>
-                        <th className="py-2.5 px-3 min-w-[110px]">월세 (만원)</th>
-                        <th className="py-2.5 px-3 text-center min-w-[90px]">공실 상태</th>
+                        <th className="py-2.5 px-3 min-w-[110px]">층 · 구획 *</th>
+                        <th className="py-2.5 px-3 min-w-[120px]">상호 / 임차인(점포명)</th>
+                        <th className="py-2.5 px-3 min-w-[115px]">계약 시작일</th>
+                        <th className="py-2.5 px-3 min-w-[110px]">명도 가능 여부</th>
+                        <th className="py-2.5 px-3 min-w-[105px]">임차보증금 (만원)</th>
+                        <th className="py-2.5 px-3 min-w-[95px]">월세 (만원)</th>
+                        <th className="py-2.5 px-2 text-center min-w-[70px]">공실 상태</th>
+                        <th className="py-2.5 px-2 text-center min-w-[80px]">같은 층 추가</th>
                         <th className="py-2.5 px-2 text-center w-10">삭제</th>
                       </tr>
                     </thead>
@@ -713,12 +805,23 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                               type="text"
                               value={item.floorHo}
                               onChange={(e) => updateLeaseItem(idx, { floorHo: e.target.value })}
-                              placeholder="예: 1층 101호"
+                              placeholder="예: 1층 1호 점포"
                               className="w-full text-xs font-bold px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-slate-900"
                             />
                           </td>
 
-                          {/* 2. 계약기간 시작일 */}
+                          {/* 2. 상호 / 임차인(점포명) */}
+                          <td className="py-2 px-2.5">
+                            <input
+                              type="text"
+                              value={item.tenantName || ''}
+                              onChange={(e) => updateLeaseItem(idx, { tenantName: e.target.value })}
+                              placeholder="예: CU편의점, 카페, 홍길동"
+                              className="w-full text-xs px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-indigo-500 text-slate-800 font-medium"
+                            />
+                          </td>
+
+                          {/* 3. 계약기간 시작일 */}
                           <td className="py-2 px-2.5">
                             <input
                               type="date"
@@ -728,7 +831,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                             />
                           </td>
 
-                          {/* 3. 명도여부 가능 */}
+                          {/* 4. 명도여부 가능 */}
                           <td className="py-2 px-2.5">
                             <select
                               value={item.evictionPossible || '명도 가능'}
@@ -742,7 +845,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                             </select>
                           </td>
 
-                          {/* 4. 임차보증금 (만원) */}
+                          {/* 5. 임차보증금 (만원) */}
                           <td className="py-2 px-2.5">
                             <input
                               type="number"
@@ -758,7 +861,7 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                             />
                           </td>
 
-                          {/* 5. 월세 (만원) */}
+                          {/* 6. 월세 (만원) */}
                           <td className="py-2 px-2.5">
                             <input
                               type="number"
@@ -774,13 +877,13 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                             />
                           </td>
 
-                          {/* 6. 공실 버튼 (원클릭 토글) */}
+                          {/* 7. 공실 버튼 (원클릭 토글) */}
                           <td className="py-2 px-2 text-center">
                             <button
                               type="button"
                               onClick={() => handleToggleVacant(idx)}
                               title={item.isVacant ? '클릭 시 입주 상태로 전환' : '클릭 시 공실(보증금/월세 0)로 전환'}
-                              className={`px-2.5 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer shadow-2xs ${
+                              className={`px-2 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer shadow-2xs ${
                                 item.isVacant
                                   ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
                                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
@@ -790,7 +893,20 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                             </button>
                           </td>
 
-                          {/* 7. 삭제 */}
+                          {/* 8. 같은 층 분할 추가 (원클릭) */}
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleAddSameFloorUnit(idx)}
+                              title="이 층에 점포(임대인)를 하나 더 추가합니다"
+                              className="inline-flex items-center gap-0.5 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200 transition-all cursor-pointer whitespace-nowrap active:scale-95 shadow-2xs"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>추가</span>
+                            </button>
+                          </td>
+
+                          {/* 9. 삭제 */}
                           <td className="py-2 px-2 text-center">
                             <button
                               type="button"
@@ -807,18 +923,28 @@ export const StoreForm: React.FC<StoreFormProps> = ({ data, onChange, transactio
                   </table>
                 </div>
 
-                {/* 행 추가 버튼 */}
-                <div className="pt-1 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => addLeaseItem()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer border border-indigo-200"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>호실 추가</span>
-                  </button>
-                  <span className="text-xs text-slate-500">
-                    * 공실인 경우 우측 [공실] 버튼을 누르면 보증금과 월세가 0으로 즉시 반영됩니다.
+                {/* 행 추가 버튼 바 */}
+                <div className="pt-1 flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleAddFirstFloorUnit}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-extrabold transition-colors cursor-pointer border border-emerald-300 shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>🏢 + 1층 점포(임대인) 추가</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addLeaseItem()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer border border-indigo-200"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>일반 호실 추가</span>
+                    </button>
+                  </div>
+                  <span className="text-xs text-slate-500 font-medium">
+                    💡 1층에 점포가 여러 개 입점한 경우 <b>[+ 1층 점포 추가]</b> 또는 해당 행의 <b>[추가]</b> 버튼을 누르면 점포별로 분할 입력할 수 있습니다.
                   </span>
                 </div>
               </div>

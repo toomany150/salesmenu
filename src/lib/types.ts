@@ -297,6 +297,7 @@ export interface HouseData {
   roomCount?: number;
   bathroomCount?: number;
   currentLeaseStatus?: string;
+  leaseStatusList?: StoreLeaseUnitItem[]; // 매매 시 층별/호수별 임대차 현황 (1층 복수 점포/호실 관리)
   parkingCount?: number;
   maintenanceFeeCommon?: number;
   maintenanceFeeWater?: number;
@@ -311,7 +312,8 @@ export interface HouseData {
 
 export interface StoreLeaseUnitItem {
   id: string;
-  floorHo: string; // 층별 호수 (예: 1층 101호, 2층 등)
+  floorHo: string; // 층별 호수 (예: 1층 101호, 1층 점포A, 2층 등)
+  tenantName?: string; // 점포명 / 상호 / 임차인(임대인) 성명 (예: CU편의점, 메가커피, 홍길동)
   contractStartDate?: string; // 계약기간 시작일 (YYYY-MM-DD 등)
   evictionPossible?: string; // 명도여부 가능 ('명도 가능', '명도 협의', '만기 퇴거 예정', '재계약 유지')
   deposit?: number; // 임차보증금 (만원)

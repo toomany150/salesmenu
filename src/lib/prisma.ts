@@ -261,6 +261,13 @@ export async function ensureDatabaseSchema(): Promise<void> {
         if (!existingStoreCols.has('previousTenantLicenseRevoked')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "previousTenantLicenseRevoked" TEXT;`);
         if (!existingStoreCols.has('previousTenantBizRegRevoked')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "previousTenantBizRegRevoked" TEXT;`);
         if (!existingStoreCols.has('monthlyRevenue')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "monthlyRevenue" REAL;`);
+        if (!existingStoreCols.has('leaseStatusList')) await prisma.$executeRawUnsafe(`ALTER TABLE "StoreDetail" ADD COLUMN "leaseStatusList" TEXT;`);
+      } catch (colErr) {}
+
+      try {
+        const houseCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("HouseDetail");`).catch(() => []);
+        const existingHouseCols = new Set(houseCols ? houseCols.map((c: any) => c.name) : []);
+        if (!existingHouseCols.has('leaseStatusList')) await prisma.$executeRawUnsafe(`ALTER TABLE "HouseDetail" ADD COLUMN "leaseStatusList" TEXT;`);
       } catch (colErr) {}
 
       try {
@@ -283,6 +290,8 @@ export async function ensureDatabaseSchema(): Promise<void> {
         `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantLicenseRevoked" TEXT;`,
         `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "previousTenantBizRegRevoked" TEXT;`,
         `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "monthlyRevenue" DOUBLE PRECISION;`,
+        `ALTER TABLE "StoreDetail" ADD COLUMN IF NOT EXISTS "leaseStatusList" TEXT;`,
+        `ALTER TABLE "HouseDetail" ADD COLUMN IF NOT EXISTS "leaseStatusList" TEXT;`,
         `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "canAccessAllData" BOOLEAN DEFAULT false;`,
         `ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN DEFAULT false;`,
         `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "residenceType" TEXT;`,

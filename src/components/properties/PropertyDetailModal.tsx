@@ -2459,7 +2459,53 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
               {property.houseDetail.currentLeaseStatus && (
                 <div className="mt-2.5 pt-2.5 border-t border-emerald-200/60 text-xs text-slate-700">
-                  <span className="font-bold text-emerald-900">현재 임대현황:</span> {property.houseDetail.currentLeaseStatus}
+                  <span className="font-bold text-emerald-900">현재 임대현황 요약:</span> {property.houseDetail.currentLeaseStatus}
+                </div>
+              )}
+
+              {/* 주택 층별 임대차 현황 (매매/다가구/상가주택) */}
+              {property.houseDetail.leaseStatusList && Array.isArray(property.houseDetail.leaseStatusList) && property.houseDetail.leaseStatusList.length > 0 && (
+                <div className="mt-3 bg-white rounded-xl border border-emerald-300 overflow-hidden shadow-2xs">
+                  <div className="bg-emerald-50/90 px-3 py-2 border-b border-emerald-200 flex items-center justify-between flex-wrap gap-1">
+                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                      층별·호수별 임대차 및 점포 현황 ({property.houseDetail.leaseStatusList.length}개 호실)
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-800">
+                      총 보증금: {property.houseDetail.leaseStatusList.reduce((acc: number, cur: any) => acc + (cur.isVacant ? 0 : (Number(cur.deposit) || 0)), 0).toLocaleString()}만원 / 
+                      총 월세: {property.houseDetail.leaseStatusList.reduce((acc: number, cur: any) => acc + (cur.isVacant ? 0 : (Number(cur.monthlyRent) || 0)), 0).toLocaleString()}만원
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px]">
+                        <tr>
+                          <th className="py-1.5 px-3 min-w-[90px]">층·구획</th>
+                          <th className="py-1.5 px-3 min-w-[100px]">상호/임차인</th>
+                          <th className="py-1.5 px-3 min-w-[90px]">계약시작일</th>
+                          <th className="py-1.5 px-3 min-w-[90px]">명도여부</th>
+                          <th className="py-1.5 px-3 min-w-[85px]">보증금</th>
+                          <th className="py-1.5 px-3 min-w-[75px]">월세</th>
+                          <th className="py-1.5 px-2 text-center min-w-[65px]">공실상태</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {property.houseDetail.leaseStatusList.map((unit: any, idx: number) => (
+                          <tr key={idx} className={unit.isVacant ? 'bg-amber-50/50' : 'hover:bg-slate-50'}>
+                            <td className="py-1.5 px-3 font-bold text-slate-900">{unit.floorHo}</td>
+                            <td className="py-1.5 px-3 font-medium text-slate-800">{unit.tenantName || '-'}</td>
+                            <td className="py-1.5 px-3 text-slate-600">{unit.contractStartDate || '-'}</td>
+                            <td className="py-1.5 px-3 text-slate-700">{unit.evictionPossible || '명도 가능'}</td>
+                            <td className="py-1.5 px-3 font-bold text-blue-900">{unit.isVacant ? '0' : `${(Number(unit.deposit) || 0).toLocaleString()}만원`}</td>
+                            <td className="py-1.5 px-3 font-bold text-emerald-900">{unit.isVacant ? '0' : `${(Number(unit.monthlyRent) || 0).toLocaleString()}만원`}</td>
+                            <td className="py-1.5 px-2 text-center font-bold">
+                              {unit.isVacant ? <span className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">공실</span> : <span className="text-emerald-600 text-[10px]">입주중</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
@@ -2674,6 +2720,52 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* 상가 매매 전용: 층별·호수별 임대차 및 점포 현황 (보증금·월세·명도·공실) */}
+                {store.leaseStatusList && Array.isArray(store.leaseStatusList) && store.leaseStatusList.length > 0 && (
+                  <div className="bg-white p-3.5 rounded-xl border border-indigo-200 space-y-2">
+                    <div className="text-xs font-extrabold text-indigo-950 flex items-center justify-between pb-1 border-b border-indigo-100 flex-wrap gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>층별·호수별 임대차 및 점포 현황 ({store.leaseStatusList.length}개 호실)</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-indigo-800">
+                        총 보증금: {store.leaseStatusList.reduce((acc: number, cur: any) => acc + (cur.isVacant ? 0 : (Number(cur.deposit) || 0)), 0).toLocaleString()}만원 / 
+                        총 월세: {store.leaseStatusList.reduce((acc: number, cur: any) => acc + (cur.isVacant ? 0 : (Number(cur.monthlyRent) || 0)), 0).toLocaleString()}만원
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px]">
+                          <tr>
+                            <th className="py-1.5 px-2.5 min-w-[90px]">층·구획</th>
+                            <th className="py-1.5 px-2.5 min-w-[100px]">상호 / 점포명</th>
+                            <th className="py-1.5 px-2.5 min-w-[90px]">계약시작일</th>
+                            <th className="py-1.5 px-2.5 min-w-[90px]">명도여부</th>
+                            <th className="py-1.5 px-2.5 min-w-[85px]">보증금</th>
+                            <th className="py-1.5 px-2.5 min-w-[75px]">월세</th>
+                            <th className="py-1.5 px-2 text-center min-w-[65px]">공실상태</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {store.leaseStatusList.map((unit: any, idx: number) => (
+                            <tr key={idx} className={unit.isVacant ? 'bg-amber-50/50' : 'hover:bg-slate-50'}>
+                              <td className="py-1.5 px-2.5 font-bold text-slate-900">{unit.floorHo}</td>
+                              <td className="py-1.5 px-2.5 font-medium text-slate-800">{unit.tenantName || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-slate-600">{unit.contractStartDate || '-'}</td>
+                              <td className="py-1.5 px-2.5 text-slate-700">{unit.evictionPossible || '명도 가능'}</td>
+                              <td className="py-1.5 px-2.5 font-bold text-blue-900">{unit.isVacant ? '0' : `${(Number(unit.deposit) || 0).toLocaleString()}만원`}</td>
+                              <td className="py-1.5 px-2.5 font-bold text-emerald-900">{unit.isVacant ? '0' : `${(Number(unit.monthlyRent) || 0).toLocaleString()}만원`}</td>
+                              <td className="py-1.5 px-2 text-center font-bold">
+                                {unit.isVacant ? <span className="text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">공실</span> : <span className="text-emerald-600 text-[10px]">입주중</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 {/* 섹터 4. 매장 운영 및 시설 현황 */}
                 <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">

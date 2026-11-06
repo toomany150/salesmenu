@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   HouseData, 
+  StoreLeaseUnitItem,
+  PublicBuildingLedgerResult,
   HOUSE_AIRCON_TYPES, 
   HOUSE_AIRCON_ROOMS, 
   HOUSE_OPTION_CATEGORIES 
@@ -16,15 +18,182 @@ import {
   Plus, 
   RotateCcw,
   CheckCircle2,
-  Zap
+  Zap,
+  Building2,
+  Trash2,
+  Home
 } from 'lucide-react';
 
 interface HouseFormProps {
   data: Partial<HouseData>;
   onChange: (updated: Partial<HouseData>) => void;
+  transactionType?: string;
+  ledgerData?: PublicBuildingLedgerResult | null;
 }
 
-export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
+export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactionType, ledgerData }) => {
+  // 매매 시 층별/호수별 임대차 현황 리스트 (상가주택/다가구 매매 지원)
+  const leaseList: StoreLeaseUnitItem[] = data.leaseStatusList || [];
+
+  const updateLeaseItem = (index: number, updatedItem: Partial<StoreLeaseUnitItem>) => {
+    const nextList = [...leaseList];
+    nextList[index] = { ...nextList[index], ...updatedItem };
+    
+    // 텍스트 요약도 자동 생성하여 currentLeaseStatus에 동기화
+    const summary = nextList
+      .map((item) => `${item.floorHo}${item.tenantName ? `(${item.tenantName})` : ''}: ${item.isVacant ? '공실' : `보${item.deposit || 0}/월${item.monthlyRent || 0}`}`)
+      .join(', ');
+
+    onChange({ 
+      ...data, 
+      leaseStatusList: nextList,
+      currentLeaseStatus: summary || data.currentLeaseStatus,
+    });
+  };
+
+  const addLeaseItem = (floorHoDefault = '', insertAfterIndex?: number) => {
+    const newItem: StoreLeaseUnitItem = {
+      id: `lease-h-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      floorHo: floorHoDefault || `${leaseList.length + 1}층`,
+      tenantName: '',
+      contractStartDate: '',
+      evictionPossible: '명도 가능',
+      deposit: undefined,
+      monthlyRent: undefined,
+      isVacant: false,
+    };
+    if (insertAfterIndex !== undefined && insertAfterIndex >= 0) {
+      const nextList = [...leaseList];
+      nextList.splice(insertAfterIndex + 1, 0, newItem);
+      onChange({ ...data, leaseStatusList: nextList });
+    } else {
+      onChange({ ...data, leaseStatusList: [...leaseList, newItem] });
+    }
+  };
+
+  // 1층에 여러 점포(임대인)를 넣을 수 있는 전용 추가 버튼 핸들러
+  const handleAddFirstFloorUnit = () => {
+    const firstFloorItems = leaseList.filter((item) => 
+      item.floorHo.includes('1층') || /^10\d/.test(item.floorHo) || item.floorHo.startsWith('1-')
+    );
+    const count = firstFloorItems.length + 1;
+    const defaultName = count === 1 ? '1층 1호' : `1층 ${count}호 점포`;
+    
+    let insertIdx = -1;
+    for (let i = leaseList.length - 1; i >= 0; i--) {
+      if (leaseList[i].floorHo.includes('1층') || /^10\d/.test(leaseList[i].floorHo) || leaseList[i].floorHo.startsWith('1-')) {
+        insertIdx = i;
+        break;
+      }
+    }
+    
+    const newItem: StoreLeaseUnitItem = {
+      id: `lease-h-1f-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      floorHo: defaultName,
+      tenantName: '',
+      contractStartDate: '',
+      evictionPossible: '명도 가능',
+      deposit: undefined,
+      monthlyRent: undefined,
+      isVacant: false,
+    };
+
+    if (insertIdx >= 0) {
+      const next = [...leaseList];
+      next.splice(insertIdx + 1, 0, newItem);
+      onChange({ ...data, leaseStatusList: next });
+    } else {
+      onChange({ ...data, leaseStatusList: [newItem, ...leaseList] });
+    }
+  };
+
+  // 특정 행과 같은 층 점포/호실을 바로 아래에 추가하는 핸들러
+  const handleAddSameFloorUnit = (index: number) => {
+    const current = leaseList[index];
+    const floorText = current.floorHo.trim();
+    const match = floorText.match(/^(지하\s*\d+층|\d+층|옥탑\d*층?|\S+층|\S+호)/);
+    const prefix = match ? match[0] : floorText;
+    
+    const sameCount = leaseList.filter((item) => item.floorHo.includes(prefix)).length + 1;
+    const defaultName = `${prefix} 점포 ${sameCount}`;
+
+    const newItem: StoreLeaseUnitItem = {
+      id: `lease-h-same-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      floorHo: defaultName,
+      tenantName: '',
+      contractStartDate: '',
+      evictionPossible: current.evictionPossible || '명도 가능',
+      deposit: undefined,
+      monthlyRent: undefined,
+      isVacant: false,
+    };
+
+    const next = [...leaseList];
+    next.splice(index + 1, 0, newItem);
+    onChange({ ...data, leaseStatusList: next });
+  };
+
+  const removeLeaseItem = (index: number) => {
+    const nextList = leaseList.filter((_, i) => i !== index);
+    onChange({ ...data, leaseStatusList: nextList });
+  };
+
+  const handleToggleVacant = (index: number) => {
+    const cur = leaseList[index];
+    const nextVacant = !cur.isVacant;
+    updateLeaseItem(index, {
+      isVacant: nextVacant,
+      deposit: nextVacant ? 0 : (cur.deposit === 0 ? undefined : cur.deposit),
+      monthlyRent: nextVacant ? 0 : (cur.monthlyRent === 0 ? undefined : cur.monthlyRent),
+    });
+  };
+
+  // 건축물대장 층별/호수 정보로부터 자동 생성
+  const handleLoadFromLedger = () => {
+    if (!ledgerData) return;
+    const generated: StoreLeaseUnitItem[] = [];
+
+    if (ledgerData.unitList && ledgerData.unitList.length > 0) {
+      ledgerData.unitList.forEach((u: any, idx: number) => {
+        generated.push({
+          id: `ledger-h-unit-${idx}-${Date.now()}`,
+          floorHo: `${u.dong ? u.dong + ' ' : ''}${u.ho || u.floor || (idx + 1) + '호'}`,
+          tenantName: u.owner || '',
+          contractStartDate: '',
+          evictionPossible: '명도 가능',
+          deposit: undefined,
+          monthlyRent: undefined,
+          isVacant: false,
+        });
+      });
+    } else if (ledgerData.floorList && ledgerData.floorList.length > 0) {
+      ledgerData.floorList.forEach((f: any, idx: number) => {
+        generated.push({
+          id: `ledger-h-floor-${idx}-${Date.now()}`,
+          floorHo: `${f.floor} (${f.mainUse || '주택/점포'})`,
+          tenantName: '',
+          contractStartDate: '',
+          evictionPossible: '명도 가능',
+          deposit: undefined,
+          monthlyRent: undefined,
+          isVacant: false,
+        });
+      });
+    }
+
+    if (generated.length > 0) {
+      onChange({ ...data, leaseStatusList: generated });
+    }
+  };
+
+  // 총 보증금 및 총 월세 계산
+  const totalDeposit = useMemo(() => {
+    return leaseList.reduce((acc, cur) => acc + (cur.isVacant ? 0 : (Number(cur.deposit) || 0)), 0);
+  }, [leaseList]);
+
+  const totalMonthlyRent = useMemo(() => {
+    return leaseList.reduce((acc, cur) => acc + (cur.isVacant ? 0 : (Number(cur.monthlyRent) || 0)), 0);
+  }, [leaseList]);
   // 1. 에어컨 상태 (종류 및 설치 위치)
   const [airconType, setAirconType] = useState<string>(() => {
     if (data.airconType) return data.airconType;
@@ -495,8 +664,305 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange }) => {
         </div>
       </div>
 
+      {/* 2-1. 매매 시 또는 다가구/상가주택용: 층별·호수별 임대차 및 점포 현황 */}
+      <div className="bg-white rounded-2xl border-2 border-emerald-200/90 shadow-xs overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 px-4 py-3.5 border-b border-emerald-200 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-2xs">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-emerald-950 flex items-center gap-1.5">
+                <span>층별·호수별 임대차 및 점포 현황</span>
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-300">
+                  다가구·상가주택·원룸 매매
+                </span>
+              </h4>
+              <span className="text-xs text-emerald-800">
+                건축물대장 층별 호수 연동, 1층 다중 점포/세대 분할, 보증금 및 월세, 공실 원클릭 관리
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {ledgerData && (
+              <button
+                type="button"
+                onClick={handleLoadFromLedger}
+                title="건축물대장의 층별개요 또는 호실 목록을 불러와 자동으로 채웁니다"
+                className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>대장 층/호수 불러오기</span>
+              </button>
+            )}
+            {/* [사용자 요청]: 1층에 여러 점포/임대인을 넣을 수 있는 전용 버튼 */}
+            <button
+              type="button"
+              onClick={handleAddFirstFloorUnit}
+              title="1층에 여러 점포나 임대인이 입점한 경우 클릭하여 1층 호실을 추가합니다"
+              className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold shadow-2xs flex items-center gap-1 transition-all cursor-pointer ring-1 ring-teal-400"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>🏢 + 1층 점포(임대인) 추가</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => addLeaseItem()}
+              className="px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 text-xs font-bold shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>일반 호실 추가</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-4">
+          {leaseList.length === 0 ? (
+            <div className="p-5 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/30 text-center space-y-2">
+              <p className="text-sm font-bold text-slate-700">등록된 층별·호수별 임대차 내역이 없습니다.</p>
+              <p className="text-xs text-slate-500">
+                상단의 [대장 층/호수 불러오기]를 누르시거나 1층에 여러 점포가 입점한 경우 [+ 1층 점포(임대인) 추가]를 눌러주세요.
+              </p>
+              <div className="pt-2 flex flex-wrap justify-center gap-2">
+                {ledgerData && (
+                  <button
+                    type="button"
+                    onClick={handleLoadFromLedger}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold shadow-xs hover:bg-emerald-700 cursor-pointer flex items-center gap-1"
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>🏛️ 건축물대장 층별 목록 일괄 불러오기</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleAddFirstFloorUnit}
+                  className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-bold shadow-xs hover:bg-teal-700 cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>🏢 + 1층 점포(임대인) 추가</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addLeaseItem('1층')}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-50 cursor-pointer"
+                >
+                  + 첫 호실 직접 입력하기
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
+                      <th className="py-2.5 px-3 min-w-[110px]">층 · 구획 *</th>
+                      <th className="py-2.5 px-3 min-w-[120px]">상호 / 세입자(임차인)</th>
+                      <th className="py-2.5 px-3 min-w-[115px]">계약 시작일</th>
+                      <th className="py-2.5 px-3 min-w-[110px]">명도 가능 여부</th>
+                      <th className="py-2.5 px-3 min-w-[105px]">임차보증금 (만원)</th>
+                      <th className="py-2.5 px-3 min-w-[95px]">월세 (만원)</th>
+                      <th className="py-2.5 px-2 text-center min-w-[70px]">공실 상태</th>
+                      <th className="py-2.5 px-2 text-center min-w-[80px]">같은 층 추가</th>
+                      <th className="py-2.5 px-2 text-center w-10">삭제</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {leaseList.map((item, idx) => (
+                      <tr 
+                        key={item.id || idx}
+                        className={`transition-colors ${item.isVacant ? 'bg-amber-50/40' : 'hover:bg-slate-50'}`}
+                      >
+                        {/* 1. 층별 호수 */}
+                        <td className="py-2 px-2.5">
+                          <input
+                            type="text"
+                            value={item.floorHo}
+                            onChange={(e) => updateLeaseItem(idx, { floorHo: e.target.value })}
+                            placeholder="예: 1층 1호 점포"
+                            className="w-full text-xs font-bold px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-900"
+                          />
+                        </td>
+
+                        {/* 2. 상호 / 세입자명 */}
+                        <td className="py-2 px-2.5">
+                          <input
+                            type="text"
+                            value={item.tenantName || ''}
+                            onChange={(e) => updateLeaseItem(idx, { tenantName: e.target.value })}
+                            placeholder="예: CU편의점, 세탁소, 김철수"
+                            className="w-full text-xs px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-800 font-medium"
+                          />
+                        </td>
+
+                        {/* 3. 계약기간 시작일 */}
+                        <td className="py-2 px-2.5">
+                          <input
+                            type="date"
+                            value={item.contractStartDate || ''}
+                            onChange={(e) => updateLeaseItem(idx, { contractStartDate: e.target.value })}
+                            className="w-full text-xs px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-800"
+                          />
+                        </td>
+
+                        {/* 4. 명도여부 가능 */}
+                        <td className="py-2 px-2.5">
+                          <select
+                            value={item.evictionPossible || '명도 가능'}
+                            onChange={(e) => updateLeaseItem(idx, { evictionPossible: e.target.value })}
+                            className="w-full text-xs font-bold px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-emerald-500 text-slate-800"
+                          >
+                            <option value="명도 가능">🟢 명도 가능</option>
+                            <option value="명도 협의">🟡 명도 협의</option>
+                            <option value="만기 퇴거 예정">🔵 만기 퇴거 예정</option>
+                            <option value="재계약 승계">⚪ 재계약 승계</option>
+                          </select>
+                        </td>
+
+                        {/* 5. 임차보증금 (만원) */}
+                        <td className="py-2 px-2.5">
+                          <input
+                            type="number"
+                            disabled={item.isVacant}
+                            value={item.isVacant ? 0 : (item.deposit !== undefined && item.deposit !== null ? item.deposit : '')}
+                            onChange={(e) => updateLeaseItem(idx, { deposit: e.target.value ? parseFloat(e.target.value) : undefined })}
+                            placeholder="보증금 (만원)"
+                            className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${
+                              item.isVacant
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                : 'bg-white border-blue-300 text-blue-950 focus:ring-1 focus:ring-blue-500'
+                            }`}
+                          />
+                        </td>
+
+                        {/* 6. 월세 (만원) */}
+                        <td className="py-2 px-2.5">
+                          <input
+                            type="number"
+                            disabled={item.isVacant}
+                            value={item.isVacant ? 0 : (item.monthlyRent !== undefined && item.monthlyRent !== null ? item.monthlyRent : '')}
+                            onChange={(e) => updateLeaseItem(idx, { monthlyRent: e.target.value ? parseFloat(e.target.value) : undefined })}
+                            placeholder="월세 (만원)"
+                            className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${
+                              item.isVacant
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                : 'bg-white border-emerald-300 text-emerald-950 focus:ring-1 focus:ring-emerald-500'
+                            }`}
+                          />
+                        </td>
+
+                        {/* 7. 공실 버튼 (원클릭 토글) */}
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleVacant(idx)}
+                            title={item.isVacant ? '클릭 시 입주 상태로 전환' : '클릭 시 공실(보증금/월세 0)로 전환'}
+                            className={`px-2 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer shadow-2xs ${
+                              item.isVacant
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                            }`}
+                          >
+                            {item.isVacant ? '✓ 공실' : '입주중'}
+                          </button>
+                        </td>
+
+                        {/* 8. 같은 층 분할 추가 (원클릭) */}
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleAddSameFloorUnit(idx)}
+                            title="이 층에 점포/호실을 하나 더 추가합니다"
+                            className="inline-flex items-center gap-0.5 px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold border border-emerald-200 transition-all cursor-pointer whitespace-nowrap active:scale-95 shadow-2xs"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>추가</span>
+                          </button>
+                        </td>
+
+                        {/* 9. 삭제 */}
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeLeaseItem(idx)}
+                            title="해당 층/호수 삭제"
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 행 추가 버튼 바 */}
+              <div className="pt-1 flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleAddFirstFloorUnit}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-extrabold transition-colors cursor-pointer border border-teal-300 shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-teal-600" />
+                    <span>🏢 + 1층 점포(임대인) 추가</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addLeaseItem()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-colors cursor-pointer border border-emerald-200"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>일반 호실 추가</span>
+                  </button>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  💡 1층에 여러 점포나 세대가 있는 경우 <b>[+ 1층 점포 추가]</b> 또는 해당 행의 <b>[추가]</b> 버튼을 누르면 쉽게 여러 곳을 입력할 수 있습니다.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 총 보증금 및 월세 합계 카드 */}
+          <div className="mt-3 p-3.5 rounded-xl bg-gradient-to-r from-slate-900 via-teal-950 to-emerald-950 text-white shadow-md">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <div>
+                  <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    전체 호실 임대차 집계 요약
+                  </h5>
+                  <p className="text-[11px] text-slate-400">
+                    총 {leaseList.length}개 호실 (입주 {leaseList.filter((l) => !l.isVacant).length}곳 / 공실 {leaseList.filter((l) => l.isVacant).length}곳)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-5 sm:gap-8">
+                <div className="text-right">
+                  <span className="block text-[11px] font-bold text-slate-400">총 보증금 합계</span>
+                  <span className="text-lg sm:text-xl font-black text-amber-300 tracking-tight font-mono">
+                    {totalDeposit.toLocaleString()} <span className="text-xs font-bold text-white">만원</span>
+                  </span>
+                </div>
+                <div className="w-[1px] h-8 bg-slate-700"></div>
+                <div className="text-right">
+                  <span className="block text-[11px] font-bold text-slate-400">총 월세 합계</span>
+                  <span className="text-lg sm:text-xl font-black text-emerald-300 tracking-tight font-mono">
+                    {totalMonthlyRent.toLocaleString()} <span className="text-xs font-bold text-white">만원</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 종합 임대현황 요약 메모 (직접 수정 가능) */}
       <div>
-        <label className="block text-xs font-medium text-slate-700 mb-1">현재 임대현황 (다가구/원룸 등)</label>
+        <label className="block text-xs font-medium text-slate-700 mb-1">현재 임대현황 종합 메모 (자동 연동 또는 직접 수정)</label>
         <input
           type="text"
           value={data.currentLeaseStatus || ''}
