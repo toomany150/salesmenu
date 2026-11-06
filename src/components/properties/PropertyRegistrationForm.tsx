@@ -1475,14 +1475,22 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       const finalSaved = { ...fallbackSavedProperty, ...data, customer: finalCustomerResult || fallbackSavedProperty.customer };
       saveCustomProperty(finalSaved);
 
-      alert(isEditMode ? '매물 정보가 성공적으로 수정되었습니다.' : '매물이 성공적으로 등록되었습니다.');
+      alert(
+        isEditMode
+          ? '매물 정보가 중앙 서버 DB에 성공적으로 수정·반영되었습니다.\n(모든 PC와 스마트폰에서 실시간으로 확인하실 수 있습니다)'
+          : '매물이 중앙 서버 DB에 성공적으로 등록되었습니다!\n(모든 PC와 스마트폰에서 실시간으로 공유됩니다)'
+      );
       onSuccess(finalSaved, finalCustomerResult);
       onClose();
     } catch (err: any) {
       console.warn('API save fallback, saving locally:', err);
       // 서버 에러나 Vercel 환경에서도 로컬스토리지에 안전하게 저장하여 매물 사라짐 완전 차단
       saveCustomProperty(fallbackSavedProperty);
-      alert(`${isEditMode ? '매물 정보가 수정되었습니다' : '매물이 안전하게 등록/저장되었습니다'}. (영구 보관 완료)`);
+      alert(
+        `⚠️ 네트워크 지연 또는 서버 응답 문제로 인해 현재 PC 브라우저에 우선 안전 보관되었습니다.\n\n` +
+        `💡 다른 PC나 스마트폰에서도 이 매물을 즉시 확인하시려면:\n` +
+        `상단 메뉴의 [🔄 기기 동기화] -> [1. 데이터 보내기] -> [서버로 전송하기]를 눌러주세요.`
+      );
       onSuccess(fallbackSavedProperty, linkedCustomer);
       onClose();
     } finally {

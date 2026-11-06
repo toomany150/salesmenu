@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(customers, {
       headers: {
-        'Cache-Control': 'private, no-cache, stale-while-revalidate=30',
+        'Cache-Control': 'private, no-cache, no-store, must-revalidate',
       },
     });
   } catch (error: any) {

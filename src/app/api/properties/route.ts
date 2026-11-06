@@ -329,7 +329,7 @@ export async function GET(request: NextRequest) {
 
     const cacheHeader = !userRole
       ? 'public, s-maxage=30, stale-while-revalidate=120'
-      : 'private, no-cache, stale-while-revalidate=30';
+      : 'private, no-cache, no-store, must-revalidate';
 
     return NextResponse.json(formattedProperties, {
       headers: {

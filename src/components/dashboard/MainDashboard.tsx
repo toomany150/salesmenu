@@ -210,9 +210,10 @@ const DashboardContent: React.FC = () => {
         'x-user-name': encodeURIComponent(user.name || ''),
         'x-user-can-access-all': user.canAccessAllData ? 'true' : 'false',
       };
+      const ts = Date.now();
       const [custRes, propRes] = await Promise.all([
-        fetch('/api/customers', { headers }),
-        fetch('/api/properties', { headers }),
+        fetch(`/api/customers?_t=${ts}`, { headers, cache: 'no-store' }),
+        fetch(`/api/properties?_t=${ts}`, { headers, cache: 'no-store' }),
       ]);
 
       if (custRes.ok) {
