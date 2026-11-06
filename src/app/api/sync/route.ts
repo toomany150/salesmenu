@@ -285,8 +285,20 @@ export async function POST(request: NextRequest) {
               if (uExists) validUserId = uExists.id;
             }
 
+            let targetPropNum = propNum;
+            const existingByNum = await prisma.property.findUnique({
+              where: { propertyNumber: targetPropNum },
+              select: { id: true, address: true }
+            }).catch(() => null);
+
+            if (existingByNum && existingByNum.address && !existingByNum.address.includes(targetAddress.slice(0, 6)) && !targetAddress.includes(existingByNum.address.slice(0, 6))) {
+              // 번호는 같지만(예: '상가매매') 주소가 완전히 다른 별개 매물인 경우 덮어쓰지 않고 고유 식별하여 분리 보존
+              const cleanDong = targetAddress.replace(/[^가-힣0-9]/g, '').slice(0, 6);
+              targetPropNum = `${propNum}-${cleanDong}`;
+            }
+
             const propDataToSave: any = {
-              propertyNumber: propNum,
+              propertyNumber: targetPropNum,
               receiptDate: prop.receiptDate ? new Date(prop.receiptDate) : new Date(),
               propertyType: prop.propertyType || 'STORE',
               status: prop.status || 'AVAILABLE',
@@ -322,7 +334,7 @@ export async function POST(request: NextRequest) {
             };
 
             const savedProp = await prisma.property.upsert({
-              where: { propertyNumber: propNum },
+              where: { propertyNumber: targetPropNum },
               update: propDataToSave,
               create: {
                 id: prop.id || `prop-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
