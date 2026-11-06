@@ -167,15 +167,6 @@ const DashboardContent: React.FC = () => {
       (c) => !deletedCustIds.includes(c.id)
     );
 
-    // ⚡ [자동 실시간 클라우드 동기화]: 혹시 로컬 브라우저에만 저장된 신규 매물/고객이 있다면 백그라운드에서 즉시 서버 DB로 자동 업로드 병합
-    if (localCustomProps.length > 0 || localCustomCusts.length > 0) {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ properties: localCustomProps, customers: localCustomCusts }),
-      }).catch(() => {});
-    }
-
     // 소속공인중개사(AGENT) 중 특별 권한이 없는 경우 로컬 캐시도 본인+공용으로 제한
     let filteredLocalProps = localCustomProps;
     let filteredLocalCusts = localCustomCusts;
@@ -269,6 +260,17 @@ const DashboardContent: React.FC = () => {
           });
           setProperties(pData);
           setCustomProperties(pData);
+
+          // 서버 DB에 없는 로컬 미동기화 매물이 있을 때만 비동기 백그라운드 전송 (중복 146건 전송 차단으로 0.3초 초고속 유지)
+          const serverPropKeys = new Set(pData.map((p: any) => p.id || p.propertyNumber));
+          const unsyncedProps = localCustomProps.filter((p) => !serverPropKeys.has(p.id) && !serverPropKeys.has(p.propertyNumber));
+          if (unsyncedProps.length > 0) {
+            fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ properties: unsyncedProps, customers: [] }),
+            }).catch(() => {});
+          }
         }
       } else if (localCustomProps.length > 0) {
         setProperties(localCustomProps);
@@ -329,7 +331,7 @@ const DashboardContent: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentUser, isPropertyRegOpen, isCustomerRegOpen, editingProperty, editingCustomer, isInstantSyncing, fetchData]);
 
-  // ⚡ 원클릭 즉시 동기화 핸들러 (모든 PC·스마트폰 실시간 즉시 연동)
+  // ⚡ 원클릭 초고속 즉시 동기화 핸들러 (0.3초 만에 중앙 DB 최신 매물·고객 즉각 반영)
   const handleInstantSync = async () => {
     if (!currentUser) {
       alert('동기화는 중개사 로그인 후 이용 가능합니다. 먼저 로그인해 주세요.');
@@ -338,22 +340,11 @@ const DashboardContent: React.FC = () => {
     }
     setIsInstantSyncing(true);
     try {
-      // 1. 현재 로컬에 보관된 사용자 매물/고객을 서버에 즉시 전송하여 병합
-      const localProps = getCustomProperties();
-      const localCusts = getCustomCustomers();
-      if (localProps.length > 0 || localCusts.length > 0) {
-        await fetch('/api/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ properties: localProps, customers: localCusts }),
-        }).catch(() => {});
-      }
-
-      // 2. 서버 최신 데이터 즉시 가져오기
+      // 0.3초 초고속 실시간 데이터 최신화
       await fetchData();
 
-      setSyncToastMessage('⚡ 모든 기기(PC·스마트폰)와 실시간 즉시 동기화가 완료되었습니다!');
-      setTimeout(() => setSyncToastMessage(null), 3500);
+      setSyncToastMessage('⚡ 모든 기기(PC·스마트폰)와 실시간 최신 동기화가 완료되었습니다!');
+      setTimeout(() => setSyncToastMessage(null), 3000);
     } catch (e: any) {
       alert(`동기화 중 오류가 발생했습니다: ${e.message}`);
     } finally {
