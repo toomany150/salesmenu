@@ -89,6 +89,43 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
 
   if (!isOpen) return null;
 
+  // ⚡ 1초 원클릭 즉시 동기화 (보내기 + 가져오기 동시 처리)
+  const [isInstantSyncing, setIsInstantSyncing] = useState(false);
+  const [instantSyncMsg, setInstantSyncMsg] = useState<string | null>(null);
+
+  const handleInstantSyncAll = async () => {
+    setIsInstantSyncing(true);
+    setInstantSyncMsg(null);
+    try {
+      // 1. 현재 기기의 데이터를 서버에 전송
+      const bundle = exportDataBundle(currentProperties, currentCustomers);
+      if (bundle.properties.length > 0 || bundle.customers.length > 0) {
+        await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bundle),
+        });
+      }
+
+      // 2. 서버에서 최신 데이터 가져와 로컬에 반영
+      const res = await fetch('/api/sync');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const result = importDataBundle(data);
+        if (result.success) {
+          setInstantSyncMsg(`🎉 즉시 동기화 완료! 매물 ${result.importedPropertiesCount}건, 고객 ${result.importedCustomersCount}명이 모든 기기와 동기화되었습니다.`);
+          if (onSyncSuccess) onSyncSuccess();
+        } else {
+          setInstantSyncMsg(`⚠️ 동기화 실패: ${result.error}`);
+        }
+      }
+    } catch (e: any) {
+      setInstantSyncMsg(`⚠️ 동기화 실패: ${e.message}`);
+    } finally {
+      setIsInstantSyncing(false);
+    }
+  };
+
   // 1. 현재 기기 -> 서버 전송 (PC ➔ 스마트폰 또는 스마트폰 ➔ PC)
   const handlePushToServer = async () => {
     setIsServerSyncing(true);
@@ -369,6 +406,33 @@ export const DataSyncModal: React.FC<DataSyncModalProps> = ({
 
         {/* 모달 본문 */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 text-slate-800">
+          
+          {/* ⚡ 1초 원클릭 즉시 동기화 메인 배너 */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl p-2 bg-white/20 rounded-xl">⚡</span>
+                <div>
+                  <h4 className="font-black text-sm sm:text-base">1초 원클릭 즉시 동기화</h4>
+                  <p className="text-xs text-indigo-100">보내기/가져오기 구분 없이, 클릭 한 번으로 모든 PC와 스마트폰의 데이터를 즉시 일치시킵니다.</p>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleInstantSyncAll}
+              disabled={isInstantSyncing}
+              className="w-full py-2.5 px-4 bg-white text-indigo-950 font-black rounded-xl hover:bg-indigo-50 transition-all active:scale-98 shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${isInstantSyncing ? 'animate-spin' : ''}`} />
+              <span>{isInstantSyncing ? '중앙 DB와 실시간 동기화 중...' : '지금 바로 모든 기기와 즉시 동기화하기'}</span>
+            </button>
+            {instantSyncMsg && (
+              <div className="p-2.5 bg-black/25 rounded-xl text-xs font-bold text-emerald-200">
+                {instantSyncMsg}
+              </div>
+            )}
+          </div>
           
           {/* ────────────────────────────────────────────────────────── */}
           {/* TAB 1: 데이터 보내기 (현재 기기 ➔ 다른 기기) */}

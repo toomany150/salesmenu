@@ -24,6 +24,8 @@ interface HeaderProps {
   onOpenNewCustomer?: () => void;
   onOpenAdminLogs?: () => void;
   onOpenDataSync?: () => void;
+  onInstantSync?: () => void;
+  isSyncing?: boolean;
   onOpenLogin?: () => void;
   onGoHome?: () => void;
 }
@@ -33,6 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewCustomer,
   onOpenAdminLogs,
   onOpenDataSync,
+  onInstantSync,
+  isSyncing = false,
   onGoHome,
 }) => {
   const { currentUser, login, logout } = useAuth();
@@ -110,16 +114,33 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* 🔄 기기 동기화 & 백업 버튼 (스마트폰 <-> PC 데이터 연동) */}
-            <button
-              type="button"
-              onClick={onOpenDataSync}
-              title="스마트폰과 PC 간 데이터 동기화 및 백업"
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg border border-blue-200 transition-all active:scale-95 cursor-pointer shrink-0 shadow-2xs"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>기기 동기화</span>
-            </button>
+            {/* ⚡ 원클릭 즉시 동기화 버튼 (모든 PC·스마트폰 실시간 자동 연동) */}
+            <div className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50/70 p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={onInstantSync || onOpenDataSync}
+                disabled={isSyncing}
+                title="클릭 한 번으로 다른 PC 및 스마트폰과 전체 매물/고객 데이터를 즉시 동기화합니다"
+                className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-md transition-all active:scale-95 cursor-pointer shrink-0 ${
+                  isSyncing
+                    ? 'bg-indigo-600 text-white animate-pulse'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white hover:shadow-xs'
+                }`}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? '동기화 중...' : '⚡ 즉시 동기화'}</span>
+              </button>
+              {onOpenDataSync && (
+                <button
+                  type="button"
+                  onClick={onOpenDataSync}
+                  title="동기화 코드 복사 및 백업 파일 관리"
+                  className="px-1.5 py-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-950 hover:bg-indigo-100 rounded transition-colors"
+                >
+                  백업
+                </button>
+              )}
+            </div>
           </div>
 
           {/* 2. 소공/대표 아이디/비밀번호 입력칸 & 로그인 세션 */}

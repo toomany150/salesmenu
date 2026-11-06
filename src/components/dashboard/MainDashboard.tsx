@@ -292,6 +292,53 @@ const DashboardContent: React.FC = () => {
     }
   }, [currentUser, authLoading, fetchData]);
 
+  // 다른 PC나 브라우저 탭에서 돌아왔을 때 창 활성화(focus) 시 자동 최신 데이터 동기화
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleFocus = () => {
+      if (currentUser && !loading) {
+        fetchData();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [currentUser, loading, fetchData]);
+
+  // ⚡ 원클릭 즉시 동기화 핸들러 (모든 PC·스마트폰 실시간 즉시 연동)
+  const [isInstantSyncing, setIsInstantSyncing] = useState(false);
+  const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
+
+  const handleInstantSync = async () => {
+    if (!currentUser) {
+      alert('동기화는 중개사 로그인 후 이용 가능합니다. 먼저 로그인해 주세요.');
+      setIsLoginOpen(true);
+      return;
+    }
+    setIsInstantSyncing(true);
+    try {
+      // 1. 현재 로컬에 보관된 사용자 매물/고객을 서버에 즉시 전송하여 병합
+      const localProps = getCustomProperties();
+      const localCusts = getCustomCustomers();
+      if (localProps.length > 0 || localCusts.length > 0) {
+        await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ properties: localProps, customers: localCusts }),
+        }).catch(() => {});
+      }
+
+      // 2. 서버 최신 데이터 즉시 가져오기
+      await fetchData();
+
+      setSyncToastMessage('⚡ 모든 기기(PC·스마트폰)와 실시간 즉시 동기화가 완료되었습니다!');
+      setTimeout(() => setSyncToastMessage(null), 3500);
+    } catch (e: any) {
+      alert(`동기화 중 오류가 발생했습니다: ${e.message}`);
+    } finally {
+      setIsInstantSyncing(false);
+    }
+  };
+
   // 카카오톡/문자 공유 링크로 접속 시 매물 브리핑 화면 자동 연결 (고객 및 중개사 즉시 조회)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -537,9 +584,19 @@ const DashboardContent: React.FC = () => {
           setIsAdminLogsOpen(true);
         }}
         onOpenDataSync={() => setIsDataSyncOpen(true)}
+        onInstantSync={handleInstantSync}
+        isSyncing={isInstantSyncing}
         onOpenLogin={() => setIsLoginOpen(true)}
         onGoHome={() => setActiveTab('HOME')}
       />
+
+      {/* ⚡ 실시간 즉시 동기화 완료 토스트 알림 바 */}
+      {syncToastMessage && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-emerald-600 text-white font-extrabold text-xs sm:text-sm rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-200 border border-emerald-400">
+          <span>✓</span>
+          <span>{syncToastMessage}</span>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 space-y-4 sm:space-y-6">
         
