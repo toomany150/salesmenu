@@ -2309,29 +2309,35 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
-                <span className="text-[11px] text-slate-500 block">대지면적</span>
+                <span className="text-[11px] text-slate-500 block">{property.propertyType === 'LAND' ? '토지면적' : '대지면적'}</span>
                 <span className="font-bold text-slate-900">
-                  {property.landArea ? `${property.landArea} ㎡` : (property.houseDetail?.landArea ? `${property.houseDetail.landArea} ㎡` : '-')}
+                  {property.landArea ? `${property.landArea} ㎡` : (property.landDetail?.landArea ? `${property.landDetail.landArea} ㎡` : (property.houseDetail?.landArea ? `${property.houseDetail.landArea} ㎡` : '-'))}
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-500 block">연면적</span>
+                <span className="text-[11px] text-slate-500 block">{property.propertyType === 'LAND' ? '용도지역' : '연면적'}</span>
                 <span className="font-bold text-slate-900">
-                  {property.totalFloorArea ? `${property.totalFloorArea} ㎡` : (property.houseDetail?.totalFloorArea ? `${property.houseDetail.totalFloorArea} ㎡` : '-')}
+                  {property.propertyType === 'LAND'
+                    ? (property.landDetail?.zoningArea || property.zoningArea || '-')
+                    : (property.totalFloorArea ? `${property.totalFloorArea} ㎡` : (property.houseDetail?.totalFloorArea ? `${property.houseDetail.totalFloorArea} ㎡` : '-'))}
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-500 block">대장상 주용도</span>
+                <span className="text-[11px] text-slate-500 block">{property.propertyType === 'LAND' ? '지목 (토지 용도)' : '대장상 주용도'}</span>
                 <span className="font-bold text-slate-900">
-                  {property.buildingRegisterUse || property.houseDetail?.buildingUse || '-'}
+                  {property.propertyType === 'LAND'
+                    ? (property.landDetail?.landCategory || property.buildingRegisterUse || '-')
+                    : (property.buildingRegisterUse || property.houseDetail?.buildingUse || '-')}
                 </span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-500 block">사용승인일</span>
+                <span className="text-[11px] text-slate-500 block">{property.propertyType === 'LAND' ? '접도 조건' : '사용승인일'}</span>
                 <span className="font-bold text-slate-900">
-                  {property.approvalDate 
-                    ? property.approvalDate.substring(0, 10) 
-                    : (property.houseDetail?.approvalDate ? String(property.houseDetail.approvalDate).substring(0, 10) : '-')}
+                  {property.propertyType === 'LAND'
+                    ? (property.landDetail?.roadAccess || property.landDetail?.roadDirection || '-')
+                    : (property.approvalDate 
+                        ? property.approvalDate.substring(0, 10) 
+                        : (property.houseDetail?.approvalDate ? String(property.houseDetail.approvalDate).substring(0, 10) : '-'))}
                 </span>
               </div>
             </div>
@@ -3071,10 +3077,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       </span>
                     </span>
                     <div className="font-extrabold text-slate-900 text-sm">
-                      {land.roadDirection || property.direction || '북측 도로 접 (일조권 유리)'}
+                      {land.roadDirection || property.direction || '-'}
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      도로 폭: <strong className="text-slate-800">{land.roadWidth || '4~6m (차량교행가능)'}</strong>
+                      도로 폭: <strong className="text-slate-800">{land.roadWidth || '-'}</strong>
                     </div>
                     {land.roadPavement && (
                       <div className="text-[10px] text-slate-400">
@@ -3088,15 +3094,17 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <span className="text-[11px] font-bold text-cyan-900 block flex items-center justify-between">
                       <span>🌊 조망 방향과 경관 (뷰)</span>
                       <span className="text-[10px] text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded font-extrabold">
-                        {land.viewDirection ? '열린조망' : '남향'}
+                        {land.viewDirection ? '열린조망' : '-'}
                       </span>
                     </span>
                     <div className="font-extrabold text-slate-900 text-sm">
-                      {land.viewDirection || '남향 조망 (영구 채광)'}
+                      {land.viewDirection || '-'}
                     </div>
-                    <div className="text-[11px] text-cyan-800 font-semibold">
-                      {land.viewType || '바다/오션뷰 또는 마운틴뷰'}
-                    </div>
+                    {land.viewType && (
+                      <div className="text-[11px] text-cyan-800 font-semibold">
+                        {land.viewType}
+                      </div>
+                    )}
                     {land.viewDetails && (
                       <div className="text-[10px] text-slate-500 italic">
                         &quot;{land.viewDetails}&quot;
@@ -3109,14 +3117,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <span className="text-[11px] font-bold text-emerald-900 block flex items-center justify-between">
                       <span>⛰️ 지세와 경사 방향</span>
                       <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-extrabold">
-                        선호도 최상
+                        {land.topography ? '확인됨' : '-'}
                       </span>
                     </span>
                     <div className="font-extrabold text-slate-900 text-sm">
-                      {land.topography || '남향 완경사 (일조/배수 최상)'}
+                      {land.topography || '-'}
                     </div>
                     <div className="text-[11px] text-slate-500">
-                      형상(모양): <strong className="text-slate-800">{land.landShape || '정방형 (정사각형)'}</strong>
+                      형상(모양): <strong className="text-slate-800">{land.landShape || '-'}</strong>
                     </div>
                   </div>
                 </div>
@@ -3149,13 +3157,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <div>
                       <span className="text-[11px] text-slate-500 block">지목 (토지 용도)</span>
                       <span className="font-extrabold text-emerald-800 text-sm">
-                        {land.landCategory || '전 (밭)'}
+                        {land.landCategory || property.buildingRegisterUse || '-'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-500 block">용도지역</span>
                       <span className="font-extrabold text-slate-800 text-sm">
-                        {land.zoningArea || property.zoningArea || '자연녹지지역'}
+                        {land.zoningArea || property.zoningArea || '-'}
                       </span>
                     </div>
                   </div>

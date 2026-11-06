@@ -1124,9 +1124,9 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
           {/* 서브 정보: 용도지역, 접도조건, 소유구분 */}
           <div className="p-2.5 bg-slate-50 rounded-lg text-xs flex flex-wrap items-center justify-between gap-2 border border-slate-200">
             <div className="flex items-center gap-3 flex-wrap">
-              <span>🏛️ <strong>용도지역:</strong> {landData.zoningArea || '자연녹지지역'}</span>
-              <span>👤 <strong>소유구분:</strong> {landData.ownership || '개인'}</span>
-              <span>🛣️ <strong>접도조건:</strong> {landData.roadAccess || '폭 4~6m 도로 접'}</span>
+              <span>🏛️ <strong>용도지역:</strong> {landData.zoningArea || '-'}</span>
+              <span>👤 <strong>소유구분:</strong> {landData.ownership || '-'}</span>
+              <span>🛣️ <strong>접도조건:</strong> {landData.roadAccess || '-'}</span>
             </div>
             {onApplyLandData && (
               <button

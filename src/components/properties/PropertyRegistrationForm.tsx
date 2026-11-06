@@ -284,12 +284,15 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setOwnerSearchQuery('');
 
         // Public data (7대 대장 데이터)
-        setLandArea(initialData.landArea);
+        const initLandArea = initialData.landArea ?? initialData.landDetail?.landArea;
+        const initZoningArea = initialData.zoningArea ?? initialData.landDetail?.zoningArea;
+        const initBuildingUse = initialData.buildingRegisterUse ?? initialData.landDetail?.landCategory;
+        setLandArea(initLandArea);
         setTotalFloorArea(initialData.totalFloorArea);
         setBuildingArea(initialData.buildingArea);
         setApprovalDate(initialData.approvalDate ? initialData.approvalDate.substring(0, 10) : undefined);
-        setBuildingRegisterUse(initialData.buildingRegisterUse);
-        setZoningArea(initialData.zoningArea);
+        setBuildingRegisterUse(initBuildingUse);
+        setZoningArea(initZoningArea);
         setStructureName(initialData.structureName);
         setFloorCount(initialData.floorCount);
         setUnderFloorCount(initialData.underFloorCount);
@@ -422,7 +425,17 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setOfficeData(initialOffice);
 
         setFactoryWarehouseData(initialData.factoryWarehouseDetail || {});
-        setLandData(initialData.landDetail || {});
+        const initialLand = initialData.landDetail ? { ...initialData.landDetail } : {};
+        if (initialLand.landArea === undefined && initLandArea !== undefined) {
+          initialLand.landArea = initLandArea;
+        }
+        if (initialLand.zoningArea === undefined && initZoningArea !== undefined) {
+          initialLand.zoningArea = initZoningArea;
+        }
+        if (initialLand.landCategory === undefined && initBuildingUse !== undefined) {
+          initialLand.landCategory = initBuildingUse;
+        }
+        setLandData(initialLand);
       } else {
         // Create Mode - Defaults
         setPropertyType('APARTMENT');
@@ -840,11 +853,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       roadAccess: landResult.roadAccess || prev.roadAccess,
       landOwnership: landResult.ownership || prev.landOwnership,
     }));
-    if (landResult.landArea && !landArea) {
+    if (landResult.landArea) {
       setLandArea(landResult.landArea);
     }
-    if (landResult.zoningArea && !zoningArea) {
+    if (landResult.zoningArea) {
       setZoningArea(landResult.zoningArea);
+    }
+    if (landResult.landCategory) {
+      setBuildingRegisterUse(landResult.landCategory);
     }
   };
   const handleApplyPublicData = (data: PublicBuildingLedgerResult) => {
@@ -1315,12 +1331,18 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       marketPriceBasis: marketPriceBasis.trim() || undefined,
       isNoMaintenanceFee,
       consultationNotes: consultationNotes.trim() || undefined,
-      landArea: propertyType === 'HOUSE' && houseData?.landArea !== undefined ? houseData.landArea : landArea,
+      landArea: propertyType === 'LAND'
+        ? (landData?.landArea !== undefined ? landData.landArea : landArea)
+        : (propertyType === 'HOUSE' && houseData?.landArea !== undefined ? houseData.landArea : landArea),
       totalFloorArea: propertyType === 'HOUSE' && houseData?.totalFloorArea !== undefined ? houseData.totalFloorArea : totalFloorArea,
       buildingArea: propertyType === 'HOUSE' && houseData?.buildingArea !== undefined ? houseData.buildingArea : buildingArea,
       approvalDate: propertyType === 'HOUSE' && houseData?.approvalDate !== undefined ? houseData.approvalDate : approvalDate,
-      buildingRegisterUse: propertyType === 'HOUSE' && houseData?.buildingUse !== undefined ? houseData.buildingUse : buildingRegisterUse,
-      zoningArea: propertyType === 'HOUSE' && houseData?.zoningArea !== undefined ? houseData.zoningArea : zoningArea,
+      buildingRegisterUse: propertyType === 'LAND'
+        ? (landData?.landCategory || buildingRegisterUse || '토지')
+        : (propertyType === 'HOUSE' && houseData?.buildingUse !== undefined ? houseData.buildingUse : buildingRegisterUse),
+      zoningArea: propertyType === 'LAND'
+        ? (landData?.zoningArea || zoningArea)
+        : (propertyType === 'HOUSE' && houseData?.zoningArea !== undefined ? houseData.zoningArea : zoningArea),
       structureName: propertyType === 'HOUSE' && houseData?.structure !== undefined ? houseData.structure : structureName,
       floorCount,
       underFloorCount,
@@ -1351,7 +1373,12 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       } : undefined,
       officeDetail: propertyType === 'OFFICE' ? { ...officeData, monthlyRentVat: isMonthlyRentVat } : undefined,
       factoryWarehouseDetail: propertyType === 'FACTORY_WAREHOUSE' ? factoryWarehouseData : undefined,
-      landDetail: propertyType === 'LAND' ? landData : undefined,
+      landDetail: propertyType === 'LAND' ? {
+        ...landData,
+        landArea: landData?.landArea !== undefined ? landData.landArea : landArea,
+        zoningArea: landData?.zoningArea !== undefined ? landData.zoningArea : zoningArea,
+        landCategory: landData?.landCategory || buildingRegisterUse,
+      } : undefined,
     };
 
     // 로컬 즉시 영구 저장용 전체 객체 구성 (서버리스 컨테이너 재부팅 시에도 소실 방지)
@@ -1541,6 +1568,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     setLedgerData(null);
                   }}
                   onApplyData={handleApplyPublicData}
+                  onApplyLandData={handleApplyLandData}
                   onSelectFloor={handleSelectFloorFromLedger}
                   onSelectFloors={handleSelectFloorsFromLedger}
                   onSelectUnit={handleSelectUnitFromLedger}
@@ -3225,7 +3253,15 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     <FactoryWarehouseForm data={factoryWarehouseData} onChange={setFactoryWarehouseData} />
                   )}
                   {propertyType === 'LAND' && (
-                    <LandForm data={landData} onChange={setLandData} />
+                    <LandForm
+                      data={landData}
+                      onChange={(updated) => {
+                        setLandData(updated);
+                        if (updated.landArea !== undefined) setLandArea(updated.landArea);
+                        if (updated.zoningArea !== undefined) setZoningArea(updated.zoningArea);
+                        if (updated.landCategory !== undefined) setBuildingRegisterUse(updated.landCategory);
+                      }}
+                    />
                   )}
                   {propertyType === 'ETC' && (
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">

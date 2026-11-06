@@ -409,6 +409,25 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               })()}
                             </div>
                           )}
+                          {(property.propertyType === 'LAND' || property.landDetail) && (
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[11px]">
+                              {(property.landArea || property.landDetail?.landArea) && (
+                                <span className="px-1.5 py-0.2 rounded font-bold bg-emerald-50 text-emerald-900 border border-emerald-200">
+                                  📐 토지 {property.landArea || property.landDetail?.landArea}㎡ (약 {((property.landArea || property.landDetail?.landArea || 0) * 0.3025).toFixed(1)}평)
+                                </span>
+                              )}
+                              {(property.landDetail?.zoningArea || property.zoningArea) && (
+                                <span className="px-1.5 py-0.2 rounded font-semibold bg-slate-100 text-slate-700">
+                                  🏛️ {property.landDetail?.zoningArea || property.zoningArea}
+                                </span>
+                              )}
+                              {property.landDetail?.landCategory && (
+                                <span className="px-1.5 py-0.2 rounded font-semibold bg-slate-100 text-slate-700">
+                                  지목: {property.landDetail.landCategory}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
@@ -695,6 +714,28 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                         {/* 토지 매물 전용 입지 뱃지 & 개별공시지가 정보 */}
                         {(property.propertyType === 'LAND' || property.landDetail) && (
                           <div className="mt-2 space-y-1.5">
+                            {/* 토지 면적 및 용도지역/지목 핵심 정보 */}
+                            <div className="flex items-center gap-2 flex-wrap text-xs font-bold text-slate-800 bg-emerald-50/70 p-2 rounded-lg border border-emerald-200">
+                              {(property.landArea || property.landDetail?.landArea) ? (
+                                <span className="text-emerald-950">
+                                  📐 토지면적: <strong>{property.landArea || property.landDetail?.landArea}㎡</strong>
+                                  <span className="text-emerald-700 ml-1 font-semibold">
+                                    (약 {((property.landArea || property.landDetail?.landArea || 0) * 0.3025).toFixed(1)}평)
+                                  </span>
+                                </span>
+                              ) : null}
+                              {(property.landDetail?.zoningArea || property.zoningArea) && (
+                                <span className="text-slate-700 font-semibold">
+                                  | 🏛️ {property.landDetail?.zoningArea || property.zoningArea}
+                                </span>
+                              )}
+                              {property.landDetail?.landCategory && (
+                                <span className="text-slate-700 font-semibold">
+                                  | 지목: {property.landDetail.landCategory}
+                                </span>
+                              )}
+                            </div>
+
                             <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
                               {property.landDetail?.roadDirection && (
                                 <span className="px-2 py-0.5 rounded font-extrabold bg-blue-50 text-blue-800 border border-blue-200">
