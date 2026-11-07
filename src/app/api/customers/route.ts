@@ -235,23 +235,32 @@ export async function POST(request: NextRequest) {
     const cleanPhone = phone.trim();
     const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
     let existingCustomer = body.id ? await prisma.customer.findUnique({ where: { id: body.id }, include: { properties: true, demands: true } }) : null;
-    if (!existingCustomer && phoneDigits && phoneDigits.length >= 8) {
-      const phoneVariants = Array.from(new Set([
-        cleanPhone,
-        phoneDigits,
-        phoneDigits.length === 11 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}` : '',
-        phoneDigits.length === 10 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}` : '',
-      ])).filter(Boolean);
+    if (!existingCustomer) {
+      if (phoneDigits && phoneDigits.length >= 8 && phoneDigits !== '01000000000') {
+        const phoneVariants = Array.from(new Set([
+          cleanPhone,
+          phoneDigits,
+          phoneDigits.length === 11 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}` : '',
+          phoneDigits.length === 10 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}` : '',
+        ])).filter(Boolean);
 
-      existingCustomer = await prisma.customer.findFirst({
-        where: {
-          OR: [
-            { phone: { in: phoneVariants } },
-            ...(cleanName ? [{ name: cleanName, phone: { in: phoneVariants } }] : []),
-          ],
-        },
-        include: { properties: true, demands: true },
-      });
+        existingCustomer = await prisma.customer.findFirst({
+          where: {
+            phone: { in: phoneVariants },
+            group: finalGroup,
+          },
+          include: { properties: true, demands: true },
+        });
+      } else if (cleanName) {
+        existingCustomer = await prisma.customer.findFirst({
+          where: {
+            name: cleanName,
+            group: finalGroup,
+            phone: cleanPhone || '010-0000-0000',
+          },
+          include: { properties: true, demands: true },
+        });
+      }
     }
 
     let customer: any;

@@ -121,12 +121,31 @@ export function setCustomProperties(list: PropertyItem[]): void {
   try {
     const localList = getCustomProperties();
     const serverKeys = new Set(list.map((p) => p.id || p.propertyNumber));
-    // 로컬에만 존재하는 미동기화 매물 추출 (절대 소실 방지)
-    const localOnly = localList.filter((p) => !serverKeys.has(p.id) && !serverKeys.has(p.propertyNumber));
+    const serverAddrMap = new Map<string, string>();
+    list.forEach((p) => {
+      const addr = (p.address || p.roadAddress || '').trim().replace(/\s+/g, ' ');
+      if (addr) serverAddrMap.set(addr, p.id || p.propertyNumber);
+    });
+
+    // 로컬에만 존재하는 미동기화 매물 추출 (동일 주소 매물 중복 방지)
+    const localOnly = localList.filter((p) => {
+      if (serverKeys.has(p.id) || serverKeys.has(p.propertyNumber)) return false;
+      const addr = (p.address || p.roadAddress || '').trim().replace(/\s+/g, ' ');
+      if (addr && serverAddrMap.has(addr)) return false;
+      return true;
+    });
+
     const mergedList = [...localOnly, ...list];
+    const uniquePropMap = new Map<string, PropertyItem>();
+    mergedList.forEach((p) => {
+      const key = (p.propertyNumber || p.id || '').trim();
+      if (key && !uniquePropMap.has(key)) {
+        uniquePropMap.set(key, p);
+      }
+    });
 
     // 1차 시도: 썸네일 포함 경량화 목록 저장
-    const sanitized = mergedList.map((p) => sanitizePropertyForStorage(p, true));
+    const sanitized = Array.from(uniquePropMap.values()).map((p) => sanitizePropertyForStorage(p, true));
     localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(sanitized));
   } catch (err) {
     console.warn('Quota exceeded with thumbnails, falling back to pure metadata cache:', err);
@@ -135,8 +154,15 @@ export function setCustomProperties(list: PropertyItem[]): void {
       const serverKeys = new Set(list.map((p) => p.id || p.propertyNumber));
       const localOnly = localList.filter((p) => !serverKeys.has(p.id) && !serverKeys.has(p.propertyNumber));
       const mergedList = [...localOnly, ...list];
-      // 2차 시도: 이미지 완전 제외 순수 메타데이터로 100% 저장 보장 (수백 개 매물도 수십 KB로 저장 가능)
-      const pureMeta = mergedList.map((p) => sanitizePropertyForStorage(p, false));
+      const uniquePropMap = new Map<string, PropertyItem>();
+      mergedList.forEach((p) => {
+        const key = (p.propertyNumber || p.id || '').trim();
+        if (key && !uniquePropMap.has(key)) {
+          uniquePropMap.set(key, p);
+        }
+      });
+      // 2차 시도: 이미지 완전 제외 순수 메타데이터로 100% 저장 보장
+      const pureMeta = Array.from(uniquePropMap.values()).map((p) => sanitizePropertyForStorage(p, false));
       localStorage.setItem(STORAGE_CUSTOM_PROPERTIES, JSON.stringify(pureMeta));
     } catch (fallbackErr) {
       console.error('Failed to set custom properties to localStorage:', fallbackErr);
@@ -221,13 +247,46 @@ export function getDeletedCustomerIds(): string[] {
  * (로컬에만 존재하는 미동기화 신규 고객은 절대 삭제하지 않고 안전 병합)
  */
 export function setCustomCustomers(list: CustomerItem[]): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !Array.isArray(list)) return;
   try {
     const localList = getCustomCustomers();
     const serverKeys = new Set(list.map((c) => c.id));
-    const localOnly = localList.filter((c) => !serverKeys.has(c.id));
+    const serverPhoneMap = new Map<string, string>();
+    const serverNameMap = new Map<string, string>();
+
+    list.forEach((c) => {
+      const clean = (c.phone || '').replace(/[^0-9]/g, '');
+      if (clean && clean !== '01000000000') {
+        serverPhoneMap.set(`${c.group || 'RECEIVED'}_${clean}`, c.id);
+      } else if (c.name) {
+        serverNameMap.set(`${c.group || 'RECEIVED'}_${c.name.trim()}`, c.id);
+      }
+    });
+
+    // 로컬에만 존재하는 미동기화 고객 추출 (전화번호/이름 중복 원천 차단)
+    const localOnly = localList.filter((c) => {
+      if (serverKeys.has(c.id)) return false;
+      const clean = (c.phone || '').replace(/[^0-9]/g, '');
+      const grp = c.group || (c.type === 'SELLER' || c.type === 'LESSOR' ? 'RECEIVED' : 'SEARCHING');
+      if (clean && clean !== '01000000000' && serverPhoneMap.has(`${grp}_${clean}`)) return false;
+      if ((!clean || clean === '01000000000') && serverNameMap.has(`${grp}_${(c.name || '').trim()}`)) return false;
+      return true;
+    });
+
     const mergedList = [...localOnly, ...list];
-    localStorage.setItem(STORAGE_CUSTOM_CUSTOMERS, JSON.stringify(mergedList));
+    // 중복 제거된 병합 목록 영구 저장
+    const uniqueMap = new Map<string, CustomerItem>();
+    mergedList.forEach((c) => {
+      const clean = (c.phone || '').replace(/[^0-9]/g, '');
+      const grp = c.group || (c.type === 'SELLER' || c.type === 'LESSOR' ? 'RECEIVED' : 'SEARCHING');
+      const key = (clean && clean !== '01000000000') ? `${grp}_${clean}` : `${grp}_${(c.name || '').trim()}`;
+      // DB id(cmw...)가 있는 항목 우선 보존
+      if (!uniqueMap.has(key) || c.id.startsWith('cmw') || !uniqueMap.get(key)!.id.startsWith('cmw')) {
+        uniqueMap.set(key, c);
+      }
+    });
+
+    localStorage.setItem(STORAGE_CUSTOM_CUSTOMERS, JSON.stringify(Array.from(uniqueMap.values())));
   } catch (err) {
     console.error('Failed to set custom customers to localStorage:', err);
   }

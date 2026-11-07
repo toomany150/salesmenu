@@ -92,6 +92,7 @@ const DashboardContent: React.FC = () => {
     }
   });
   const [loading, setLoading] = useState(false);
+  const hasInitiallyRendered = useRef(false);
   const [isInitialLoaded, setIsInitialLoaded] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -183,24 +184,35 @@ const DashboardContent: React.FC = () => {
       });
     }
 
-    // [성능 개선 - 즉시 렌더링 (SWR 패턴)]: 서버 API 응답을 기다리지 않고, 로컬 캐시를 0ms 즉각 화면에 띄움
-    if (filteredLocalProps.length > 0) {
-      filteredLocalProps.sort((a: any, b: any) => {
-        const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
-        const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
-        return tB - tA;
-      });
-      setProperties(filteredLocalProps);
-    }
-    if (filteredLocalCusts.length > 0) {
-      filteredLocalCusts.sort((a: any, b: any) => {
+    const sortCustomersList = (list: any[]) => {
+      return [...list].sort((a: any, b: any) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
         const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
         const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
         const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
         const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
-        return tB - tA;
+        if (tB !== tA) return tB - tA;
+        const createdA = new Date(a.createdAt || 0).getTime();
+        const createdB = new Date(b.createdAt || 0).getTime();
+        return createdB - createdA;
       });
-      setCustomers(filteredLocalCusts);
+    };
+
+    // [성능 개선 - 즉시 렌더링 (SWR 패턴)]: 초기 1회에 한하여 로컬 캐시를 0ms 즉각 화면에 띄움 (이후 폴링 시에는 깜빡임 방지를 위해 덮어쓰지 않음)
+    if (!hasInitiallyRendered.current) {
+      if (filteredLocalProps.length > 0) {
+        filteredLocalProps.sort((a: any, b: any) => {
+          const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+          const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+          return tB - tA;
+        });
+        setProperties(filteredLocalProps);
+      }
+      if (filteredLocalCusts.length > 0) {
+        setCustomers(sortCustomersList(filteredLocalCusts));
+      }
+      hasInitiallyRendered.current = true;
     }
 
     try {
@@ -220,22 +232,58 @@ const DashboardContent: React.FC = () => {
         const cData = await custRes.json();
         if (Array.isArray(cData)) {
           const serverCustKeys = new Set(cData.map((c: any) => c.id));
-          const unsyncedCusts = localCustomCusts.filter((c) => !serverCustKeys.has(c.id));
-          const mergedCusts = [...unsyncedCusts, ...cData];
+          const serverPhoneMap = new Map<string, string>();
+          const serverNameMap = new Map<string, string>();
 
-          mergedCusts.sort((a: any, b: any) => {
-            if (a.isPinned && !b.isPinned) return -1;
-            if (!a.isPinned && b.isPinned) return 1;
-            const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
-            const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
-            const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
-            const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
-            if (tB !== tA) return tB - tA;
-            const createdA = new Date(a.createdAt || 0).getTime();
-            const createdB = new Date(b.createdAt || 0).getTime();
-            return createdB - createdA;
+          cData.forEach((c: any) => {
+            const cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
+            const grp = c.group || (c.type === 'SELLER' || c.type === 'LESSOR' ? 'RECEIVED' : 'SEARCHING');
+            if (cleanPhone && cleanPhone !== '01000000000') {
+              serverPhoneMap.set(`${grp}_${cleanPhone}`, c.id);
+            } else if (c.name) {
+              serverNameMap.set(`${grp}_${c.name.trim()}`, c.id);
+            }
           });
-          setCustomers(mergedCusts);
+
+          // 로컬 고객 중 서버에 이미 존재하는 고객(ID, 전화번호, 이름 일치)은 중복 추가하지 않음
+          const unsyncedCusts: CustomerItem[] = [];
+          localCustomCusts.forEach((c) => {
+            const cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
+            const grp = c.group || (c.type === 'SELLER' || c.type === 'LESSOR' ? 'RECEIVED' : 'SEARCHING');
+            const phoneKey = `${grp}_${cleanPhone}`;
+            const nameKey = `${grp}_${(c.name || '').trim()}`;
+
+            let isMatched = false;
+            if (serverCustKeys.has(c.id)) {
+              isMatched = true;
+            } else if (cleanPhone && cleanPhone !== '01000000000' && serverPhoneMap.has(phoneKey)) {
+              isMatched = true;
+            } else if ((!cleanPhone || cleanPhone === '01000000000') && serverNameMap.has(nameKey)) {
+              isMatched = true;
+            }
+
+            if (!isMatched) {
+              unsyncedCusts.push(c);
+            }
+          });
+
+          const mergedCusts = sortCustomersList([...unsyncedCusts, ...cData]);
+
+          setCustomers((prev) => {
+            if (
+              prev.length === mergedCusts.length &&
+              prev.every(
+                (p, i) =>
+                  p.id === mergedCusts[i]?.id &&
+                  p.isPinned === mergedCusts[i]?.isPinned &&
+                  p.receiptDate === mergedCusts[i]?.receiptDate &&
+                  (p.properties?.length || 0) === (mergedCusts[i]?.properties?.length || 0)
+              )
+            ) {
+              return prev; // 데이터 변경 없으면 기존 객체 참조 유지 -> 화면 깜빡임/순서 뒤바뀜 100% 차단!
+            }
+            return mergedCusts;
+          });
           setCustomCustomers(mergedCusts);
 
           if (unsyncedCusts.length > 0) {
@@ -247,19 +295,7 @@ const DashboardContent: React.FC = () => {
           }
         }
       } else if (localCustomCusts.length > 0) {
-        localCustomCusts.sort((a: any, b: any) => {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
-          const propDateA = a.properties && a.properties[0]?.receiptDate ? a.properties[0].receiptDate : null;
-          const propDateB = b.properties && b.properties[0]?.receiptDate ? b.properties[0].receiptDate : null;
-          const tA = new Date(a.receiptDate || propDateA || a.createdAt || 0).getTime();
-          const tB = new Date(b.receiptDate || propDateB || b.createdAt || 0).getTime();
-          if (tB !== tA) return tB - tA;
-          const createdA = new Date(a.createdAt || 0).getTime();
-          const createdB = new Date(b.createdAt || 0).getTime();
-          return createdB - createdA;
-        });
-        setCustomers(localCustomCusts);
+        setCustomers(sortCustomersList(localCustomCusts));
       }
 
       if (propRes.ok) {
@@ -267,15 +303,41 @@ const DashboardContent: React.FC = () => {
         if (Array.isArray(pData)) {
           // 서버 DB에 없는 로컬 미동기화 매물도 화면에서 삭제되지 않고 절대 보존
           const serverPropKeys = new Set(pData.map((p: any) => p.id || p.propertyNumber));
-          const unsyncedProps = localCustomProps.filter((p) => !serverPropKeys.has(p.id) && !serverPropKeys.has(p.propertyNumber));
-          const mergedProps = [...unsyncedProps, ...pData];
+          const serverAddrMap = new Map<string, string>();
+          pData.forEach((p: any) => {
+            const addr = (p.address || p.roadAddress || '').trim().replace(/\s+/g, ' ');
+            if (addr) serverAddrMap.set(addr, p.id || p.propertyNumber);
+          });
 
-          mergedProps.sort((a: any, b: any) => {
+          const unsyncedProps = localCustomProps.filter((p) => {
+            if (serverPropKeys.has(p.id) || serverPropKeys.has(p.propertyNumber)) return false;
+            const addr = (p.address || p.roadAddress || '').trim().replace(/\s+/g, ' ');
+            if (addr && serverAddrMap.has(addr)) return false;
+            return true;
+          });
+
+          const mergedProps = [...unsyncedProps, ...pData].sort((a: any, b: any) => {
             const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
             const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
             return tB - tA;
           });
-          setProperties(mergedProps);
+
+          setProperties((prev) => {
+            if (
+              prev.length === mergedProps.length &&
+              prev.every(
+                (p, i) =>
+                  p.id === mergedProps[i]?.id &&
+                  p.status === mergedProps[i]?.status &&
+                  p.price === mergedProps[i]?.price &&
+                  p.deposit === mergedProps[i]?.deposit &&
+                  p.monthlyRent === mergedProps[i]?.monthlyRent
+              )
+            ) {
+              return prev;
+            }
+            return mergedProps;
+          });
           setCustomProperties(mergedProps);
 
           // 미동기화 매물이 있으면 백그라운드에서 즉시 서버 DB로 자동 업로드 (모든 기기에 공유)
@@ -296,7 +358,7 @@ const DashboardContent: React.FC = () => {
         setProperties(localCustomProps);
       }
       if (localCustomCusts.length > 0) {
-        setCustomers(localCustomCusts);
+        setCustomers(sortCustomersList(localCustomCusts));
       }
     } finally {
       setLoading(false);
@@ -500,10 +562,17 @@ const DashboardContent: React.FC = () => {
     if (createdCustomer) {
       saveCustomCustomer(createdCustomer);
       setCustomers((prev) => {
-        const idx = prev.findIndex((c) => c.id === createdCustomer.id);
+        const cleanPhone = (createdCustomer.phone || '').replace(/[^0-9]/g, '');
+        const idx = prev.findIndex((c) => {
+          if (c.id === createdCustomer.id) return true;
+          const cClean = (c.phone || '').replace(/[^0-9]/g, '');
+          if (cleanPhone && cleanPhone !== '01000000000' && cClean === cleanPhone) return true;
+          if ((!cleanPhone || cleanPhone === '01000000000') && c.name === createdCustomer.name) return true;
+          return false;
+        });
         if (idx >= 0) {
           const next = [...prev];
-          next[idx] = createdCustomer;
+          next[idx] = { ...next[idx], ...createdCustomer };
           return next;
         }
         return [createdCustomer, ...prev];

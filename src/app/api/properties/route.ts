@@ -506,35 +506,49 @@ export async function POST(request: NextRequest) {
       creatorName: creatorName || null,
     };
 
-    if (customerInput.phone?.trim()) {
-      const existingCust = await prisma.customer.findFirst({
-        where: { phone: customerInput.phone.trim() },
+    const cleanInputPhone = (customerInput.phone || '').trim();
+    const phoneDigits = cleanInputPhone.replace(/[^0-9]/g, '');
+    let existingCust: any = null;
+
+    if (phoneDigits && phoneDigits.length >= 8 && phoneDigits !== '01000000000') {
+      const phoneVariants = Array.from(new Set([
+        cleanInputPhone,
+        phoneDigits,
+        phoneDigits.length === 11 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}` : '',
+        phoneDigits.length === 10 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}` : '',
+      ])).filter(Boolean);
+
+      existingCust = await prisma.customer.findFirst({
+        where: { phone: { in: phoneVariants } },
       });
-      if (existingCust) {
-        await prisma.customer.update({
-          where: { id: existingCust.id },
-          data: {
-            carrier: custCarrier || existingCust.carrier,
-            subType: autoCustomerSubType || existingCust.subType,
-            receiptDate: targetReceiptDate,
-            memo: custMemo || existingCust.memo,
-            price: custPrice !== null ? custPrice : existingCust.price,
-            negotiablePrice: custNegoPrice !== null ? custNegoPrice : existingCust.negotiablePrice,
-            deposit: custDeposit !== null ? custDeposit : existingCust.deposit,
-            negotiableDeposit: custNegoDeposit !== null ? custNegoDeposit : existingCust.negotiableDeposit,
-            monthlyRent: custMonthlyRent !== null ? custMonthlyRent : existingCust.monthlyRent,
-            negotiableMonthlyRent: custNegoMonthlyRent !== null ? custNegoMonthlyRent : existingCust.negotiableMonthlyRent,
-            premium: custPremium !== null ? custPremium : existingCust.premium,
-            transactionType: transactionType || existingCust.transactionType,
-          },
-        });
-        finalCustomerId = existingCust.id;
-      } else {
-        const newCust = await prisma.customer.create({
-          data: customerDataToSave,
-        });
-        finalCustomerId = newCust.id;
-      }
+    } else if (customerInput.name?.trim()) {
+      existingCust = await prisma.customer.findFirst({
+        where: {
+          name: customerInput.name.trim(),
+          phone: cleanInputPhone || '010-0000-0000',
+        },
+      });
+    }
+
+    if (existingCust) {
+      await prisma.customer.update({
+        where: { id: existingCust.id },
+        data: {
+          carrier: custCarrier || existingCust.carrier,
+          subType: autoCustomerSubType || existingCust.subType,
+          receiptDate: targetReceiptDate,
+          memo: custMemo || existingCust.memo,
+          price: custPrice !== null ? custPrice : existingCust.price,
+          negotiablePrice: custNegoPrice !== null ? custNegoPrice : existingCust.negotiablePrice,
+          deposit: custDeposit !== null ? custDeposit : existingCust.deposit,
+          negotiableDeposit: custNegoDeposit !== null ? custNegoDeposit : existingCust.negotiableDeposit,
+          monthlyRent: custMonthlyRent !== null ? custMonthlyRent : existingCust.monthlyRent,
+          negotiableMonthlyRent: custNegoMonthlyRent !== null ? custNegoMonthlyRent : existingCust.negotiableMonthlyRent,
+          premium: custPremium !== null ? custPremium : existingCust.premium,
+          transactionType: transactionType || existingCust.transactionType,
+        },
+      });
+      finalCustomerId = existingCust.id;
     } else {
       const newCust = await prisma.customer.create({
         data: customerDataToSave,

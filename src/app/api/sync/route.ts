@@ -225,36 +225,66 @@ export async function POST(request: NextRequest) {
         await Promise.all(
           chunk.map(async (cust) => {
             if (!cust.id || !cust.name) return;
-            return prisma.customer.upsert({
-              where: { id: cust.id },
-              update: {
-                name: cust.name,
-                phone: cust.phone || '010-0000-0000',
-                carrier: cust.carrier,
-                type: cust.type || 'BUYER',
-                subType: cust.subType,
-                group: cust.group || 'SEARCHING',
-                receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : undefined,
-                memo: cust.memo,
-                price: cust.price !== undefined ? cust.price : null,
-                deposit: cust.deposit !== undefined ? cust.deposit : null,
-                monthlyRent: cust.monthlyRent !== undefined ? cust.monthlyRent : null,
-              },
-              create: {
-                id: cust.id,
-                name: cust.name,
-                phone: cust.phone || '010-0000-0000',
-                carrier: cust.carrier,
-                type: cust.type || 'BUYER',
-                subType: cust.subType,
-                group: cust.group || 'SEARCHING',
-                receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : (cust.createdAt ? new Date(cust.createdAt) : new Date()),
-                memo: cust.memo,
-                price: cust.price !== undefined ? cust.price : null,
-                deposit: cust.deposit !== undefined ? cust.deposit : null,
-                monthlyRent: cust.monthlyRent !== undefined ? cust.monthlyRent : null,
-              },
-            }).catch((err) => console.warn('Sync customer upsert error:', err));
+            const cleanPhone = (cust.phone || '').trim();
+            const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+            const targetGroup = cust.group || (cust.type === 'SELLER' || cust.type === 'LESSOR' ? 'RECEIVED' : 'SEARCHING');
+
+            let existing: any = null;
+            if (cust.id) {
+              existing = await prisma.customer.findUnique({ where: { id: cust.id } }).catch(() => null);
+            }
+            if (!existing && phoneDigits && phoneDigits.length >= 8 && phoneDigits !== '01000000000') {
+              const phoneVariants = Array.from(new Set([
+                cleanPhone,
+                phoneDigits,
+                phoneDigits.length === 11 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}` : '',
+                phoneDigits.length === 10 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}` : '',
+              ])).filter(Boolean);
+
+              existing = await prisma.customer.findFirst({
+                where: {
+                  phone: { in: phoneVariants },
+                  group: targetGroup,
+                },
+              }).catch(() => null);
+            } else if (!existing && cust.name?.trim()) {
+              existing = await prisma.customer.findFirst({
+                where: {
+                  name: cust.name.trim(),
+                  group: targetGroup,
+                  phone: cleanPhone || '010-0000-0000',
+                },
+              }).catch(() => null);
+            }
+
+            const updateData: any = {
+              name: cust.name,
+              phone: cust.phone || (existing ? existing.phone : '010-0000-0000'),
+              carrier: cust.carrier || (existing ? existing.carrier : null),
+              type: cust.type || (existing ? existing.type : 'BUYER'),
+              subType: cust.subType || (existing ? existing.subType : null),
+              group: targetGroup,
+              receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : (existing ? existing.receiptDate : undefined),
+              memo: cust.memo && existing?.memo && !existing.memo.includes(cust.memo) ? `${existing.memo}\n${cust.memo}` : (cust.memo || (existing ? existing.memo : null)),
+              price: cust.price !== undefined ? cust.price : (existing ? existing.price : null),
+              deposit: cust.deposit !== undefined ? cust.deposit : (existing ? existing.deposit : null),
+              monthlyRent: cust.monthlyRent !== undefined ? cust.monthlyRent : (existing ? existing.monthlyRent : null),
+            };
+
+            if (existing) {
+              await prisma.customer.update({
+                where: { id: existing.id },
+                data: updateData,
+              }).catch((err) => console.warn('Sync customer update error:', err));
+            } else {
+              await prisma.customer.create({
+                data: {
+                  id: cust.id,
+                  ...updateData,
+                  receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : (cust.createdAt ? new Date(cust.createdAt) : new Date()),
+                },
+              }).catch((err) => console.warn('Sync customer create error:', err));
+            }
           })
         );
       }
