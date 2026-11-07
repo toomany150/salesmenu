@@ -443,6 +443,8 @@ export async function POST(request: NextRequest) {
       if (uExists) validUserId = uExists.id;
     }
 
+    const targetReceiptDate = receiptDate ? new Date(receiptDate) : (customerInput?.receiptDate ? new Date(customerInput.receiptDate) : new Date());
+
     // 접수 고객 직접 입력 시 고객 DB 자동 등록/연동 (요구사항 10: 매도인/임대인/임차인(권리금) 자동 연계 및 가격/메모 매핑)
     let finalCustomerId = customerId || null;
     if (finalCustomerId) {
@@ -488,6 +490,7 @@ export async function POST(request: NextRequest) {
       type: autoCustomerType,
       subType: autoCustomerSubType,
       group: 'RECEIVED',
+      receiptDate: targetReceiptDate,
       memo: custMemo,
       price: custPrice,
       negotiablePrice: custNegoPrice,
@@ -513,6 +516,7 @@ export async function POST(request: NextRequest) {
           data: {
             carrier: custCarrier || existingCust.carrier,
             subType: autoCustomerSubType || existingCust.subType,
+            receiptDate: targetReceiptDate,
             memo: custMemo || existingCust.memo,
             price: custPrice !== null ? custPrice : existingCust.price,
             negotiablePrice: custNegoPrice !== null ? custNegoPrice : existingCust.negotiablePrice,
@@ -545,6 +549,15 @@ export async function POST(request: NextRequest) {
     if (cExists) validCustomerId = cExists.id;
   }
 
+  // 매물에 연동된 고객의 접수일자를 매물 접수일자 기준으로 자동 동기화 보장
+  if (validCustomerId && (receiptDate || body.receiptDate)) {
+    const syncTargetDate = new Date(receiptDate || body.receiptDate);
+    await prisma.customer.update({
+      where: { id: validCustomerId },
+      data: { receiptDate: syncTargetDate },
+    }).catch(() => {});
+  }
+
   // 등기부상 소유주 처리 (접수 고객과 다를 경우 고객 DB 자동 연동)
   const isOwnerSame = ownerSameAsCustomer !== false;
   let finalOwnerCustomerId: string | null = null;
@@ -570,6 +583,7 @@ export async function POST(request: NextRequest) {
         type: transactionType === '매매' ? 'SELLER' : 'LESSOR',
         subType: '등기부소유자',
         group: 'RECEIVED',
+        receiptDate: targetReceiptDate,
         memo: `[매물 #${propertyNumber} (${address})] 등기부상 소유주`,
         managerName: managerName || '사무실',
         createdById: validUserId,
@@ -1109,6 +1123,10 @@ export async function PUT(request: NextRequest) {
         }
       }
 
+      const targetReceiptDate = receiptDate !== undefined 
+        ? (receiptDate ? new Date(receiptDate) : null) 
+        : (customerInput?.receiptDate ? new Date(customerInput.receiptDate) : (existingProp.receiptDate ? new Date(existingProp.receiptDate) : null));
+
       const custMemo = customerInput.memo?.trim() || consultationNotes?.trim() || `매물 #${propertyNumber || existingProp.propertyNumber} 접수 고객`;
       const custPrice = customerInput.price !== undefined ? customerInput.price : (price !== undefined ? (price ? parseFloat(price) : null) : undefined);
       const custNegoPrice = customerInput.negotiablePrice !== undefined ? customerInput.negotiablePrice : (body.negotiablePrice !== undefined ? (body.negotiablePrice ? parseFloat(body.negotiablePrice) : null) : undefined);
@@ -1143,6 +1161,7 @@ export async function PUT(request: NextRequest) {
               carrier: custCarrier || existingCust.carrier,
               type: autoCustomerType || existingCust.type,
               subType: autoCustomerSubType || existingCust.subType,
+              receiptDate: targetReceiptDate || existingCust.receiptDate,
               memo: custMemo || existingCust.memo,
               price: custPrice !== undefined ? custPrice : existingCust.price,
               negotiablePrice: custNegoPrice !== undefined ? custNegoPrice : existingCust.negotiablePrice,
@@ -1164,6 +1183,7 @@ export async function PUT(request: NextRequest) {
               type: autoCustomerType || 'SELLER',
               subType: autoCustomerSubType || '매도인',
               group: 'RECEIVED',
+              receiptDate: targetReceiptDate || new Date(),
               memo: custMemo,
               price: custPrice || null,
               negotiablePrice: custNegoPrice || null,
@@ -1190,6 +1210,18 @@ export async function PUT(request: NextRequest) {
       } else {
         validCustomerId = null;
       }
+    }
+
+    // 매물 수정 시에도 연동된 고객의 접수일자를 매물 접수일자 기준으로 자동 동기화 보장
+    const updateTargetReceiptDate = receiptDate !== undefined 
+      ? (receiptDate ? new Date(receiptDate) : null) 
+      : (existingProp.receiptDate ? new Date(existingProp.receiptDate) : null);
+
+    if (validCustomerId && updateTargetReceiptDate) {
+      await prisma.customer.update({
+        where: { id: validCustomerId },
+        data: { receiptDate: updateTargetReceiptDate },
+      }).catch(() => {});
     }
 
     // 등기부상 소유주 처리 (수정 시)
@@ -1235,6 +1267,7 @@ export async function PUT(request: NextRequest) {
               type: transactionType === '매매' ? 'SELLER' : 'LESSOR',
               subType: '등기부소유자',
               group: 'RECEIVED',
+              receiptDate: updateTargetReceiptDate || new Date(),
               memo: `[매물 #${propertyNumber || existingProp.propertyNumber}] 등기부상 소유주`,
               managerName: managerName || existingProp.managerName || '사무실',
             },

@@ -1217,7 +1217,19 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     } else if (customerMode === 'SELECT' && customerId) {
       const found = allCustomers.find((c) => c.id === customerId);
       if (found) {
-        linkedCustomer = found;
+        const syncedReceiptDate = receiptDate || found.receiptDate || new Date().toISOString();
+        linkedCustomer = {
+          ...found,
+          receiptDate: syncedReceiptDate,
+        };
+        // 고객 로컬 캐시 동기화
+        saveCustomCustomer(linkedCustomer);
+        // 서버 DB 고객 접수일자 동기화
+        fetch(`/api/customers?id=${found.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ receiptDate: syncedReceiptDate }),
+        }).catch((err) => console.warn('Customer receiptDate sync notice:', err));
         finalCustomerId = found.id;
       }
     }

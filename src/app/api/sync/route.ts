@@ -234,6 +234,7 @@ export async function POST(request: NextRequest) {
                 type: cust.type || 'BUYER',
                 subType: cust.subType,
                 group: cust.group || 'SEARCHING',
+                receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : undefined,
                 memo: cust.memo,
                 price: cust.price !== undefined ? cust.price : null,
                 deposit: cust.deposit !== undefined ? cust.deposit : null,
@@ -247,6 +248,7 @@ export async function POST(request: NextRequest) {
                 type: cust.type || 'BUYER',
                 subType: cust.subType,
                 group: cust.group || 'SEARCHING',
+                receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : (cust.createdAt ? new Date(cust.createdAt) : new Date()),
                 memo: cust.memo,
                 price: cust.price !== undefined ? cust.price : null,
                 deposit: cust.deposit !== undefined ? cust.deposit : null,
@@ -276,7 +278,16 @@ export async function POST(request: NextRequest) {
             let validCustomerId: string | null = null;
             if (prop.customerId) {
               const cExists = await prisma.customer.findUnique({ where: { id: prop.customerId } }).catch(() => null);
-              if (cExists) validCustomerId = cExists.id;
+              if (cExists) {
+                validCustomerId = cExists.id;
+                // 매물 접수일자 기준으로 고객 접수일자 자동 일치 보장
+                if (prop.receiptDate) {
+                  await prisma.customer.update({
+                    where: { id: validCustomerId },
+                    data: { receiptDate: new Date(prop.receiptDate) }
+                  }).catch(() => {});
+                }
+              }
             }
 
             let validUserId: string | null = null;
