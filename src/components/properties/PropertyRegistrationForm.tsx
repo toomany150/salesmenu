@@ -46,7 +46,7 @@ import { KakaoAddressMap } from '../map/KakaoAddressMap';
 import { PropertyImageUploader } from './PropertyImageUploader';
 import { useAuth } from '../auth/AuthContext';
 import { VoiceTextarea } from '../common/VoiceInput';
-import { saveCustomProperty, saveCustomCustomer, getCustomCustomers } from '@/lib/storage';
+import { saveCustomProperty, saveCustomCustomer, getCustomCustomers, getCustomProperties } from '@/lib/storage';
 
 // Subforms
 import { ApartmentForm } from './forms/ApartmentForm';
@@ -58,6 +58,7 @@ import { LandForm } from './forms/LandForm';
 
 interface PropertyRegistrationFormProps {
   customers: CustomerItem[];
+  properties?: PropertyItem[];
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (savedProperty: PropertyItem, createdCustomer?: CustomerItem) => void;
@@ -67,6 +68,7 @@ interface PropertyRegistrationFormProps {
 
 export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> = ({
   customers,
+  properties = [],
   isOpen,
   onClose,
   onSuccess,
@@ -75,6 +77,9 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 }) => {
   const { currentUser, availableAgents, addCustomAgent, removeCustomAgent } = useAuth();
   const isEditMode = mode === 'EDIT' || !!initialData;
+
+  // Duplicate Check States (동일 매물번호 / 주소 동일 중복 검사)
+  const [duplicateCheckStatus, setDuplicateCheckStatus] = useState<'IDLE' | 'DUPLICATE_CONFIRMED' | 'AVAILABLE'>('IDLE');
 
   // Common Form States
   const [propertyType, setPropertyType] = useState<PropertyType>('APARTMENT');
@@ -1056,6 +1061,93 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     }
   };
 
+  /**
+   * 동일 매물번호 또는 동일 주소 중복 매물 탐색
+   */
+  const findDuplicateProperty = (targetNum: string, targetAddr: string) => {
+    const cleanNum = targetNum.trim().toLowerCase();
+    const cleanAddr = targetAddr.replace(/\s+/g, '').trim();
+
+    const allProps = properties && properties.length > 0 ? properties : getCustomProperties();
+
+    for (const p of allProps) {
+      // 수정(EDIT) 모드일 때 현재 수정 중인 매물 본인은 중복 검사 대상에서 제외
+      if (initialData && (p.id === initialData.id || p.propertyNumber === initialData.propertyNumber)) {
+        continue;
+      }
+
+      const pNum = (p.propertyNumber || '').trim().toLowerCase();
+      const pAddr = (p.address || p.roadAddress || p.jibunAddress || '').replace(/\s+/g, '').trim();
+      const pRoad = (p.roadAddress || '').replace(/\s+/g, '').trim();
+      const pJibun = (p.jibunAddress || '').replace(/\s+/g, '').trim();
+
+      const numMatches = Boolean(cleanNum && pNum && cleanNum === pNum);
+      const addrMatches = Boolean(
+        cleanAddr && cleanAddr.length >= 5 && (
+          (pAddr && (cleanAddr === pAddr || (cleanAddr.length >= 8 && (cleanAddr.includes(pAddr) || pAddr.includes(cleanAddr))))) ||
+          (pRoad && (cleanAddr === pRoad || (cleanAddr.length >= 8 && (cleanAddr.includes(pRoad) || pRoad.includes(cleanAddr))))) ||
+          (pJibun && (cleanAddr === pJibun || (cleanAddr.length >= 8 && (cleanAddr.includes(pJibun) || pJibun.includes(cleanAddr)))))
+        )
+      );
+
+      if (numMatches || addrMatches) {
+        return { property: p, numMatches, addrMatches };
+      }
+    }
+    return null;
+  };
+
+  /**
+   * 중복 매물 확인 핸들러 (동일 매물번호 / 주소 동일 알림 및 계속 진행 확인)
+   */
+  const handleCheckDuplicate = (showAlertIfAvailable = true): boolean => {
+    const finalPropNumber = propertyNumber.trim();
+    const finalAddress = roadAddress.trim() || jibunAddress.trim() || address.trim();
+
+    if (!finalPropNumber && !finalAddress) {
+      if (showAlertIfAvailable) {
+        alert('매물번호 또는 소재지 주소를 먼저 입력해주세요.');
+      }
+      return true;
+    }
+
+    const dup = findDuplicateProperty(finalPropNumber, finalAddress);
+    if (dup) {
+      const reasonText = dup.numMatches && dup.addrMatches
+        ? '동일 매물번호 및 주소 동일'
+        : dup.numMatches
+          ? '동일 매물번호'
+          : '주소 동일';
+
+      const propPriceText = dup.property.price 
+        ? `${dup.property.price}만원` 
+        : (dup.property.deposit || dup.property.monthlyRent ? `${dup.property.deposit || 0}/${dup.property.monthlyRent || 0}만원` : '');
+
+      const confirmMessage = 
+        `기존 매물 입니다.\n\n` +
+        `• 확인 사유: ${reasonText}\n` +
+        `• 기존 매물번호: ${dup.property.propertyNumber}\n` +
+        `• 기존 소재지: ${dup.property.address || dup.property.roadAddress || '(주소 미입력)'}\n` +
+        `• 기존 거래형태: ${dup.property.transactionType || ''} ${propPriceText}\n\n` +
+        `계속 진행하시겠습니까?`;
+
+      const proceed = window.confirm(confirmMessage);
+      if (proceed) {
+        setDuplicateCheckStatus('DUPLICATE_CONFIRMED');
+        return true;
+      } else {
+        setDuplicateCheckStatus('IDLE');
+        return false;
+      }
+    } else {
+      setDuplicateCheckStatus('AVAILABLE');
+      if (showAlertIfAvailable) {
+        alert('[확인] 중복된 기존 매물이 없습니다. 계속 등록을 진행하세요.');
+      }
+      return true;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalPropNumber = propertyNumber.trim();
@@ -1067,6 +1159,14 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     if (!finalAddress) {
       setErrorMsg('소재지 주소(주소1 도로명 또는 주소2 지번)를 입력해주세요.');
       return;
+    }
+
+    // [중복 확인] "동일 매물번호"이거나 "주소가 동일할 경우" 기존 매물 확인 여부 점검
+    if (duplicateCheckStatus !== 'DUPLICATE_CONFIRMED') {
+      const canProceed = handleCheckDuplicate(false);
+      if (!canProceed) {
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -1586,6 +1686,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                     setJibunAddress(jibun);
                     setAddress(road || jibun);
                     setLedgerData(null);
+                    setDuplicateCheckStatus('IDLE');
                   }}
                   onApplyData={handleApplyPublicData}
                   onApplyLandData={handleApplyLandData}
@@ -2199,17 +2300,49 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                         <label className="text-sm font-bold text-slate-800">
                           매물번호 (고유번호) *
                         </label>
-                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                          직접 입력
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleCheckDuplicate(true)}
+                            className="text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md border border-blue-200 transition-colors cursor-pointer"
+                            title="엔터키 또는 버튼을 눌러 동일 매물번호 및 주소 중복 여부를 확인합니다."
+                          >
+                            중복확인 (Enter)
+                          </button>
+                        </div>
                       </div>
                       <input
                         type="text"
                         value={propertyNumber}
-                        onChange={(e) => setPropertyNumber(e.target.value)}
-                        placeholder="매물번호 직접 입력 (예: 101, 2026-01)"
-                        className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-mono font-extrabold text-blue-900 shadow-2xs"
+                        onChange={(e) => {
+                          setPropertyNumber(e.target.value);
+                          setDuplicateCheckStatus('IDLE');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCheckDuplicate(true);
+                          }
+                        }}
+                        placeholder="매물번호 입력 후 Enter (예: 101, 2026-01)"
+                        className={`w-full text-sm px-3.5 py-2.5 bg-white border rounded-xl focus:ring-2 font-mono font-extrabold shadow-2xs transition-colors ${
+                          duplicateCheckStatus === 'DUPLICATE_CONFIRMED'
+                            ? 'border-amber-400 text-amber-900 focus:ring-amber-400 bg-amber-50/40'
+                            : duplicateCheckStatus === 'AVAILABLE'
+                              ? 'border-emerald-400 text-emerald-900 focus:ring-emerald-400 bg-emerald-50/40'
+                              : 'border-slate-300 text-blue-900 focus:ring-blue-500'
+                        }`}
                       />
+                      {duplicateCheckStatus === 'DUPLICATE_CONFIRMED' && (
+                        <p className="text-[11px] text-amber-700 font-bold mt-1 flex items-center gap-1">
+                          <span>⚠️ 기존 매물과 동일하지만 계속 진행하도록 확인되었습니다.</span>
+                        </p>
+                      )}
+                      {duplicateCheckStatus === 'AVAILABLE' && (
+                        <p className="text-[11px] text-emerald-700 font-bold mt-1 flex items-center gap-1">
+                          <span>✓ 사용 가능한 신규 매물번호입니다.</span>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-800 mb-1.5">

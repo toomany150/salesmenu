@@ -1122,6 +1122,7 @@ const DashboardContent: React.FC = () => {
       {/* 1) 새 매물 등록 및 수정 폼 (로그인 시에만 열림) */}
       <PropertyRegistrationForm
         customers={customers}
+        properties={properties}
         isOpen={!!currentUser && isPropertyRegOpen}
         initialData={editingProperty}
         mode={editingProperty ? 'EDIT' : 'CREATE'}
