@@ -310,8 +310,8 @@ export const KakaoAddressMap: React.FC<KakaoAddressMapProps> = ({
         }
       });
 
-      // Authentic Kakao Marker Pin (카카오맵 공식 정품 핀)
-      const markerImageSrc = 'https://t1.daumcdn.net/mapjsapi/images/2x/marker.png';
+      // Authentic Kakao Marker Pin (카카오맵 공식 정품 핀 - kakaocdn 최신 도메인)
+      const markerImageSrc = 'https://t1.kakaocdn.net/mapjsapi/images/2x/marker.png';
       const imageSize = new window.kakao.maps.Size(29, 42);
       const imageOption = { offset: new window.kakao.maps.Point(14, 42) };
       const markerImage = new window.kakao.maps.MarkerImage(markerImageSrc, imageSize, imageOption);

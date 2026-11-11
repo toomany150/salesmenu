@@ -9,12 +9,12 @@ declare global {
 }
 
 /**
- * 다음 우편번호 서비스 스크립트 동적 로드
+ * 다음/카카오 우편번호 서비스 스크립트 동적 로드 (kakaocdn 최신 공식 도메인)
  */
 export function loadDaumPostcodeScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') return resolve(false);
-    if (window.daum && window.daum.Postcode) return resolve(true);
+    if ((window.daum && window.daum.Postcode) || (window.kakao && window.kakao.Postcode)) return resolve(true);
 
     const existing = document.getElementById('daum-postcode-sdk');
     if (existing) {
@@ -24,7 +24,7 @@ export function loadDaumPostcodeScript(): Promise<boolean> {
 
     const script = document.createElement('script');
     script.id = 'daum-postcode-sdk';
-    script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+    script.src = '//t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
     document.head.appendChild(script);
@@ -32,7 +32,7 @@ export function loadDaumPostcodeScript(): Promise<boolean> {
 }
 
 /**
- * 다음 우편번호 검색 팝업 열기
+ * 다음/카카오 우편번호 검색 팝업 열기
  */
 export async function openDaumPostcode(
   onComplete: (result: {
@@ -44,12 +44,13 @@ export async function openDaumPostcode(
   }) => void
 ) {
   const loaded = await loadDaumPostcodeScript();
-  if (!loaded || !window.daum?.Postcode) {
+  const PostcodeConstructor = window.daum?.Postcode || window.kakao?.Postcode;
+  if (!loaded || !PostcodeConstructor) {
     alert('우편번호 서비스를 불러올 수 없습니다. 인터넷 연결 상태를 확인해주세요.');
     return;
   }
 
-  new window.daum.Postcode({
+  new PostcodeConstructor({
     oncomplete: (data: any) => {
       const road = data.roadAddress || data.autoRoadAddress || '';
       const jibun = data.jibunAddress || data.autoJibunAddress || '';
