@@ -164,6 +164,86 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     }
   };
 
+  const getMaintenanceFeeDisplay = (p: PropertyItem) => {
+    const fee = p.storeDetail?.maintenanceFee ?? p.officeDetail?.maintenanceFee ?? p.apartmentDetail?.maintenanceFee ?? p.maintenanceFee;
+    if (fee !== undefined && fee !== null && Number(fee) > 0) {
+      return `관리비 ${Number(fee).toLocaleString()}만`;
+    }
+    const feeDetail = p.storeDetail?.managementFeeDetails || p.maintenanceFeeDetails;
+    if (feeDetail && feeDetail.trim() && !feeDetail.includes('관리비 없음') && !feeDetail.includes('자체 관리')) {
+      return `관리비: ${feeDetail}`;
+    }
+    return '';
+  };
+
+  const getPropertyAreaDisplay = (p: PropertyItem) => {
+    let commonAreaM2: number | undefined;
+    let commonAreaPy: number | undefined;
+    let exclusiveAreaM2: number | undefined;
+    let exclusiveAreaPy: number | undefined;
+
+    if (p.propertyType === 'STORE') {
+      exclusiveAreaM2 = p.storeDetail?.actualArea ?? p.actualArea;
+      exclusiveAreaPy = p.storeDetail?.actualAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.storeDetail?.buildingArea ?? p.buildingArea;
+      commonAreaPy = p.storeDetail?.buildingAreaPyeong;
+    } else if (p.propertyType === 'APARTMENT') {
+      exclusiveAreaM2 = p.apartmentDetail?.exclusiveArea ?? p.actualArea;
+      exclusiveAreaPy = p.apartmentDetail?.exclusiveAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.apartmentDetail?.supplyArea ?? p.buildingArea;
+      commonAreaPy = p.apartmentDetail?.supplyAreaPyeong;
+    } else if (p.propertyType === 'OFFICE') {
+      exclusiveAreaM2 = p.officeDetail?.actualArea ?? p.actualArea;
+      exclusiveAreaPy = p.officeDetail?.actualAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.officeDetail?.buildingArea ?? p.buildingArea;
+      commonAreaPy = p.officeDetail?.buildingAreaPyeong;
+    } else if (p.propertyType === 'HOUSE') {
+      exclusiveAreaM2 = p.houseDetail?.actualArea ?? p.houseDetail?.exclusiveArea ?? p.actualArea;
+      exclusiveAreaPy = p.houseDetail?.actualAreaPyeong ?? p.houseDetail?.exclusiveAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.houseDetail?.buildingArea ?? p.buildingArea;
+      commonAreaPy = p.houseDetail?.buildingAreaPyeong;
+    } else if (p.propertyType === 'LAND') {
+      const landM2 = p.landArea ?? p.landDetail?.landArea;
+      if (landM2) {
+        const landPy = (landM2 * 0.3025).toFixed(1);
+        return {
+          hasData: true,
+          displayText: `토지 ${landM2.toLocaleString()}㎡ (${landPy}평)`,
+        };
+      }
+      return { hasData: false, displayText: '' };
+    } else {
+      exclusiveAreaM2 = p.actualArea;
+      exclusiveAreaPy = p.actualAreaPyeong;
+      commonAreaM2 = p.buildingArea;
+    }
+
+    // 평수 자동 계산 (㎡만 있는 경우)
+    if (exclusiveAreaM2 && !exclusiveAreaPy) {
+      exclusiveAreaPy = +(exclusiveAreaM2 * 0.3025).toFixed(1);
+    }
+    if (commonAreaM2 && !commonAreaPy) {
+      commonAreaPy = +(commonAreaM2 * 0.3025).toFixed(1);
+    }
+
+    const parts: string[] = [];
+    if (commonAreaM2) {
+      parts.push(`공용 ${commonAreaM2}㎡(${commonAreaPy}평)`);
+    }
+    if (exclusiveAreaM2) {
+      parts.push(`전용 ${exclusiveAreaM2}㎡(${exclusiveAreaPy}평)`);
+    }
+
+    if (parts.length === 0) {
+      return { hasData: false, displayText: '' };
+    }
+
+    return {
+      hasData: true,
+      displayText: parts.join(' / '),
+    };
+  };
+
   return (
     <div className="space-y-4">
       
@@ -328,7 +408,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                       {/* Content */}
                       <div className="flex-1 min-w-0 flex flex-col justify-between">
                         <div>
-                          <div className="flex items-center justify-between gap-1 mb-1">
+                          {/* 1행: 접수일자 + 매물구분 + 거래유형 (좌측) / 공용면적 + 전용면적 (우측 원래 가격 자리) */}
+                          <div className="flex items-center justify-between gap-2 mb-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {property.receiptDate && (
                                 <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
@@ -348,22 +429,48 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 </span>
                               )}
                             </div>
-                            <span className="text-sm font-black text-blue-900 truncate">
-                              {getPriceDisplay(property)}
-                            </span>
+                            {/* 우측 원래 가격 자리에 공용면적, 전용면적 표시 (데이터 없으면 공란) */}
+                            {(() => {
+                              const areaInfo = getPropertyAreaDisplay(property);
+                              if (!areaInfo.hasData) return null;
+                              return (
+                                <span className="text-xs sm:text-[13px] font-extrabold text-slate-700 shrink-0 truncate bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+                                  📐 {areaInfo.displayText}
+                                </span>
+                              );
+                            })()}
                           </div>
 
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className={`font-black text-xs sm:text-sm line-clamp-1 ${
-                              isContracted ? 'text-slate-800' : 'text-slate-900'
-                            }`}>
-                              {getPropertyDisplayName(property)}
-                            </h4>
-                            {isContracted && (
-                              <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
-                                [판매완료]
+                          {/* 2행: 소재지/매물명 (좌측) + 매매가/보증금/월세 (한칸 밑으로 내림) & 관리비 (우측) */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap mt-0.5 mb-1">
+                            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                              <h4 className={`font-black text-xs sm:text-sm line-clamp-1 ${
+                                isContracted ? 'text-slate-800' : 'text-slate-900'
+                              }`}>
+                                {getPropertyDisplayName(property)}
+                              </h4>
+                              {isContracted && (
+                                <span className="px-1.5 py-0.2 text-[10px] font-black rounded bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
+                                  [판매완료]
+                                </span>
+                              )}
+                            </div>
+
+                            {/* 우측: 매매가/보증금/월세 & 관리비 */}
+                            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                              <span className="text-sm font-black text-blue-900">
+                                {getPriceDisplay(property)}
                               </span>
-                            )}
+                              {(() => {
+                                const feeText = getMaintenanceFeeDisplay(property);
+                                if (!feeText) return null;
+                                return (
+                                  <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                    {feeText}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </div>
 
                           <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
@@ -640,11 +747,23 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                       <div className="p-4">
                         <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
                           <span className="font-mono">#{property.propertyNumber}</span>
-                          <span>
-                            {property.propertyType === 'LAND'
-                              ? (property.landDetail?.roadDirection || property.direction || '도로접')
-                              : `${property.direction || '남향'} (${property.directionCriteria || '기준없음'})`}
-                          </span>
+                          {(() => {
+                            const areaInfo = getPropertyAreaDisplay(property);
+                            if (areaInfo.hasData) {
+                              return (
+                                <span className="font-extrabold text-slate-700 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                  📐 {areaInfo.displayText}
+                                </span>
+                              );
+                            }
+                            return (
+                              <span>
+                                {property.propertyType === 'LAND'
+                                  ? (property.landDetail?.roadDirection || property.direction || '도로접')
+                                  : `${property.direction || '남향'} (${property.directionCriteria || '기준없음'})`}
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -671,12 +790,23 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                           </p>
                         )}
 
-                        {/* Price */}
+                        {/* Price & Maintenance Fee */}
                         <div className="mt-3 p-2.5 rounded-lg bg-blue-50/60 border border-blue-100 flex items-center justify-between">
                           <span className="text-xs text-slate-600 font-medium">거래금액</span>
-                          <span className="text-base font-black text-blue-900">
-                            {getPriceDisplay(property)}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            <span className="text-base font-black text-blue-900">
+                              {getPriceDisplay(property)}
+                            </span>
+                            {(() => {
+                              const feeText = getMaintenanceFeeDisplay(property);
+                              if (!feeText) return null;
+                              return (
+                                <span className="text-[11px] font-bold text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                  {feeText}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
 
                         {property.propertyType === 'STORE' && (
