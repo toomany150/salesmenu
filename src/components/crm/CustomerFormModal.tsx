@@ -313,9 +313,11 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   // 층수 항목
   const [preferredFloor, setPreferredFloor] = useState('1층 선호');
 
-  // 면적 (㎡ <-> 평 실시간 양방향 자동 환산)
-  const [preferredArea, setPreferredArea] = useState('');
-  const [preferredAreaPy, setPreferredAreaPy] = useState('');
+  // 면적 (최소/최대 ㎡ <-> 평 실시간 양방향 자동 환산)
+  const [minPreferredArea, setMinPreferredArea] = useState('');
+  const [minPreferredAreaPy, setMinPreferredAreaPy] = useState('');
+  const [maxPreferredArea, setMaxPreferredArea] = useState('');
+  const [maxPreferredAreaPy, setMaxPreferredAreaPy] = useState('');
 
   // 주차 요건 (매물등록란 형식 반영)
   const [isParkingImpossible, setIsParkingImpossible] = useState(false);
@@ -393,8 +395,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         if (d.targetRegion) setTargetRegion(d.targetRegion);
         if (d.regionReason) setRegionReason(d.regionReason);
         if (d.preferredFloor) setPreferredFloor(d.preferredFloor);
-        if (d.preferredArea) setPreferredArea(String(d.preferredArea));
-        if (d.preferredAreaPy) setPreferredAreaPy(String(d.preferredAreaPy));
+        const initMinArea = d.minPreferredArea !== undefined && d.minPreferredArea !== null ? d.minPreferredArea : d.preferredArea;
+        const initMinAreaPy = d.minPreferredAreaPy !== undefined && d.minPreferredAreaPy !== null ? d.minPreferredAreaPy : d.preferredAreaPy;
+        if (initMinArea) setMinPreferredArea(String(initMinArea));
+        if (initMinAreaPy) setMinPreferredAreaPy(String(initMinAreaPy));
+        if (d.maxPreferredArea) setMaxPreferredArea(String(d.maxPreferredArea));
+        if (d.maxPreferredAreaPy) setMaxPreferredAreaPy(String(d.maxPreferredAreaPy));
         if (d.targetPrice) setTargetPrice(String(d.targetPrice));
         if (d.targetJeonse) setTargetJeonse(String(d.targetJeonse));
         if (d.minDeposit) setTargetDeposit(String(d.minDeposit));
@@ -510,8 +516,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setTargetDeposit('');
       setTargetMonthlyRent('');
       setPreferredFloor('');
-      setPreferredArea('');
-      setPreferredAreaPy('');
+      setMinPreferredArea('');
+      setMinPreferredAreaPy('');
+      setMaxPreferredArea('');
+      setMaxPreferredAreaPy('');
       setParkingRequirement('');
       setMoveInTiming('즉시가능');
       setMoveInReason('');
@@ -539,24 +547,59 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     setNewAgentInput('');
   }, [isOpen, mode, initialData, currentUser, defaultGroup]);
 
-  // 면적 양방향 환산 핸들러 (공통)
-  const handleAreaSqmChange = (val: string) => {
-    setPreferredArea(val);
+  // 면적 양방향 환산 핸들러 (최소 / 최대)
+  const handleMinAreaSqmChange = (val: string) => {
+    setMinPreferredArea(val);
     if (!val || isNaN(parseFloat(val))) {
-      setPreferredAreaPy('');
+      setMinPreferredAreaPy('');
     } else {
       const py = (parseFloat(val) / 3.305785).toFixed(1);
-      setPreferredAreaPy(py);
+      setMinPreferredAreaPy(py);
     }
   };
 
-  const handleAreaPyChange = (val: string) => {
-    setPreferredAreaPy(val);
+  const handleMinAreaPyChange = (val: string) => {
+    setMinPreferredAreaPy(val);
     if (!val || isNaN(parseFloat(val))) {
-      setPreferredArea('');
+      setMinPreferredArea('');
     } else {
       const sqm = (parseFloat(val) * 3.305785).toFixed(1);
-      setPreferredArea(sqm);
+      setMinPreferredArea(sqm);
+    }
+  };
+
+  const handleMaxAreaSqmChange = (val: string) => {
+    setMaxPreferredArea(val);
+    if (!val || isNaN(parseFloat(val))) {
+      setMaxPreferredAreaPy('');
+    } else {
+      const py = (parseFloat(val) / 3.305785).toFixed(1);
+      setMaxPreferredAreaPy(py);
+    }
+  };
+
+  const handleMaxAreaPyChange = (val: string) => {
+    setMaxPreferredAreaPy(val);
+    if (!val || isNaN(parseFloat(val))) {
+      setMaxPreferredArea('');
+    } else {
+      const sqm = (parseFloat(val) * 3.305785).toFixed(1);
+      setMaxPreferredArea(sqm);
+    }
+  };
+
+  const setQuickAreaRange = (minPyVal: string, maxPyVal: string) => {
+    if (minPyVal) {
+      handleMinAreaPyChange(minPyVal);
+    } else {
+      setMinPreferredArea('');
+      setMinPreferredAreaPy('');
+    }
+    if (maxPyVal) {
+      handleMaxAreaPyChange(maxPyVal);
+    } else {
+      setMaxPreferredArea('');
+      setMaxPreferredAreaPy('');
     }
   };
 
@@ -614,9 +657,16 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     const regionText = targetRegion.trim() ? `'${targetRegion.trim()}'` : '원하시는 지역';
     const regionReasonText = regionReason.trim() ? ` (선정 이유: ${regionReason.trim()})` : '';
     const floorText = preferredFloor ? `'${preferredFloor}'` : '층수 무관';
-    const areaText = preferredAreaPy 
-      ? `'약 ${preferredAreaPy}평 (${preferredArea}㎡)'` 
-      : (preferredArea ? `'${preferredArea}㎡'` : '적정 면적');
+    let areaText = '적정 면적';
+    if (minPreferredAreaPy && maxPreferredAreaPy) {
+      areaText = `'${minPreferredAreaPy}평 ~ ${maxPreferredAreaPy}평 (${minPreferredArea}㎡ ~ ${maxPreferredArea}㎡)'`;
+    } else if (minPreferredAreaPy) {
+      areaText = `'최소 ${minPreferredAreaPy}평 (${minPreferredArea}㎡) 이상'`;
+    } else if (maxPreferredAreaPy) {
+      areaText = `'최대 ${maxPreferredAreaPy}평 (${maxPreferredArea}㎡) 이하'`;
+    } else if (minPreferredArea) {
+      areaText = `'최소 ${minPreferredArea}㎡ 이상'`;
+    }
     const budgetText = getBudgetSummary();
     const parkingText = getFullParkingSummary();
     const timingText = moveInTiming ? `'${moveInTiming}'` : '협의';
@@ -771,8 +821,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         minMonthlyRent: targetMonthlyRent ? parseFloat(targetMonthlyRent) : undefined,
         maxMonthlyRent: targetMonthlyRent ? parseFloat(targetMonthlyRent) : undefined,
         preferredFloor: preferredFloor.trim() || undefined,
-        preferredArea: preferredArea ? parseFloat(preferredArea) : undefined,
-        preferredAreaPy: preferredAreaPy ? parseFloat(preferredAreaPy) : undefined,
+        minPreferredArea: minPreferredArea ? parseFloat(minPreferredArea) : undefined,
+        minPreferredAreaPy: minPreferredAreaPy ? parseFloat(minPreferredAreaPy) : undefined,
+        maxPreferredArea: maxPreferredArea ? parseFloat(maxPreferredArea) : undefined,
+        maxPreferredAreaPy: maxPreferredAreaPy ? parseFloat(maxPreferredAreaPy) : undefined,
+        preferredArea: minPreferredArea ? parseFloat(minPreferredArea) : (maxPreferredArea ? parseFloat(maxPreferredArea) : undefined),
+        preferredAreaPy: minPreferredAreaPy ? parseFloat(minPreferredAreaPy) : (maxPreferredAreaPy ? parseFloat(maxPreferredAreaPy) : undefined),
         parkingRequirement: getFullParkingSummary(),
         moveInTiming: moveInTiming.trim() || undefined,
         moveInReason: moveInReason.trim() || undefined,
@@ -845,6 +899,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         minMonthlyRent: payload.demand.minMonthlyRent,
         maxMonthlyRent: payload.demand.maxMonthlyRent,
         preferredFloor: payload.demand.preferredFloor,
+        minPreferredArea: payload.demand.minPreferredArea,
+        minPreferredAreaPy: payload.demand.minPreferredAreaPy,
+        maxPreferredArea: payload.demand.maxPreferredArea,
+        maxPreferredAreaPy: payload.demand.maxPreferredAreaPy,
         preferredArea: payload.demand.preferredArea,
         preferredAreaPy: payload.demand.preferredAreaPy,
         parkingRequirement: payload.demand.parkingRequirement,
@@ -1492,74 +1550,134 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 희망 전용면적 (평 ↔ ㎡ 양방향 자동 환산) */}
-                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                  {/* 희망 전용면적 범위 (최소면적 ~ 최대면적, 평 ↔ ㎡ 양방향 실시간 자동 환산) */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                        희망 전용면적 (평 ↔ ㎡ 실시간 자동 환산)
+                        <span>희망 전용면적 범위 (최소면적 ~ 최대면적 | 실시간 자동 환산)</span>
                       </label>
                       <span className="text-[11px] text-slate-500">1평 = 3.3058㎡</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-slate-600">전용면적 (㎡)</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* 1. 최소 희망면적 */}
+                      <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                            최소 희망면적
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">이상</span>
                         </div>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="any"
-                            value={preferredArea}
-                            onChange={(e) => handleAreaSqmChange(e.target.value)}
-                            placeholder="예: 66.1"
-                            className="w-full text-xs font-bold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg pr-9 focus:bg-white focus:ring-2 focus:ring-blue-500"
-                          />
-                          <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">㎡</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[11px] font-medium text-slate-600 block mb-1">최소 전용 (㎡)</span>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                value={minPreferredArea}
+                                onChange={(e) => handleMinAreaSqmChange(e.target.value)}
+                                placeholder="예: 33.1"
+                                className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg pr-7 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                              />
+                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-slate-400">㎡</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-medium text-slate-600 block mb-1">최소 실평수 (평)</span>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                value={minPreferredAreaPy}
+                                onChange={(e) => handleMinAreaPyChange(e.target.value)}
+                                placeholder="예: 10"
+                                className="w-full text-xs font-bold px-2.5 py-1.5 bg-blue-50/50 border border-blue-300 rounded-lg pr-7 focus:bg-white focus:ring-2 focus:ring-blue-500 text-blue-900"
+                              />
+                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-blue-600">평</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-slate-600">실평수 (평)</span>
+                      {/* 2. 최대 희망면적 */}
+                      <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            최대 희망면적
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">이하</span>
                         </div>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="any"
-                            value={preferredAreaPy}
-                            onChange={(e) => handleAreaPyChange(e.target.value)}
-                            placeholder="예: 20"
-                            className="w-full text-xs font-bold px-3 py-2 bg-blue-50/50 border border-blue-300 rounded-lg pr-9 focus:bg-white focus:ring-2 focus:ring-blue-500 text-blue-900"
-                          />
-                          <span className="absolute right-3 top-2 text-xs font-bold text-blue-600">평</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[11px] font-medium text-slate-600 block mb-1">최대 전용 (㎡)</span>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                value={maxPreferredArea}
+                                onChange={(e) => handleMaxAreaSqmChange(e.target.value)}
+                                placeholder="예: 49.6"
+                                className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg pr-7 focus:bg-white focus:ring-2 focus:ring-blue-500"
+                              />
+                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-slate-400">㎡</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-medium text-slate-600 block mb-1">최대 실평수 (평)</span>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="any"
+                                value={maxPreferredAreaPy}
+                                onChange={(e) => handleMaxAreaPyChange(e.target.value)}
+                                placeholder="예: 15"
+                                className="w-full text-xs font-bold px-2.5 py-1.5 bg-blue-50/50 border border-blue-300 rounded-lg pr-7 focus:bg-white focus:ring-2 focus:ring-blue-500 text-blue-900"
+                              />
+                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-blue-600">평</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
 
+                    {/* 빠른 범위 선택 버튼 */}
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <span className="text-[11px] text-slate-400 font-semibold mr-1">빠른 선택:</span>
+                      <span className="text-[11px] text-slate-400 font-semibold mr-1">빠른 범위 선택:</span>
                       {[
-                        { py: '10', sqm: '33.1' },
-                        { py: '15', sqm: '49.6' },
-                        { py: '20', sqm: '66.1' },
-                        { py: '30', sqm: '99.2' },
-                        { py: '50', sqm: '165.3' },
-                        { py: '100', sqm: '330.6' },
+                        { label: '10~15평 (33~50㎡)', minPy: '10', maxPy: '15' },
+                        { label: '15~20평 (50~66㎡)', minPy: '15', maxPy: '20' },
+                        { label: '20~30평 (66~99㎡)', minPy: '20', maxPy: '30' },
+                        { label: '30~50평 (99~165㎡)', minPy: '30', maxPy: '50' },
+                        { label: '50~100평 (165~331㎡)', minPy: '50', maxPy: '100' },
+                        { label: '100평 이상', minPy: '100', maxPy: '' },
                       ].map((item) => (
                         <button
-                          key={item.py}
+                          key={item.label}
                           type="button"
-                          onClick={() => {
-                            setPreferredAreaPy(item.py);
-                            setPreferredArea(item.sqm);
-                          }}
+                          onClick={() => setQuickAreaRange(item.minPy, item.maxPy)}
                           className="px-2 py-0.5 text-[11px] font-semibold bg-slate-100 hover:bg-blue-100 hover:text-blue-800 text-slate-600 rounded border border-slate-200 transition-colors"
                         >
-                          {item.py}평 ({item.sqm}㎡)
+                          {item.label}
                         </button>
                       ))}
+                      {(minPreferredArea || maxPreferredArea) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMinPreferredArea('');
+                            setMinPreferredAreaPy('');
+                            setMaxPreferredArea('');
+                            setMaxPreferredAreaPy('');
+                          }}
+                          className="px-2 py-0.5 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded border border-rose-200 transition-colors"
+                        >
+                          초기화
+                        </button>
+                      )}
                     </div>
                   </div>
 

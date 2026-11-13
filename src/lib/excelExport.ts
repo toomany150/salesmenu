@@ -207,7 +207,12 @@ export function exportCustomersToExcel(customers: CustomerItem[], customFilename
       '';
 
     // 면적
-    const areaPy = (c.demands && (c.demands[0]?.preferredAreaPy || c.demands[0]?.minRequiredAreaPy)) || '';
+    const d0 = c.demands?.[0];
+    const areaPy = d0
+      ? (d0.minPreferredAreaPy && d0.maxPreferredAreaPy
+          ? `${d0.minPreferredAreaPy}~${d0.maxPreferredAreaPy}`
+          : (d0.minPreferredAreaPy || d0.preferredAreaPy || d0.minRequiredAreaPy || ''))
+      : '';
 
     // 입주/오픈 시기
     const moveInTiming = 

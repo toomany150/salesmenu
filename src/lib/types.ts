@@ -637,6 +637,10 @@ export interface CustomerDemandItem {
   minMonthlyRent?: number;
   maxMonthlyRent?: number;
   preferredFloor?: string;
+  minPreferredArea?: number;
+  minPreferredAreaPy?: number;
+  maxPreferredArea?: number;
+  maxPreferredAreaPy?: number;
   preferredArea?: number;
   preferredAreaPy?: number;
   parkingRequirement?: string;

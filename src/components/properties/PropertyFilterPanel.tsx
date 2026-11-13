@@ -189,10 +189,11 @@ export const PropertyFilterPanel: React.FC<PropertyFilterPanelProps> = ({
       if (demand.maxDeposit) setMaxDeposit(String(demand.maxDeposit));
       if (demand.minMonthlyRent) setMinMonthlyRent(String(demand.minMonthlyRent));
       if (demand.maxMonthlyRent) setMaxMonthlyRent(String(demand.maxMonthlyRent));
-      if (demand.preferredArea) {
-        const pyeong = Math.round(demand.preferredArea / 3.30578);
-        handleMinPyeongChange(String(Math.max(1, pyeong - 5)));
-        handleMaxPyeongChange(String(pyeong + 10));
+      if (demand.minPreferredAreaPy || demand.maxPreferredAreaPy || demand.minPreferredArea || demand.preferredArea) {
+        const minPy = demand.minPreferredAreaPy || (demand.minPreferredArea ? Math.round(demand.minPreferredArea / 3.30578) : (demand.preferredAreaPy || (demand.preferredArea ? Math.max(1, Math.round(demand.preferredArea / 3.30578) - 5) : 1)));
+        const maxPy = demand.maxPreferredAreaPy || (demand.maxPreferredArea ? Math.round(demand.maxPreferredArea / 3.30578) : (demand.preferredAreaPy ? demand.preferredAreaPy + 5 : (demand.preferredArea ? Math.round(demand.preferredArea / 3.30578) + 10 : 100)));
+        handleMinPyeongChange(String(minPy));
+        handleMaxPyeongChange(String(maxPy));
       }
     }
   };

@@ -132,8 +132,12 @@ model CustomerDemand {
   
   // 층수 및 면적 조건 (평/㎡ 양방향 환산)
   preferredFloor        String?   // 희망 층수 (예: 1층 선호, 3층 이하, 로얄층, 무관 등)
-  preferredArea         Float?    // 희망 전용/실면적 (㎡)
-  preferredAreaPy       Float?    // 희망 전용/실면적 (평)
+  minPreferredArea      Float?    // 최소 희망 전용/실면적 (㎡)
+  minPreferredAreaPy    Float?    // 최소 희망 전용/실면적 (평)
+  maxPreferredArea      Float?    // 최대 희망 전용/실면적 (㎡)
+  maxPreferredAreaPy    Float?    // 최대 희망 전용/실면적 (평)
+  preferredArea         Float?    // 희망 전용/실면적 (㎡) - 하위호환
+  preferredAreaPy       Float?    // 희망 전용/실면적 (평) - 하위호환
   
   // 주차 요건
   parkingRequirement    String?   // 주차 요건 (예: 주차 무관, 최소 2대 필수, 자주식 선호 등)

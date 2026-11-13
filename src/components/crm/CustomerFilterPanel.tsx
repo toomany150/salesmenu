@@ -191,14 +191,20 @@ export const CustomerFilterPanel: React.FC<CustomerFilterPanelProps> = ({
         let areaMatched = false;
         if (customer.demands && customer.demands.length > 0) {
           areaMatched = customer.demands.some((d) => {
-            const area = 
+            const minArea = 
+              d.minPreferredArea || 
+              (d.minPreferredAreaPy ? d.minPreferredAreaPy * 3.305785 : null) || 
               d.preferredArea || 
               (d.preferredAreaPy ? d.preferredAreaPy * 3.305785 : null) || 
               d.minRequiredArea || 
               (d.minRequiredAreaPy ? d.minRequiredAreaPy * 3.305785 : null);
-            if (area === null || area === undefined) return false;
-            if (minM2Val !== null && area < minM2Val) return false;
-            if (maxM2Val !== null && area > maxM2Val) return false;
+            const maxArea = 
+              d.maxPreferredArea || 
+              (d.maxPreferredAreaPy ? d.maxPreferredAreaPy * 3.305785 : null) || 
+              minArea;
+            if (minArea === null && maxArea === null) return false;
+            if (minM2Val !== null && maxArea !== null && maxArea < minM2Val) return false;
+            if (maxM2Val !== null && minArea !== null && minArea > maxM2Val) return false;
             return true;
           });
         }

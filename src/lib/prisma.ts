@@ -275,6 +275,10 @@ export async function ensureDatabaseSchema(force = false): Promise<void> {
         if (!existingDemandCols.has('monthlyRemainingPeriod')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "monthlyRemainingPeriod" TEXT;`);
         if (!existingDemandCols.has('monthlyRenewalClaimUsed')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "monthlyRenewalClaimUsed" TEXT;`);
         if (!existingDemandCols.has('loanRequirement')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "loanRequirement" TEXT;`);
+        if (!existingDemandCols.has('minPreferredArea')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "minPreferredArea" REAL;`);
+        if (!existingDemandCols.has('minPreferredAreaPy')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "minPreferredAreaPy" REAL;`);
+        if (!existingDemandCols.has('maxPreferredArea')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "maxPreferredArea" REAL;`);
+        if (!existingDemandCols.has('maxPreferredAreaPy')) await prisma.$executeRawUnsafe(`ALTER TABLE "CustomerDemand" ADD COLUMN "maxPreferredAreaPy" REAL;`);
       } catch (colErr) {}
     } else {
       // 4. PostgreSQL (Supabase / Production) 환경 누락 컬럼 개별 안전 보정
@@ -296,6 +300,10 @@ export async function ensureDatabaseSchema(force = false): Promise<void> {
         `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRemainingPeriod" TEXT;`,
         `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "monthlyRenewalClaimUsed" TEXT;`,
         `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "loanRequirement" TEXT;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "minPreferredArea" DOUBLE PRECISION;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "minPreferredAreaPy" DOUBLE PRECISION;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "maxPreferredArea" DOUBLE PRECISION;`,
+        `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "maxPreferredAreaPy" DOUBLE PRECISION;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "collateral" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "purchasePrice" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "currentMarketPrice" TEXT;`,

@@ -34,6 +34,38 @@ import { maskPhoneNumber, canViewCustomerContact, canDeleteItem, canEditItem } f
 import { formatKoreanMoney } from './CustomerFormModal';
 import { saveCustomCustomer } from '@/lib/storage';
 
+export const formatDemandArea = (demand: CustomerDemandItem): string => {
+  if (demand.minPreferredAreaPy && demand.maxPreferredAreaPy) {
+    const minSqm = demand.minPreferredArea || +(demand.minPreferredAreaPy * 3.3058).toFixed(1);
+    const maxSqm = demand.maxPreferredArea || +(demand.maxPreferredAreaPy * 3.3058).toFixed(1);
+    return `${demand.minPreferredAreaPy}평 ~ ${demand.maxPreferredAreaPy}평 (${minSqm}㎡ ~ ${maxSqm}㎡)`;
+  }
+  if (demand.minPreferredAreaPy) {
+    const minSqm = demand.minPreferredArea || +(demand.minPreferredAreaPy * 3.3058).toFixed(1);
+    return `최소 ${demand.minPreferredAreaPy}평 (${minSqm}㎡) 이상`;
+  }
+  if (demand.maxPreferredAreaPy) {
+    const maxSqm = demand.maxPreferredArea || +(demand.maxPreferredAreaPy * 3.3058).toFixed(1);
+    return `최대 ${demand.maxPreferredAreaPy}평 (${maxSqm}㎡) 이하`;
+  }
+  if (demand.minPreferredArea && demand.maxPreferredArea) {
+    return `${demand.minPreferredArea}㎡ ~ ${demand.maxPreferredArea}㎡`;
+  }
+  if (demand.minPreferredArea) {
+    return `${demand.minPreferredArea}㎡ 이상`;
+  }
+  if (demand.maxPreferredArea) {
+    return `${demand.maxPreferredArea}㎡ 이하`;
+  }
+  if (demand.preferredAreaPy) {
+    return `${demand.preferredAreaPy}평${demand.preferredArea ? ` (${demand.preferredArea}㎡)` : ''}`;
+  }
+  if (demand.preferredArea) {
+    return `${demand.preferredArea}㎡`;
+  }
+  return '면적 협의';
+};
+
 interface CustomerDetailModalProps {
   customer: CustomerItem | null;
   isOpen: boolean;
@@ -168,9 +200,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
           text += `   └ 선정이유: ${demand.regionReason}\n`;
         }
 
-        const areaStr = demand.preferredAreaPy
-          ? `${demand.preferredAreaPy}평 (${demand.preferredArea}㎡)`
-          : (demand.preferredArea ? `${demand.preferredArea}㎡` : '협의');
+        const areaStr = formatDemandArea(demand);
         text += `📐 희망 면적: ${areaStr}\n`;
         text += `🏢 희망 층수: ${demand.preferredFloor || '층수 무관'}\n`;
         text += `🚗 주차 요건: ${demand.parkingRequirement || '주차 조건 협의'}\n`;
@@ -334,9 +364,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
     const region = demand.targetRegion || '원하시는 지역';
     const regionReason = demand.regionReason ? ` (선정이유: ${demand.regionReason})` : '';
     const floor = demand.preferredFloor || '층수 무관';
-    const area = demand.preferredAreaPy 
-      ? `${demand.preferredAreaPy}평 (${demand.preferredArea}㎡)` 
-      : (demand.preferredArea ? `${demand.preferredArea}㎡` : '면적 협의');
+    const area = formatDemandArea(demand);
     
     let budget = '예산 협의';
     if (demand.targetTransactionType === '매매') {
@@ -980,9 +1008,8 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                         {/* 면적 */}
                         <div className="p-3 bg-indigo-50/30 rounded-xl border border-indigo-100">
                           <span className="text-[11px] text-slate-500 font-semibold block">희망 전용면적</span>
-                          <span className="font-black text-indigo-900 text-sm mt-0.5 block">
-                            {demand.preferredAreaPy ? `${demand.preferredAreaPy}평` : ''}
-                            {demand.preferredArea ? ` (${demand.preferredArea}㎡)` : (demand.preferredAreaPy ? '' : '협의')}
+                          <span className="font-black text-indigo-900 text-xs sm:text-sm mt-0.5 block break-words">
+                            {formatDemandArea(demand)}
                           </span>
                         </div>
 
