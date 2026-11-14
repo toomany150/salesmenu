@@ -282,7 +282,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
         const targetInflow = initialData.inflowPath || initialData.customer?.inflowPath || '';
         if (targetInflow) {
-          const standardList = ['당근', '직방', '네이버', '워크인', '블로그', '홈페이지', '유선전화', '문자'];
+          const standardList = ['당근', '직방', '네이버', '직접방문', '워크인', '블로그', '홈페이지', '유선전화', '문자'];
           if (standardList.includes(targetInflow)) {
             setInflowPathSelect(targetInflow);
             setInflowPathCustom('');
@@ -1875,10 +1875,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                           />
                         </div>
 
-                        {/* 연락처와 접수일자 사이: 물건 접수 경로 */}
+                        {/* 연락처와 접수일자 사이: 접수경로 */}
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                            <span>물건 접수 경로</span>
+                            <span>접수경로</span>
                             <span className="text-[10px] text-blue-600 font-normal">광고/유입</span>
                           </label>
                           <select
@@ -1890,6 +1890,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             <option value="당근">당근</option>
                             <option value="직방">직방</option>
                             <option value="네이버">네이버</option>
+                            <option value="직접방문">직접방문</option>
                             <option value="워크인">워크인</option>
                             <option value="블로그">블로그</option>
                             <option value="홈페이지">홈페이지</option>

@@ -622,7 +622,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
               <div className="flex items-center gap-2 flex-wrap">
                 {customer.inflowPath && (
                   <>
-                    <span className="text-xs text-slate-500 ml-1">문의 경로:</span>
+                    <span className="text-xs text-slate-500 ml-1">접수 경로:</span>
                     <span className="px-2 py-0.5 text-xs font-bold bg-indigo-50 text-indigo-700 rounded-md border border-indigo-200 shadow-2xs">
                       {customer.inflowPath}
                     </span>

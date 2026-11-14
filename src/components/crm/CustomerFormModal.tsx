@@ -385,7 +385,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setPhone(initialData.phone || '');
       setCarrier((initialData.carrier as MobileCarrier) || 'SK');
       if (initialData.inflowPath) {
-        const standardList = ['당근', '직방', '네이버', '워크인', '블로그', '홈페이지', '유선전화', '문자'];
+        const standardList = ['당근', '직방', '네이버', '직접방문', '워크인', '블로그', '홈페이지', '유선전화', '문자'];
         if (standardList.includes(initialData.inflowPath)) {
           setInflowPathSelect(initialData.inflowPath);
           setInflowPathCustom('');
@@ -1190,10 +1190,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                   )}
                 </div>
 
-                {/* 문의 경로 (당근, 직방, 네이버, 워크인, 블로그, 홈페이지, 유선전화, 문자, 직접입력) */}
+                {/* 접수경로 (당근, 직방, 네이버, 직접방문, 워크인, 블로그, 홈페이지, 유선전화, 문자, 직접입력) */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>문의 경로</span>
+                    <span>접수경로</span>
                     <span className="text-[10px] text-blue-600 font-normal">광고/유입</span>
                   </label>
                   <select
@@ -1205,6 +1205,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     <option value="당근">당근</option>
                     <option value="직방">직방</option>
                     <option value="네이버">네이버</option>
+                    <option value="직접방문">직접방문</option>
                     <option value="워크인">워크인</option>
                     <option value="블로그">블로그</option>
                     <option value="홈페이지">홈페이지</option>
@@ -1217,7 +1218,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                       type="text"
                       value={inflowPathCustom}
                       onChange={(e) => setInflowPathCustom(e.target.value)}
-                      placeholder="문의경로 직접입력"
+                      placeholder="접수경로 직접입력"
                       className="w-full text-xs px-2.5 py-1.5 mt-1.5 bg-blue-50/50 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-blue-900"
                       autoFocus
                     />

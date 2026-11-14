@@ -21,6 +21,7 @@ export const STANDARD_CHANNELS = [
   '당근',
   '직방',
   '네이버',
+  '직접방문',
   '워크인',
   '블로그',
   '홈페이지',
@@ -308,7 +309,7 @@ export const StatsSummaryModal: React.FC<StatsSummaryModalProps> = ({
               <p className="text-xs text-slate-500 mt-0.5">
                 {activeTab === 'PROPERTIES' 
                   ? '연도별·월별 물건 접수 경로(당근, 직방, 네이버 등) 및 매물 유형별 종합 통계' 
-                  : '연도별·월별 매수/임차 고객 문의 및 광고 유입 경로 종합 집계'}
+                  : '연도별·월별 매수/임차 고객 접수 경로 및 유입 종합 집계'}
               </p>
             </div>
           </div>
@@ -365,7 +366,7 @@ export const StatsSummaryModal: React.FC<StatsSummaryModalProps> = ({
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>고객집계 현황 (문의/광고유입)</span>
+              <span>고객집계 현황 (접수경로)</span>
             </button>
           </div>
 
@@ -653,7 +654,7 @@ export const StatsSummaryModal: React.FC<StatsSummaryModalProps> = ({
         {/* Footer */}
         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs print:hidden">
           <span className="text-slate-500">
-            ※ 실시간 등록된 매물 및 고객의 접수일자·문의경로를 기준으로 자동 집계됩니다.
+            ※ 실시간 등록된 매물 및 고객의 접수일자·접수경로를 기준으로 자동 집계됩니다.
           </span>
           <button
             type="button"
@@ -667,3 +668,4 @@ export const StatsSummaryModal: React.FC<StatsSummaryModalProps> = ({
     </div>
   );
 };
+
