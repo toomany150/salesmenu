@@ -1,21 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  HouseData, 
+import {
+  HouseData,
   StoreLeaseUnitItem,
   PublicBuildingLedgerResult,
-  HOUSE_AIRCON_TYPES, 
-  HOUSE_AIRCON_ROOMS, 
-  HOUSE_OPTION_CATEGORIES 
+  HOUSE_AIRCON_TYPES,
+  HOUSE_AIRCON_ROOMS,
+  HOUSE_OPTION_CATEGORIES
 } from '@/lib/types';
-import { 
-  Wind, 
-  Sparkles, 
-  CookingPot, 
-  DoorClosed, 
-  Check, 
-  Plus, 
+import {
+  Wind,
+  Sparkles,
+  CookingPot,
+  DoorClosed,
+  Check,
+  Plus,
   RotateCcw,
   CheckCircle2,
   Zap,
@@ -38,14 +38,14 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
   const updateLeaseItem = (index: number, updatedItem: Partial<StoreLeaseUnitItem>) => {
     const nextList = [...leaseList];
     nextList[index] = { ...nextList[index], ...updatedItem };
-    
+
     // 텍스트 요약도 자동 생성하여 currentLeaseStatus에 동기화
     const summary = nextList
       .map((item) => `${item.floorHo}${item.tenantName ? `(${item.tenantName})` : ''}: ${item.isVacant ? '공실' : `보${item.deposit || 0}/월${item.monthlyRent || 0}`}`)
       .join(', ');
 
-    onChange({ 
-      ...data, 
+    onChange({
+      ...data,
       leaseStatusList: nextList,
       currentLeaseStatus: summary || data.currentLeaseStatus,
     });
@@ -73,12 +73,12 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
 
   // 1층에 여러 점포(임대인)를 넣을 수 있는 전용 추가 버튼 핸들러
   const handleAddFirstFloorUnit = () => {
-    const firstFloorItems = leaseList.filter((item) => 
+    const firstFloorItems = leaseList.filter((item) =>
       item.floorHo.includes('1층') || /^10\d/.test(item.floorHo) || item.floorHo.startsWith('1-')
     );
     const count = firstFloorItems.length + 1;
     const defaultName = count === 1 ? '1층 1호' : `1층 ${count}호 점포`;
-    
+
     let insertIdx = -1;
     for (let i = leaseList.length - 1; i >= 0; i--) {
       if (leaseList[i].floorHo.includes('1층') || /^10\d/.test(leaseList[i].floorHo) || leaseList[i].floorHo.startsWith('1-')) {
@@ -86,7 +86,7 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
         break;
       }
     }
-    
+
     const newItem: StoreLeaseUnitItem = {
       id: `lease-h-1f-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       floorHo: defaultName,
@@ -113,7 +113,7 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
     const floorText = current.floorHo.trim();
     const match = floorText.match(/^(지하\s*\d+층|\d+층|옥탑\d*층?|\S+층|\S+호)/);
     const prefix = match ? match[0] : floorText;
-    
+
     const sameCount = leaseList.filter((item) => item.floorHo.includes(prefix)).length + 1;
     const defaultName = `${prefix} 점포 ${sameCount}`;
 
@@ -185,8 +185,8 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
       const targetFloors = (ledgerData.selectedFloors && ledgerData.selectedFloors.length > 0)
         ? ledgerData.selectedFloors
         : (targetDong && ledgerData.floorList
-            ? ledgerData.floorList.filter((f: any) => f.dong === targetDong)
-            : ledgerData.floorList || []);
+          ? ledgerData.floorList.filter((f: any) => f.dong === targetDong)
+          : ledgerData.floorList || []);
 
       targetFloors.forEach((f: any, idx: number) => {
         const floorHoName = `${f.floor} (${f.mainUse || f.etcUse || '주택/점포'})`;
@@ -303,9 +303,9 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
     }
     const sqm = parseFloat(val);
     const py = +(sqm * 0.3025).toFixed(2);
-    onChange({ 
-      ...data, 
-      buildingArea: sqm, 
+    onChange({
+      ...data,
+      buildingArea: sqm,
       buildingAreaPyeong: py,
       actualArea: data.actualArea !== undefined ? data.actualArea : sqm,
       actualAreaPyeong: data.actualAreaPyeong !== undefined ? data.actualAreaPyeong : py,
@@ -793,7 +793,7 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {leaseList.map((item, idx) => (
-                      <tr 
+                      <tr
                         key={item.id || idx}
                         className={`transition-colors ${item.isVacant ? 'bg-amber-50/40' : 'hover:bg-slate-50'}`}
                       >
@@ -851,11 +851,10 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
                             value={item.isVacant ? 0 : (item.deposit !== undefined && item.deposit !== null ? item.deposit : '')}
                             onChange={(e) => updateLeaseItem(idx, { deposit: e.target.value ? parseFloat(e.target.value) : undefined })}
                             placeholder="보증금 (만원)"
-                            className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${
-                              item.isVacant
+                            className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${item.isVacant
                                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                                 : 'bg-white border-blue-300 text-blue-950 focus:ring-1 focus:ring-blue-500'
-                            }`}
+                              }`}
                           />
                         </td>
 
@@ -867,11 +866,10 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
                             value={item.isVacant ? 0 : (item.monthlyRent !== undefined && item.monthlyRent !== null ? item.monthlyRent : '')}
                             onChange={(e) => updateLeaseItem(idx, { monthlyRent: e.target.value ? parseFloat(e.target.value) : undefined })}
                             placeholder="월세 (만원)"
-                            className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${
-                              item.isVacant
+                            className={`w-full text-xs font-extrabold px-2 py-1.5 border rounded-lg ${item.isVacant
                                 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                                 : 'bg-white border-emerald-300 text-emerald-950 focus:ring-1 focus:ring-emerald-500'
-                            }`}
+                              }`}
                           />
                         </td>
 
@@ -881,11 +879,10 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
                             type="button"
                             onClick={() => handleToggleVacant(idx)}
                             title={item.isVacant ? '클릭 시 입주 상태로 전환' : '클릭 시 공실(보증금/월세 0)로 전환'}
-                            className={`px-2 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer shadow-2xs ${
-                              item.isVacant
+                            className={`px-2 py-1 rounded-md text-[11px] font-black transition-all cursor-pointer shadow-2xs ${item.isVacant
                                 ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                            }`}
+                              }`}
                           >
                             {item.isVacant ? '✓ 공실' : '입주중'}
                           </button>
@@ -1034,7 +1031,7 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
       {/* 4. 주택/원룸/빌라 맞춤 옵션 (사용자 요청 3번 전체 반영) */}
       {/* ======================================================== */}
       <div className="pt-3 border-t border-slate-200">
-        
+
         {/* 옵션 헤더 & 원터치 프리셋 버튼 */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
@@ -1108,11 +1105,10 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
                     key={type}
                     type="button"
                     onClick={() => toggleAirconType(type)}
-                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      isSelected
+                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${isSelected
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <span>{type}</span>
                     {isSelected ? (
@@ -1137,11 +1133,10 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
                     key={room}
                     type="button"
                     onClick={() => toggleAirconRoom(room)}
-                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      isSelected
+                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${isSelected
                         ? 'bg-emerald-50 text-emerald-900 border-emerald-400 font-bold'
                         : 'bg-slate-50/70 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <span>{room}</span>
                     {isSelected ? (
@@ -1173,11 +1168,10 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
                       key={item}
                       type="button"
                       onClick={() => toggleOption(item)}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium border text-left transition-all ${
-                        isChecked
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium border text-left transition-all ${isChecked
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-400 font-semibold'
                           : 'bg-slate-50/70 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       <span className="truncate">{item}</span>
                       {isChecked ? (
