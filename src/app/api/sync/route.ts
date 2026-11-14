@@ -20,6 +20,25 @@ let inMemorySyncStore: {
   updatedAt: new Date().toISOString(),
 };
 
+// 안전한 Date 파싱 헬퍼 (건축물대장의 " --" 등 무효 문자열로 인한 PrismaClientValidationError 원천 차단)
+function safeDate(val: any): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  const str = String(val).trim();
+  if (!str || str === '--' || str === '-' || str.includes('Invalid') || str === 'null' || str === 'undefined') {
+    return null;
+  }
+  if (/^\d{8}$/.test(str)) {
+    const y = parseInt(str.substring(0, 4), 10);
+    const m = parseInt(str.substring(4, 6), 10) - 1;
+    const d = parseInt(str.substring(6, 8), 10);
+    const dt = new Date(y, m, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  const dt = new Date(str);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
 // 매물 데이터 출력 안전 포맷팅 (JSON 문자열 파싱)
 function formatPropertyOutput(p: any): PropertyItem {
   if (!p) return p;
@@ -264,7 +283,7 @@ export async function POST(request: NextRequest) {
               type: cust.type || (existing ? existing.type : 'BUYER'),
               subType: cust.subType || (existing ? existing.subType : null),
               group: targetGroup,
-              receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : (existing ? existing.receiptDate : undefined),
+              receiptDate: safeDate(cust.receiptDate) || (existing ? existing.receiptDate : new Date()),
               memo: cust.memo && existing?.memo && !existing.memo.includes(cust.memo) ? `${existing.memo}\n${cust.memo}` : (cust.memo || (existing ? existing.memo : null)),
               price: cust.price !== undefined ? cust.price : (existing ? existing.price : null),
               deposit: cust.deposit !== undefined ? cust.deposit : (existing ? existing.deposit : null),
@@ -281,7 +300,7 @@ export async function POST(request: NextRequest) {
                 data: {
                   id: cust.id,
                   ...updateData,
-                  receiptDate: cust.receiptDate ? new Date(cust.receiptDate) : (cust.createdAt ? new Date(cust.createdAt) : new Date()),
+                  receiptDate: safeDate(cust.receiptDate) || safeDate(cust.createdAt) || new Date(),
                 },
               }).catch((err) => console.warn('Sync customer create error:', err));
             }
@@ -314,7 +333,7 @@ export async function POST(request: NextRequest) {
                 if (prop.receiptDate) {
                   await prisma.customer.update({
                     where: { id: validCustomerId },
-                    data: { receiptDate: new Date(prop.receiptDate) }
+                    data: { receiptDate: safeDate(prop.receiptDate) || new Date() }
                   }).catch(() => {});
                 }
               }
@@ -340,7 +359,7 @@ export async function POST(request: NextRequest) {
 
             const propDataToSave: any = {
               propertyNumber: targetPropNum,
-              receiptDate: prop.receiptDate ? new Date(prop.receiptDate) : new Date(),
+              receiptDate: safeDate(prop.receiptDate) || new Date(),
               propertyType: prop.propertyType || 'STORE',
               status: prop.status || 'AVAILABLE',
               transactionType: prop.transactionType || '월세',
@@ -353,7 +372,7 @@ export async function POST(request: NextRequest) {
               longitude: prop.longitude ? parseFloat(String(prop.longitude)) : null,
               direction: prop.direction || null,
               directionCriteria: prop.directionCriteria || null,
-              availableDate: prop.availableDate ? new Date(prop.availableDate) : null,
+              availableDate: safeDate(prop.availableDate),
               isImmediateAvailable: !!prop.isImmediateAvailable,
               price: prop.price !== undefined && prop.price !== null ? parseFloat(String(prop.price)) : null,
               negotiablePrice: prop.negotiablePrice !== undefined && prop.negotiablePrice !== null ? parseFloat(String(prop.negotiablePrice)) : null,
@@ -365,7 +384,7 @@ export async function POST(request: NextRequest) {
               consultationNotes: prop.consultationNotes || null,
               landArea: prop.landArea !== undefined && prop.landArea !== null ? parseFloat(String(prop.landArea)) : null,
               totalFloorArea: prop.totalFloorArea !== undefined && prop.totalFloorArea !== null ? parseFloat(String(prop.totalFloorArea)) : null,
-              approvalDate: prop.approvalDate ? new Date(prop.approvalDate) : null,
+              approvalDate: safeDate(prop.approvalDate),
               buildingRegisterUse: prop.buildingRegisterUse || null,
               customerId: validCustomerId,
               managerName: prop.managerName || '사무실',
@@ -402,7 +421,7 @@ export async function POST(request: NextRequest) {
                   roomCount: sd.roomCount ? parseInt(String(sd.roomCount)) : null,
                   bathroomCount: sd.bathroomCount ? parseInt(String(sd.bathroomCount)) : null,
                   toiletGenderType: sd.toiletGenderType || null,
-                  approvalDate: sd.approvalDate ? new Date(sd.approvalDate) : null,
+                  approvalDate: safeDate(sd.approvalDate),
                   parkingCount: sd.parkingCount ? parseInt(String(sd.parkingCount)) : null,
                   isParkingImpossible: !!sd.isParkingImpossible,
                   electricityCapacity: sd.electricityCapacity || null,
@@ -445,7 +464,7 @@ export async function POST(request: NextRequest) {
                   roomCount: sd.roomCount ? parseInt(String(sd.roomCount)) : null,
                   bathroomCount: sd.bathroomCount ? parseInt(String(sd.bathroomCount)) : null,
                   toiletGenderType: sd.toiletGenderType || null,
-                  approvalDate: sd.approvalDate ? new Date(sd.approvalDate) : null,
+                  approvalDate: safeDate(sd.approvalDate),
                   parkingCount: sd.parkingCount ? parseInt(String(sd.parkingCount)) : null,
                   isParkingImpossible: !!sd.isParkingImpossible,
                   electricityCapacity: sd.electricityCapacity || null,
@@ -487,7 +506,7 @@ export async function POST(request: NextRequest) {
                   totalFloorArea: hd.totalFloorArea !== undefined && hd.totalFloorArea !== null ? parseFloat(String(hd.totalFloorArea)) : null,
                   buildingArea: hd.buildingArea !== undefined && hd.buildingArea !== null ? parseFloat(String(hd.buildingArea)) : null,
                   buildingUse: hd.buildingUse || null,
-                  approvalDate: hd.approvalDate ? new Date(hd.approvalDate) : null,
+                  approvalDate: safeDate(hd.approvalDate),
                   roomCount: hd.roomCount ? parseInt(String(hd.roomCount)) : null,
                   bathroomCount: hd.bathroomCount ? parseInt(String(hd.bathroomCount)) : null,
                   currentLeaseStatus: hd.currentLeaseStatus || null,
@@ -508,7 +527,7 @@ export async function POST(request: NextRequest) {
                   totalFloorArea: hd.totalFloorArea !== undefined && hd.totalFloorArea !== null ? parseFloat(String(hd.totalFloorArea)) : null,
                   buildingArea: hd.buildingArea !== undefined && hd.buildingArea !== null ? parseFloat(String(hd.buildingArea)) : null,
                   buildingUse: hd.buildingUse || null,
-                  approvalDate: hd.approvalDate ? new Date(hd.approvalDate) : null,
+                  approvalDate: safeDate(hd.approvalDate),
                   roomCount: hd.roomCount ? parseInt(String(hd.roomCount)) : null,
                   bathroomCount: hd.bathroomCount ? parseInt(String(hd.bathroomCount)) : null,
                   currentLeaseStatus: hd.currentLeaseStatus || null,
@@ -535,7 +554,7 @@ export async function POST(request: NextRequest) {
                   exclusiveArea: ad.exclusiveArea !== undefined && ad.exclusiveArea !== null ? parseFloat(String(ad.exclusiveArea)) : null,
                   roomCount: ad.roomCount ? parseInt(String(ad.roomCount)) : null,
                   bathroomCount: ad.bathroomCount ? parseInt(String(ad.bathroomCount)) : null,
-                  approvalDate: ad.approvalDate ? new Date(ad.approvalDate) : null,
+                  approvalDate: safeDate(ad.approvalDate),
                   elevatorCount: ad.elevatorCount ? parseInt(String(ad.elevatorCount)) : null,
                   maintenanceFee: ad.maintenanceFee !== undefined && ad.maintenanceFee !== null ? parseFloat(String(ad.maintenanceFee)) : null,
                   heatingType: ad.heatingType || null,
@@ -555,7 +574,7 @@ export async function POST(request: NextRequest) {
                   exclusiveArea: ad.exclusiveArea !== undefined && ad.exclusiveArea !== null ? parseFloat(String(ad.exclusiveArea)) : null,
                   roomCount: ad.roomCount ? parseInt(String(ad.roomCount)) : null,
                   bathroomCount: ad.bathroomCount ? parseInt(String(ad.bathroomCount)) : null,
-                  approvalDate: ad.approvalDate ? new Date(ad.approvalDate) : null,
+                  approvalDate: safeDate(ad.approvalDate),
                   elevatorCount: ad.elevatorCount ? parseInt(String(ad.elevatorCount)) : null,
                   maintenanceFee: ad.maintenanceFee !== undefined && ad.maintenanceFee !== null ? parseFloat(String(ad.maintenanceFee)) : null,
                   heatingType: ad.heatingType || null,

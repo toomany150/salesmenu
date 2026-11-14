@@ -5,6 +5,25 @@ import { INITIAL_PROPERTIES } from '@/lib/mockData';
 import { recordAccessLog, maskPhoneNumber } from '@/lib/auth';
 import { uploadMultipleBase64ToR2 } from '@/lib/r2';
 
+// 안전한 Date 파싱 헬퍼 (건축물대장의 " --" 등 무효 문자열로 인한 PrismaClientValidationError 원천 차단)
+function safeDate(val: any): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  const str = String(val).trim();
+  if (!str || str === '--' || str === '-' || str.includes('Invalid') || str === 'null' || str === 'undefined') {
+    return null;
+  }
+  if (/^\d{8}$/.test(str)) {
+    const y = parseInt(str.substring(0, 4), 10);
+    const m = parseInt(str.substring(4, 6), 10) - 1;
+    const d = parseInt(str.substring(6, 8), 10);
+    const dt = new Date(y, m, d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  const dt = new Date(str);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
 function formatPropertyOutput(p: any, options: { fullPhotos?: boolean } = { fullPhotos: true }) {
   if (!p) return p;
   let parsedImages: string[] = [];
@@ -698,7 +717,7 @@ export async function POST(request: NextRequest) {
         consultationNotes,
         landArea: landArea ? parseFloat(landArea) : null,
         totalFloorArea: totalFloorArea ? parseFloat(totalFloorArea) : null,
-        approvalDate: approvalDate ? new Date(approvalDate) : null,
+        approvalDate: safeDate(approvalDate),
         buildingRegisterUse,
         customerId: validCustomerId,
         managerName: managerName || '사무실',
@@ -1378,7 +1397,7 @@ export async function PUT(request: NextRequest) {
         consultationNotes: consultationNotes !== undefined ? consultationNotes : undefined,
         landArea: landArea !== undefined ? (landArea ? parseFloat(landArea) : null) : undefined,
         totalFloorArea: totalFloorArea !== undefined ? (totalFloorArea ? parseFloat(totalFloorArea) : null) : undefined,
-        approvalDate: approvalDate !== undefined ? (approvalDate ? new Date(approvalDate) : null) : undefined,
+        approvalDate: approvalDate !== undefined ? safeDate(approvalDate) : undefined,
         buildingRegisterUse: buildingRegisterUse !== undefined ? buildingRegisterUse : undefined,
         customerId: validCustomerId !== undefined ? validCustomerId : undefined,
         managerName: managerName !== undefined ? managerName : undefined,
