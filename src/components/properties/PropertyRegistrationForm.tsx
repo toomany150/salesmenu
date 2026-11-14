@@ -139,6 +139,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerCarrier, setCustomerCarrier] = useState<string>('');
+  const [inflowPathSelect, setInflowPathSelect] = useState<string>('선택안함');
+  const [inflowPathCustom, setInflowPathCustom] = useState<string>('');
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
   const [allCustomers, setAllCustomers] = useState<CustomerItem[]>(customers);
 
@@ -276,6 +278,21 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           setCustomerName('');
           setCustomerPhone('');
           setCustomerCarrier('');
+        }
+
+        const targetInflow = initialData.inflowPath || initialData.customer?.inflowPath || '';
+        if (targetInflow) {
+          const standardList = ['당근', '직방', '네이버', '워크인', '블로그', '홈페이지', '유선전화', '문자'];
+          if (standardList.includes(targetInflow)) {
+            setInflowPathSelect(targetInflow);
+            setInflowPathCustom('');
+          } else {
+            setInflowPathSelect('직접입력');
+            setInflowPathCustom(targetInflow);
+          }
+        } else {
+          setInflowPathSelect('선택안함');
+          setInflowPathCustom('');
         }
 
         // Owner Customer (등기부상 소유주)
@@ -492,6 +509,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         setCustomerName('');
         setCustomerPhone('');
         setCustomerCarrier('');
+        setInflowPathSelect('선택안함');
+        setInflowPathCustom('');
         setCustomerSearchQuery('');
         setOwnerSameAsCustomer(true);
         setOwnerCustomerMode('DIRECT');
@@ -1214,6 +1233,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     }
 
     // Customer payload (요구사항: 직접입력 신규고객 CRM 연동 전송/저장 및 기존고객 연동)
+    const finalInflowPath = inflowPathSelect === '직접입력'
+      ? inflowPathCustom.trim()
+      : (inflowPathSelect === '선택안함' ? '' : inflowPathSelect);
+
     let finalCustomerId = customerMode === 'SELECT' ? (customerId || undefined) : undefined;
     let customerInput: any = undefined;
     let linkedCustomer: CustomerItem | undefined = undefined;
@@ -1255,6 +1278,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         carrier: (customerCarrier.trim() as MobileCarrier) || undefined,
         type: autoCustomerType,
         subType: autoCustomerSubType,
+        inflowPath: finalInflowPath || undefined,
         group: 'RECEIVED', // [물건 접수] 매도인/임대인란에 연계
         managerName: managerName || '개업공인중개사 (대표)',
         assignedAgents,
@@ -1299,6 +1323,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         carrier: newCustomerItem.carrier,
         type: newCustomerItem.type,
         subType: newCustomerItem.subType,
+        inflowPath: newCustomerItem.inflowPath,
         group: newCustomerItem.group,
         receiptDate: newCustomerItem.receiptDate,
         memo: newCustomerItem.memo,
@@ -1405,6 +1430,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       id: initialData?.id,
       propertyNumber: finalPropNumber,
       receiptDate,
+      inflowPath: finalInflowPath || undefined,
       propertyType,
       transactionType,
       status: initialData?.status || 'AVAILABLE',
@@ -1498,6 +1524,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       id: initialData?.id || `prop-${Date.now()}`,
       propertyNumber: payload.propertyNumber,
       receiptDate: payload.receiptDate,
+      inflowPath: payload.inflowPath,
       propertyType: payload.propertyType,
       status: payload.status,
       transactionType: payload.transactionType,
@@ -1821,7 +1848,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
 
                   {customerMode === 'DIRECT' ? (
                     <div className="p-3.5 bg-white rounded-xl border border-blue-200/80 shadow-2xs space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
                             고객명 (성함)
@@ -1846,6 +1873,40 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
                             placeholder="010-1234-5678"
                             className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono font-bold text-slate-900"
                           />
+                        </div>
+
+                        {/* 연락처와 접수일자 사이: 물건 접수 경로 */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                            <span>물건 접수 경로</span>
+                            <span className="text-[10px] text-blue-600 font-normal">광고/유입</span>
+                          </label>
+                          <select
+                            value={inflowPathSelect}
+                            onChange={(e) => setInflowPathSelect(e.target.value)}
+                            className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-slate-900"
+                          >
+                            <option value="선택안함">선택 (미지정)</option>
+                            <option value="당근">당근</option>
+                            <option value="직방">직방</option>
+                            <option value="네이버">네이버</option>
+                            <option value="워크인">워크인</option>
+                            <option value="블로그">블로그</option>
+                            <option value="홈페이지">홈페이지</option>
+                            <option value="유선전화">유선전화</option>
+                            <option value="문자">문자</option>
+                            <option value="직접입력">직접입력</option>
+                          </select>
+                          {inflowPathSelect === '직접입력' && (
+                            <input
+                              type="text"
+                              value={inflowPathCustom}
+                              onChange={(e) => setInflowPathCustom(e.target.value)}
+                              placeholder="접수경로 직접입력"
+                              className="w-full text-xs px-2.5 py-1.5 mt-1.5 bg-blue-50/50 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-blue-900"
+                              autoFocus
+                            />
+                          )}
                         </div>
 
                         <div>

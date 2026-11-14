@@ -422,6 +422,11 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               <span className="px-1.5 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 text-slate-800 shrink-0">
                                 {property.transactionType}
                               </span>
+                              {property.propertyNumber && (
+                                <span className="px-1.5 py-0.5 text-[11px] font-bold font-mono rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                                  #{property.propertyNumber}
+                                </span>
+                              )}
                               {isContracted && (
                                 <span className="px-2 py-0.5 text-[11px] font-black rounded-md bg-rose-600 text-white shadow-xs shrink-0 flex items-center gap-0.5 border border-rose-300 animate-pulse">
                                   <CheckCircle2 className="w-3 h-3" />

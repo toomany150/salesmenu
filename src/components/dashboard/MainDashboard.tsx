@@ -16,6 +16,7 @@ import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { LoginModal } from '../auth/LoginModal';
 import { AdminLogModal } from '../auth/AdminLogModal';
 import { DataSyncModal } from '../common/DataSyncModal';
+import { StatsSummaryModal } from './StatsSummaryModal';
 import { initKakao, AddressShareMode } from '@/lib/kakao';
 import { 
   getCustomProperties, 
@@ -120,6 +121,8 @@ const DashboardContent: React.FC = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isAdminLogsOpen, setIsAdminLogsOpen] = useState(false);
   const [isDataSyncOpen, setIsDataSyncOpen] = useState(false);
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [statsModalTab, setStatsModalTab] = useState<'PROPERTIES' | 'CUSTOMERS'>('PROPERTIES');
 
   // Init Kakao SDK on mount
   useEffect(() => {
@@ -702,16 +705,47 @@ const DashboardContent: React.FC = () => {
         {/* 매물장 검색(조건필터)란은 삭제하고 3개 카드로 구성 */}
         {/* ────────────────────────────────────────────────────────── */}
         <section className="bg-white/95 backdrop-blur-xs p-3.5 sm:p-5 rounded-2xl border-2 border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
             <h2 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">📊</span>
               <span>전체 현황</span>
             </h2>
-            {!currentUser && (
-              <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
-                🔒 로그인 후 상세 조회 가능
-              </span>
-            )}
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {currentUser && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatsModalTab('PROPERTIES');
+                      setIsStatsModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black shadow-xs hover:shadow transition-all active:scale-95 cursor-pointer"
+                  >
+                    <span>📦</span>
+                    <span>물건집계 현황</span>
+                    <span className="text-[10px] bg-white/25 px-1.5 py-0.2 rounded-full font-bold">월별</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStatsModalTab('CUSTOMERS');
+                      setIsStatsModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black shadow-xs hover:shadow transition-all active:scale-95 cursor-pointer"
+                  >
+                    <span>👥</span>
+                    <span>고객집계 현황</span>
+                    <span className="text-[10px] bg-white/25 px-1.5 py-0.2 rounded-full font-bold">월별</span>
+                  </button>
+                </>
+              )}
+              {!currentUser && (
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                  🔒 로그인 후 상세 조회 가능
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
@@ -1247,6 +1281,15 @@ const DashboardContent: React.FC = () => {
         onSyncSuccess={() => {
           fetchData(); // 동기화 성공 시 화면 데이터 즉시 갱신
         }}
+      />
+
+      {/* 8) 물건집계 현황 & 고객집계 현황 모달 (Request 3) */}
+      <StatsSummaryModal
+        isOpen={isStatsModalOpen}
+        onClose={() => setIsStatsModalOpen(false)}
+        properties={properties}
+        customers={customers}
+        initialTab={statsModalTab}
       />
 
     </div>

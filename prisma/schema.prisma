@@ -69,6 +69,7 @@ model Customer {
   // 메인 그룹 구분: RECEIVED([물건 접수] 매도인/임대인), SEARCHING([물건 찾음] 매수인/임차인)
   group     String   @default("RECEIVED")
   subType   String?  // 세부 구분: 매도인, 임대인, 임차인(권리금) 등
+  inflowPath String? // 문의/유입 경로 (당근, 직방, 네이버, 워크인, 블로그, 홈페이지, 유선전화, 문자, 직접입력)
   status    String   @default("ACTIVE") // 진행상태: ACTIVE(상담진행중), COMPLETED(상담/계약완료), HOLD(보류)
   receiptDate DateTime? @default(now()) // 접수일자
   isPinned  Boolean   @default(false)    // 중요 고객 여부 (맨 처음/최상단 고정)
@@ -189,6 +190,7 @@ model Property {
   // 매물번호 (중개사 수동 직접 입력 고유번호)
   propertyNumber      String    @unique
   receiptDate         DateTime  @default(now()) // 접수일자
+  inflowPath          String?   // 물건 접수 경로 (당근, 직방, 네이버, 워크인, 블로그, 홈페이지, 유선전화, 문자, 직접입력)
   // 매물종류: APARTMENT, HOUSE, STORE, OFFICE, FACTORY_WAREHOUSE, LAND, ETC
   propertyType        String    
   // 거래상태: AVAILABLE(접수/진행중), CONTRACTED(계약완료), HOLD(보류), CANCELLED(취소)

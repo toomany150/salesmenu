@@ -620,6 +620,14 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
+                {customer.inflowPath && (
+                  <>
+                    <span className="text-xs text-slate-500 ml-1">문의 경로:</span>
+                    <span className="px-2 py-0.5 text-xs font-bold bg-indigo-50 text-indigo-700 rounded-md border border-indigo-200 shadow-2xs">
+                      {customer.inflowPath}
+                    </span>
+                  </>
+                )}
                 {customer.carrier && (
                   <>
                     <span className="text-xs text-slate-500">통신사:</span>

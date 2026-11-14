@@ -1145,6 +1145,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </span>
                   )}
 
+                  {/* 1-1. 물건 접수 경로 */}
+                  {property.inflowPath && (
+                    <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-indigo-500/25 text-indigo-200 border border-indigo-400/35 flex items-center gap-1 shadow-2xs">
+                      <span className="text-[11px] text-indigo-300">접수경로:</span>
+                      <span className="font-extrabold text-white">{property.inflowPath}</span>
+                    </span>
+                  )}
+
                   {/* 2. 물건종류 */}
                   <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-blue-600 text-white shadow-xs flex items-center gap-1">
                     <span className="text-blue-200 text-[11px]">물건종류 :</span>

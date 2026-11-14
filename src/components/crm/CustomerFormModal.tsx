@@ -93,6 +93,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   const [receiptDate, setReceiptDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [name, setName] = useState('');
   const [carrier, setCarrier] = useState<MobileCarrier>('SK');
+  const [inflowPathSelect, setInflowPathSelect] = useState<string>('선택안함');
+  const [inflowPathCustom, setInflowPathCustom] = useState<string>('');
   const [phone, setPhone] = useState('');
   const [type, setType] = useState<CustomerType>(defaultGroup === 'RECEIVED' ? 'SELLER' : 'BUYER');
   const [subType, setSubType] = useState<string>(
@@ -382,6 +384,19 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setName(initialData.name || '');
       setPhone(initialData.phone || '');
       setCarrier((initialData.carrier as MobileCarrier) || 'SK');
+      if (initialData.inflowPath) {
+        const standardList = ['당근', '직방', '네이버', '워크인', '블로그', '홈페이지', '유선전화', '문자'];
+        if (standardList.includes(initialData.inflowPath)) {
+          setInflowPathSelect(initialData.inflowPath);
+          setInflowPathCustom('');
+        } else {
+          setInflowPathSelect('직접입력');
+          setInflowPathCustom(initialData.inflowPath);
+        }
+      } else {
+        setInflowPathSelect('선택안함');
+        setInflowPathCustom('');
+      }
       setType((initialData.type as CustomerType) || 'SELLER');
       setSubType(initialData.subType || (initialData.type === 'SELLER' ? '매도인' : '매수인'));
       setMemo(initialData.memo || '');
@@ -463,6 +478,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       setName('');
       setPhone('');
       setCarrier('SK');
+      setInflowPathSelect('선택안함');
+      setInflowPathCustom('');
       setType(defaultGroup === 'RECEIVED' ? 'SELLER' : 'BUYER');
       setSubType(defaultGroup === 'RECEIVED' ? '매도인' : '매수인');
       setMemo('');
@@ -733,6 +750,9 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     setErrorMsg(null);
 
     const group = isSearching ? 'SEARCHING' : 'RECEIVED';
+    const finalInflowPath = inflowPathSelect === '직접입력'
+      ? inflowPathCustom.trim()
+      : (inflowPathSelect === '선택안함' ? '' : inflowPathSelect);
 
     const payload: any = {
       name: name.trim(),
@@ -740,6 +760,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       phone: phone.trim(),
       type,
       subType,
+      inflowPath: finalInflowPath || undefined,
       group,
       status,
       receiptDate,
@@ -863,6 +884,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       phone: payload.phone,
       type: payload.type,
       subType: payload.subType,
+      inflowPath: payload.inflowPath,
       group: payload.group,
       status: payload.status,
       receiptDate: payload.receiptDate,
@@ -1100,8 +1122,8 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                 </div>
               </div>
 
-              {/* 고객 기본 인적사항 & 접수일자 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {/* 고객 기본 인적사항 & 접수일자 & 문의경로 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">고객명 *</label>
                   <input
@@ -1165,6 +1187,40 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                         {subType === 'LESSEE_PREMIUM_OK' ? '임차인 권리금가능' : (type === 'BUYER' ? '매수인' : '임차인')}
                       </div>
                     </>
+                  )}
+                </div>
+
+                {/* 문의 경로 (당근, 직방, 네이버, 워크인, 블로그, 홈페이지, 유선전화, 문자, 직접입력) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>문의 경로</span>
+                    <span className="text-[10px] text-blue-600 font-normal">광고/유입</span>
+                  </label>
+                  <select
+                    value={inflowPathSelect}
+                    onChange={(e) => setInflowPathSelect(e.target.value)}
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800"
+                  >
+                    <option value="선택안함">선택 (미지정)</option>
+                    <option value="당근">당근</option>
+                    <option value="직방">직방</option>
+                    <option value="네이버">네이버</option>
+                    <option value="워크인">워크인</option>
+                    <option value="블로그">블로그</option>
+                    <option value="홈페이지">홈페이지</option>
+                    <option value="유선전화">유선전화</option>
+                    <option value="문자">문자</option>
+                    <option value="직접입력">직접입력</option>
+                  </select>
+                  {inflowPathSelect === '직접입력' && (
+                    <input
+                      type="text"
+                      value={inflowPathCustom}
+                      onChange={(e) => setInflowPathCustom(e.target.value)}
+                      placeholder="문의경로 직접입력"
+                      className="w-full text-xs px-2.5 py-1.5 mt-1.5 bg-blue-50/50 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-blue-900"
+                      autoFocus
+                    />
                   )}
                 </div>
               </div>

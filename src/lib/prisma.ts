@@ -217,11 +217,13 @@ export async function ensureDatabaseSchema(force = false): Promise<void> {
         if (!existingCustCols.has('transactionType')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "transactionType" TEXT;`);
         if (!existingCustCols.has('isPinned')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "isPinned" BOOLEAN DEFAULT false;`);
         if (!existingCustCols.has('receiptDate')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "receiptDate" DATETIME DEFAULT CURRENT_TIMESTAMP;`);
+        if (!existingCustCols.has('inflowPath')) await prisma.$executeRawUnsafe(`ALTER TABLE "Customer" ADD COLUMN "inflowPath" TEXT;`);
       } catch (colErr) {}
 
       try {
         const propCols = await prisma.$queryRawUnsafe<any[]>(`PRAGMA table_info("Property");`).catch(() => []);
         const existingPropCols = new Set(propCols ? propCols.map((c: any) => c.name) : []);
+        if (!existingPropCols.has('inflowPath')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "inflowPath" TEXT;`);
         if (!existingPropCols.has('assignedAgents')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "assignedAgents" TEXT;`);
         if (!existingPropCols.has('negotiablePrice')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiablePrice" REAL;`);
         if (!existingPropCols.has('negotiableDeposit')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "negotiableDeposit" REAL;`);
@@ -291,6 +293,7 @@ export async function ensureDatabaseSchema(force = false): Promise<void> {
         `ALTER TABLE "HouseDetail" ADD COLUMN IF NOT EXISTS "leaseStatusList" TEXT;`,
         `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "canAccessAllData" BOOLEAN DEFAULT false;`,
         `ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN DEFAULT false;`,
+        `ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "inflowPath" TEXT;`,
         `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "residenceType" TEXT;`,
         `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "moveOutPlanDate" TEXT;`,
         `ALTER TABLE "CustomerDemand" ADD COLUMN IF NOT EXISTS "jeonseContractPeriod" TEXT;`,
@@ -313,6 +316,7 @@ export async function ensureDatabaseSchema(force = false): Promise<void> {
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerName" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerPhone" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerCarrier" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "inflowPath" TEXT;`,
         `ALTER TABLE "ApartmentDetail" ADD COLUMN IF NOT EXISTS "pyeongType" TEXT;`,
       ];
       await Promise.allSettled(pgQueries.map(q => prisma.$executeRawUnsafe(q)));

@@ -531,6 +531,7 @@ export interface PropertyItem {
   id: string;
   propertyNumber: string;
   receiptDate: string;
+  inflowPath?: string; // 물건 접수 경로 (당근, 직방, 네이버, 워크인, 블로그, 홈페이지, 유선전화, 문자, 직접입력)
   propertyType: PropertyType;
   status: PropertyStatus;
   transactionType: TransactionType;
@@ -601,6 +602,7 @@ export interface PropertyItem {
     phone: string;
     carrier?: MobileCarrier;
     type: CustomerType;
+    inflowPath?: string;
   };
   apartmentDetail?: ApartmentData;
   houseDetail?: HouseData;
@@ -717,6 +719,7 @@ export interface CustomerItem {
   phone: string;
   type: CustomerType;
   subType?: string; // '매도인' | '임대인' | '임차인(권리금)' | '매수인' | '임차인' | '임차인(권리금가능)'
+  inflowPath?: string; // 문의/유입 경로 (당근, 직방, 네이버, 워크인, 블로그, 홈페이지, 유선전화, 문자, 직접입력)
   group: CustomerGroup;
   status?: CustomerStatus;
   receiptDate?: string;
