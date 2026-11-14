@@ -385,7 +385,7 @@ const DashboardContent: React.FC = () => {
     }
   }, [currentUser, authLoading, fetchData]);
 
-  // 다른 PC나 브라우저 탭에서 돌아왔을 때 창 활성화(focus) 시 자동 최신 데이터 동기화
+  // 다른 PC나 스마트폰 브라우저 탭에서 돌아왔을 때 창 활성화(focus) 및 화면 켜짐(visibility) 시 0초 즉각 자동 최신 데이터 동기화
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleFocus = () => {
@@ -393,23 +393,33 @@ const DashboardContent: React.FC = () => {
         fetchData();
       }
     };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && currentUser && !loading) {
+        fetchData();
+      }
+    };
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [currentUser, loading, fetchData]);
 
   // ⚡ 원클릭 즉시 동기화 상태
   const [isInstantSyncing, setIsInstantSyncing] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
-  // ⚡ 모든 기기(PC1, PC2, PC3, 스마트폰) 간 실시간 무인 자동 동기화 (15초 주기 백그라운드 자동 갱신)
+  // ⚡ 모든 기기(PC, 스마트폰, 태블릿) 간 완전 무인 실시간 자동 동기화 (5초 주기 백그라운드 자동 갱신)
+  // 스마트폰에서 매물을 등록하면 PC에서 아무 버튼을 누르지 않아도 몇 초 만에 자동으로 화면에 나타납니다.
   useEffect(() => {
     if (!currentUser) return;
     const interval = setInterval(() => {
-      // 폼 입력 중이거나 모달 창이 열려 있을 때는 화면 깜빡임 방지를 위해 갱신 생략
+      // 폼 입력 중이거나 모달 창이 열려 있을 때는 화면 깜빡임/입력 방해를 위해 갱신 생략
       if (!isPropertyRegOpen && !isCustomerRegOpen && !editingProperty && !editingCustomer && !isInstantSyncing) {
         fetchData();
       }
-    }, 15000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [currentUser, isPropertyRegOpen, isCustomerRegOpen, editingProperty, editingCustomer, isInstantSyncing, fetchData]);
 
