@@ -31,7 +31,7 @@ import {
   getDeletedCustomerIds 
 } from '@/lib/storage';
 
-type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP' | 'ALL_CUSTOMERS' | 'CUSTOMER_SEARCH';
+type MainViewTab = 'HOME' | 'ALL_PROPERTIES' | 'RECEIVED_GROUP' | 'SEARCHING_GROUP' | 'ALL_CUSTOMERS' | 'CUSTOMER_SEARCH' | 'COMPLETED_CUSTOMERS';
 
 const DashboardContent: React.FC = () => {
   const { currentUser, isLoading: authLoading } = useAuth();
@@ -540,6 +540,10 @@ const DashboardContent: React.FC = () => {
 
   const receivedCustomers = customers.filter((c) => c.group === 'RECEIVED');
   const searchingCustomers = customers.filter((c) => c.group === 'SEARCHING');
+  const receivedCompletedCount = receivedCustomers.filter((c) => c.status === 'COMPLETED').length;
+  const receivedActiveCount = receivedCustomers.filter((c) => c.status !== 'COMPLETED').length;
+  const searchingCompletedCount = searchingCustomers.filter((c) => c.status === 'COMPLETED').length;
+  const searchingActiveCount = searchingCustomers.filter((c) => c.status !== 'COMPLETED').length;
 
   // 완료 및 진행중 요약 건수 계산
   const contractedPropertiesCount = properties.filter((p) => p.status === 'CONTRACTED').length;
@@ -816,9 +820,21 @@ const DashboardContent: React.FC = () => {
               </div>
               <div className="flex items-baseline justify-between mt-2">
                 {currentUser ? (
-                  <span className="text-2xl sm:text-3xl font-black text-blue-900">
-                    {receivedCustomers.length}<span className="text-sm font-normal text-blue-700 ml-1">명</span>
-                  </span>
+                  <div>
+                    <span className="text-2xl sm:text-3xl font-black text-blue-900">
+                      {receivedCustomers.length}<span className="text-sm font-normal text-blue-700 ml-1">명</span>
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[11px] font-bold text-blue-800 bg-blue-100/90 px-1.5 py-0.2 rounded">
+                        진행 {receivedActiveCount}
+                      </span>
+                      {receivedCompletedCount > 0 && (
+                        <span className="text-[11px] font-extrabold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded border border-rose-300">
+                          ✓ 판매완료 {receivedCompletedCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <span className="text-base sm:text-lg font-bold text-slate-400 flex items-center gap-1">
                     🔒 로그인 필요
@@ -847,9 +863,21 @@ const DashboardContent: React.FC = () => {
               </div>
               <div className="flex items-baseline justify-between mt-2">
                 {currentUser ? (
-                  <span className="text-2xl sm:text-3xl font-black text-indigo-900">
-                    {searchingCustomers.length}<span className="text-sm font-normal text-indigo-700 ml-1">명</span>
-                  </span>
+                  <div>
+                    <span className="text-2xl sm:text-3xl font-black text-indigo-900">
+                      {searchingCustomers.length}<span className="text-sm font-normal text-indigo-700 ml-1">명</span>
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[11px] font-bold text-indigo-800 bg-indigo-100/90 px-1.5 py-0.2 rounded">
+                        진행 {searchingActiveCount}
+                      </span>
+                      {searchingCompletedCount > 0 && (
+                        <span className="text-[11px] font-extrabold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded border border-rose-300">
+                          ✓ 판매완료 {searchingCompletedCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <span className="text-base sm:text-lg font-bold text-slate-400 flex items-center gap-1">
                     🔒 로그인 필요
@@ -1068,8 +1096,8 @@ const DashboardContent: React.FC = () => {
         {/* ────────────────────────────────────────────────────────── */}
         <div ref={detailSectionRef} className="scroll-mt-20">
           
-          {/* A. 자세한 고객현황 (전체 고객 / 조건 검색 / 물건 접수 / 물건 찾음) */}
-          {currentUser && (activeTab === 'ALL_CUSTOMERS' || activeTab === 'CUSTOMER_SEARCH' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP') && (
+          {/* A. 자세한 고객현황 (전체 고객 / 조건 검색 / 물건 접수 / 물건 찾음 / 판매완료) */}
+          {currentUser && (activeTab === 'ALL_CUSTOMERS' || activeTab === 'CUSTOMER_SEARCH' || activeTab === 'RECEIVED_GROUP' || activeTab === 'SEARCHING_GROUP' || activeTab === 'COMPLETED_CUSTOMERS') && (
             <div className="space-y-4 animate-in fade-in duration-200 bg-white/70 p-3 sm:p-5 rounded-2xl border-2 border-blue-200 shadow-sm">
               <div className="flex items-center justify-between bg-blue-50 p-3 rounded-xl border border-blue-200">
                 <div className="flex items-center gap-2">
@@ -1081,6 +1109,8 @@ const DashboardContent: React.FC = () => {
                       ? '[자세한 고객현황] 등록 고객 전체 관리장'
                       : activeTab === 'RECEIVED_GROUP'
                       ? '[자세한 고객현황] 매도·임대·권리금 접수 고객 관리장'
+                      : activeTab === 'COMPLETED_CUSTOMERS'
+                      ? '[자세한 고객현황] 판매완료(상담·계약완료) 고객 관리장'
                       : '[자세한 고객현황] 매수·임차·권리금 탐색 고객 관리장'}
                   </span>
                 </div>
@@ -1103,6 +1133,8 @@ const DashboardContent: React.FC = () => {
                     ? 'RECEIVED'
                     : activeTab === 'SEARCHING_GROUP'
                     ? 'SEARCHING'
+                    : activeTab === 'COMPLETED_CUSTOMERS'
+                    ? 'COMPLETED'
                     : 'ALL'
                 }
                 initialShowFilter={activeTab === 'CUSTOMER_SEARCH' || customerFilterOpen}
@@ -1110,10 +1142,12 @@ const DashboardContent: React.FC = () => {
                   if (grp === 'ALL') setActiveTab('ALL_CUSTOMERS');
                   else if (grp === 'RECEIVED') setActiveTab('RECEIVED_GROUP');
                   else if (grp === 'SEARCHING') setActiveTab('SEARCHING_GROUP');
+                  else if (grp === 'COMPLETED') setActiveTab('COMPLETED_CUSTOMERS');
                 }}
                 onFilterToggle={(isOpen) => setCustomerFilterOpen(isOpen)}
                 onSelectCustomer={(c) => setSelectedCustomer(c)}
                 onOpenNewCustomer={handleOpenNewCustomer}
+                onCustomerUpdated={handleCustomerSaved}
               />
             </div>
           )}

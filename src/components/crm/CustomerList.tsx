@@ -16,17 +16,19 @@ import {
   Users,
   Building2,
   Check,
+  CheckCircle2,
   FileSpreadsheet,
   Star,
   Calendar
 } from 'lucide-react';
-import { CustomerItem, CustomerGroup, PROPERTY_TYPE_LABELS } from '@/lib/types';
+import { CustomerItem, CustomerGroup, CustomerStatus, PROPERTY_TYPE_LABELS } from '@/lib/types';
 import { exportCustomersToExcel } from '@/lib/excelExport';
 import { useAuth } from '../auth/AuthContext';
-import { maskPhoneNumber, canViewCustomerContact, canAccessItem } from '@/lib/auth';
+import { maskPhoneNumber, canViewCustomerContact, canAccessItem, canEditItem } from '@/lib/auth';
+import { saveCustomCustomer } from '@/lib/storage';
 import { CustomerFilterPanel, CustomerFilterCriteria, INITIAL_CUSTOMER_FILTER_CRITERIA } from './CustomerFilterPanel';
 
-export type CustomerListGroupMode = 'ALL' | CustomerGroup;
+export type CustomerListGroupMode = 'ALL' | CustomerGroup | 'COMPLETED';
 
 interface CustomerListProps {
   customers: CustomerItem[];
@@ -36,6 +38,7 @@ interface CustomerListProps {
   onOpenNewCustomer: () => void;
   onGroupChange?: (group: CustomerListGroupMode) => void;
   onFilterToggle?: (isOpen: boolean) => void;
+  onCustomerUpdated?: (customer: CustomerItem) => void;
 }
 
 export const CustomerList: React.FC<CustomerListProps> = ({
@@ -46,6 +49,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
   onOpenNewCustomer,
   onGroupChange,
   onFilterToggle,
+  onCustomerUpdated,
 }) => {
   const { currentUser, availableAgents } = useAuth();
   const [currentGroup, setCurrentGroup] = useState<CustomerListGroupMode>(activeGroup);
@@ -86,9 +90,11 @@ export const CustomerList: React.FC<CustomerListProps> = ({
   const totalCount = customers.length;
   const receivedCount = useMemo(() => customers.filter((c) => c.group === 'RECEIVED').length, [customers]);
   const searchingCount = useMemo(() => customers.filter((c) => c.group === 'SEARCHING').length, [customers]);
+  const completedCount = useMemo(() => customers.filter((c) => c.status === 'COMPLETED').length, [customers]);
 
   // Base list filtered by currentGroup tab
   const baseGroupCustomers = useMemo(() => {
+    if (currentGroup === 'COMPLETED') return customers.filter((c) => c.status === 'COMPLETED');
     if (currentGroup === 'ALL') return customers;
     return customers.filter((c) => c.group === currentGroup);
   }, [customers, currentGroup]);
@@ -162,10 +168,52 @@ export const CustomerList: React.FC<CustomerListProps> = ({
     });
   }, [baseGroupCustomers, showFilterPanel, filteredFromPanel, currentUser, managerFilter, searchQuery]);
 
+  // 고객 목록 카드에서 원클릭으로 판매완료/진행중 상태를 즉시 토글하는 핸들러
+  const handleQuickToggleStatus = async (e: React.MouseEvent, customer: CustomerItem) => {
+    e.stopPropagation();
+    const isCompleted = customer.status === 'COMPLETED';
+    const nextStatus: CustomerStatus = isCompleted ? 'ACTIVE' : 'COMPLETED';
+    const confirmMsg = isCompleted
+      ? `"${customer.name}" 고객을 '진행중'으로 복원하시겠습니까?`
+      : `"${customer.name}" 고객을 '판매완료'(상담·계약완료) 처리하시겠습니까?\n(고객 카드에 '판매완료'가 표시됩니다)`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    const updated: CustomerItem = {
+      ...customer,
+      status: nextStatus,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await fetch('/api/customers', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || '',
+          'x-user-id': currentUser?.id || '',
+          'x-user-can-access-all': currentUser?.canAccessAllData ? 'true' : 'false',
+        },
+        body: JSON.stringify({
+          id: customer.id,
+          status: nextStatus,
+          currentUser,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to update customer status on server:', err);
+    }
+
+    saveCustomCustomer(updated);
+    if (onCustomerUpdated) {
+      onCustomerUpdated(updated);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* ────────────────────────────────────────────────────────── */}
-      {/* 1. 그룹 전환 탭 ([전체 고객] / [물건 접수] / [물건 찾음]) & 조건검색 필터 토글 */}
+      {/* 1. 그룹 전환 탭 ([전체 고객] / [물건 접수] / [물건 찾음] / [판매완료]) & 조건검색 필터 토글 */}
       {/* ────────────────────────────────────────────────────────── */}
       <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         
@@ -222,6 +270,25 @@ export const CustomerList: React.FC<CustomerListProps> = ({
               currentGroup === 'SEARCHING' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
               {searchingCount}명
+            </span>
+          </button>
+
+          {/* 고객관리장 옆 판매완료 탭 버튼 */}
+          <button
+            type="button"
+            onClick={() => handleGroupTabClick('COMPLETED')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              currentGroup === 'COMPLETED'
+                ? 'bg-rose-600 text-white shadow-sm ring-1 ring-rose-500'
+                : 'text-slate-700 hover:bg-white hover:text-rose-600'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>판매완료</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+              currentGroup === 'COMPLETED' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-800'
+            }`}>
+              {completedCount}명
             </span>
           </button>
         </div>
@@ -355,7 +422,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                 {isCompleted && (
                   <div className="absolute right-3 top-2.5 transform rotate-12 select-none pointer-events-none z-10 animate-in zoom-in-95 duration-200">
                     <div className="px-2.5 py-1 rounded-xl border-2 border-rose-500 bg-rose-950/85 text-rose-100 shadow-lg ring-1 ring-white/70 flex flex-col items-center justify-center">
-                      <span className="text-[11px] font-black tracking-widest drop-shadow-xs">상담완료</span>
+                      <span className="text-[11px] font-black tracking-widest drop-shadow-xs">판매완료</span>
                       <span className="text-[8px] font-bold text-rose-300 tracking-wider">COMPLETED</span>
                     </div>
                   </div>
@@ -528,13 +595,32 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                     )}
                   </div>
 
-                  <button
-                    onClick={() => onSelectCustomer(customer)}
-                    className="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
-                  >
-                    <span>상세보기</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* 카드에서 바로 판매완료/진행중 원클릭 상태 전환 버튼 */}
+                    {canEditItem(currentUser, customer) && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleQuickToggleStatus(e, customer)}
+                        title={isCompleted ? "판매완료를 해제하고 '진행중'으로 복원합니다" : "클릭 시 즉시 '판매완료'로 처리됩니다"}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-black border transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs ${
+                          isCompleted
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-600 hover:text-white'
+                            : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-600 hover:text-white'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{isCompleted ? '진행복원' : '판매완료'}</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => onSelectCustomer(customer)}
+                      className="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                      <span>상세보기</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
               </div>
