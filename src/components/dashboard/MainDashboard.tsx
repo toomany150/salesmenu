@@ -385,24 +385,20 @@ const DashboardContent: React.FC = () => {
     }
   }, [currentUser, authLoading, fetchData]);
 
-  // 다른 PC나 스마트폰 브라우저 탭에서 돌아왔을 때 창 활성화(focus) 및 화면 켜짐(visibility) 시 0초 즉각 자동 최신 데이터 동기화
+  // ⚡ 스마트 절전형 자동 동기화 (서버 및 PC 과부하 0% 설계)
+  // 1) 사용자가 PC 브라우저 탭을 보거나 창으로 돌아왔을 때(focus, visibilitychange) 0초 즉각 동기화
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handleFocus = () => {
-      if (currentUser && !loading) {
-        fetchData();
-      }
-    };
-    const handleVisibility = () => {
+    const handleActive = () => {
       if (document.visibilityState === 'visible' && currentUser && !loading) {
         fetchData();
       }
     };
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleActive);
+    document.addEventListener('visibilitychange', handleActive);
     return () => {
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleActive);
+      document.removeEventListener('visibilitychange', handleActive);
     };
   }, [currentUser, loading, fetchData]);
 
@@ -410,16 +406,17 @@ const DashboardContent: React.FC = () => {
   const [isInstantSyncing, setIsInstantSyncing] = useState(false);
   const [syncToastMessage, setSyncToastMessage] = useState<string | null>(null);
 
-  // ⚡ 모든 기기(PC, 스마트폰, 태블릿) 간 완전 무인 실시간 자동 동기화 (5초 주기 백그라운드 자동 갱신)
-  // 스마트폰에서 매물을 등록하면 PC에서 아무 버튼을 누르지 않아도 몇 초 만에 자동으로 화면에 나타납니다.
+  // 2) 백그라운드 절전 감지 폴링 (과부하 방지 20초 주기 + 화면 꺼짐 시 완전 중단)
+  // - 화면을 보고 있지 않거나(다른 탭, 최소화) 입력 창이 열려 있을 때는 자동 중단되어 CPU/서버 트래픽 부하가 0%입니다.
   useEffect(() => {
     if (!currentUser) return;
     const interval = setInterval(() => {
-      // 폼 입력 중이거나 모달 창이 열려 있을 때는 화면 깜빡임/입력 방해를 위해 갱신 생략
+      // 절전 보호: 브라우저가 최소화되어 있거나 다른 탭을 볼 때, 또는 글 작성 중일 때는 요청하지 않음
+      if (document.hidden) return;
       if (!isPropertyRegOpen && !isCustomerRegOpen && !editingProperty && !editingCustomer && !isInstantSyncing) {
         fetchData();
       }
-    }, 5000);
+    }, 20000); // 안전하고 쾌적한 20초 주기 (과부하 완전 차단)
     return () => clearInterval(interval);
   }, [currentUser, isPropertyRegOpen, isCustomerRegOpen, editingProperty, editingCustomer, isInstantSyncing, fetchData]);
 
