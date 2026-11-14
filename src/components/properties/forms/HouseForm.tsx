@@ -148,35 +148,58 @@ export const HouseForm: React.FC<HouseFormProps> = ({ data, onChange, transactio
     });
   };
 
-  // 건축물대장 층별/호수 정보로부터 자동 생성
+  // 건축물대장 층별/호수 정보로부터 자동 생성 (선택된 건물/층이 있으면 해당 데이터만 반영)
   const handleLoadFromLedger = () => {
     if (!ledgerData) return;
     const generated: StoreLeaseUnitItem[] = [];
 
+    const prevList = (data.leaseStatusList || []) as StoreLeaseUnitItem[];
+    const prevMap = new Map<string, StoreLeaseUnitItem>();
+    prevList.forEach((it) => {
+      if (it.floorHo) prevMap.set(it.floorHo.trim(), it);
+    });
+
+    const targetDong = ledgerData.selectedDong;
     if (ledgerData.unitList && ledgerData.unitList.length > 0) {
-      ledgerData.unitList.forEach((u: any, idx: number) => {
+      // 선택된 동이 있다면 해당 동의 호수만 불러옴
+      const filteredUnits = targetDong
+        ? ledgerData.unitList.filter((u: any) => u.dong && (u.dong === targetDong || u.dong.replace(/동$/, '') === targetDong.replace(/동$/, '')))
+        : ledgerData.unitList;
+
+      filteredUnits.forEach((u: any, idx: number) => {
+        const floorHoName = `${u.dong ? u.dong + ' ' : ''}${u.ho || u.floor || (idx + 1) + '호'}`;
+        const existing = prevMap.get(floorHoName);
         generated.push({
-          id: `ledger-h-unit-${idx}-${Date.now()}`,
-          floorHo: `${u.dong ? u.dong + ' ' : ''}${u.ho || u.floor || (idx + 1) + '호'}`,
-          tenantName: u.owner || '',
-          contractStartDate: '',
-          evictionPossible: '명도 가능',
-          deposit: undefined,
-          monthlyRent: undefined,
-          isVacant: false,
+          id: existing?.id || `ledger-h-unit-${idx}-${Date.now()}`,
+          floorHo: floorHoName,
+          tenantName: existing?.tenantName || u.owner || '',
+          contractStartDate: existing?.contractStartDate || '',
+          evictionPossible: existing?.evictionPossible || '명도 가능',
+          deposit: existing?.deposit,
+          monthlyRent: existing?.monthlyRent,
+          isVacant: existing?.isVacant || false,
         });
       });
-    } else if (ledgerData.floorList && ledgerData.floorList.length > 0) {
-      ledgerData.floorList.forEach((f: any, idx: number) => {
+    } else if ((ledgerData.selectedFloors && ledgerData.selectedFloors.length > 0) || (ledgerData.floorList && ledgerData.floorList.length > 0)) {
+      // 사용자가 층별개요에서 특정 건물이나 층들을 선택한 경우, 전체가 아닌 선택된 건물/층만 불러옴!
+      const targetFloors = (ledgerData.selectedFloors && ledgerData.selectedFloors.length > 0)
+        ? ledgerData.selectedFloors
+        : (targetDong && ledgerData.floorList
+            ? ledgerData.floorList.filter((f: any) => f.dong === targetDong)
+            : ledgerData.floorList || []);
+
+      targetFloors.forEach((f: any, idx: number) => {
+        const floorHoName = `${f.floor} (${f.mainUse || f.etcUse || '주택/점포'})`;
+        const existing = prevMap.get(floorHoName);
         generated.push({
-          id: `ledger-h-floor-${idx}-${Date.now()}`,
-          floorHo: `${f.floor} (${f.mainUse || '주택/점포'})`,
-          tenantName: '',
-          contractStartDate: '',
-          evictionPossible: '명도 가능',
-          deposit: undefined,
-          monthlyRent: undefined,
-          isVacant: false,
+          id: existing?.id || `ledger-h-floor-${idx}-${Date.now()}`,
+          floorHo: floorHoName,
+          tenantName: existing?.tenantName || '',
+          contractStartDate: existing?.contractStartDate || '',
+          evictionPossible: existing?.evictionPossible || '명도 가능',
+          deposit: existing?.deposit,
+          monthlyRent: existing?.monthlyRent,
+          isVacant: existing?.isVacant || false,
         });
       });
     }

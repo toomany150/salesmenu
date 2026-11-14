@@ -650,6 +650,8 @@ async function fetchBuildingLedgerFromGov(
         area: parseFloat(f.area) || 0,
         mainUse: f.mainPurpsCdNm || f.etcPurps || '근린생활시설',
         etcUse: f.etcPurps || f.mainPurpsCdNm || '',
+        dong: (f.dongNm || f.bldNm || '').trim(),
+        bldNm: (f.bldNm || '').trim(),
       }));
 
       // [세번째 이미지 해결] 층수 순 정렬 (지하층 -> 1층 -> 2층 -> ... -> 최고층 -> 옥탑 순서로 오름차순 정렬)

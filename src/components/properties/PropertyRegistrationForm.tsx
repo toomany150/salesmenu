@@ -32,6 +32,7 @@ import {
   PublicBuildingLedgerResult,
   PublicBuildingFloorInfo,
   PublicBuildingUnitInfo,
+  StoreLeaseUnitItem,
   PROPERTY_TYPE_LABELS,
   DIRECTION_OPTIONS,
   DIRECTION_CRITERIA_OPTIONS,
@@ -818,24 +819,84 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     }
   };
 
-  // 대장상 층수 다중 선택 시 해당층수, 대장상면적 합계, 주용도 자동 입력 (수정 가능)
+  // 대장상 층수 다중 선택 시 해당층수, 대장상면적 합계, 주용도 자동 입력 및 선택된 건물/층만 임대차 현황에 연동
   const handleSelectFloorsFromLedger = (
     floors: PublicBuildingFloorInfo[],
     summary: { totalArea: number; totalAreaPyeong: number; floorText: string; useText: string }
   ) => {
+    // 1. ledgerData에 선택된 층(selectedFloors) 보관
+    setLedgerData((prev) => (prev ? { ...prev, selectedFloors: floors } : prev));
+
     if (!floors || floors.length === 0) return;
 
     setDetailAddress(summary.floorText);
-    if (propertyType === 'STORE') {
-      setStoreData((prev: any) => ({
-        ...prev,
-        currentFloor: summary.floorText,
-        buildingArea: summary.totalArea,
-        buildingAreaPyeong: summary.totalAreaPyeong,
-        buildingUse: summary.useText || prev.buildingUse,
-        actualArea: summary.totalArea, // 다중 선택 시 실평수 초기값도 선택 면적 합계로 즉시 갱신
-        actualAreaPyeong: summary.totalAreaPyeong,
-      }));
+
+    // 2. 선택된 건물/층만을 기반으로 층별·호수별 임대차 및 점포 현황 자동 갱신 (선택한 건물만 나오도록 반영)
+    if (propertyType === 'HOUSE') {
+      setHouseData((prev: any) => {
+        const prevList = (prev.leaseStatusList || []) as StoreLeaseUnitItem[];
+        const prevMap = new Map<string, StoreLeaseUnitItem>();
+        prevList.forEach((it) => {
+          if (it.floorHo) prevMap.set(it.floorHo.trim(), it);
+        });
+
+        const newLeaseList: StoreLeaseUnitItem[] = floors.map((f, idx) => {
+          const floorHoName = `${f.floor} (${f.mainUse || f.etcUse || '주택/점포'})`;
+          const existing = prevMap.get(floorHoName);
+          return {
+            id: existing?.id || `ledger-h-selected-${idx}-${Date.now()}`,
+            floorHo: floorHoName,
+            tenantName: existing?.tenantName || '',
+            contractStartDate: existing?.contractStartDate || '',
+            evictionPossible: existing?.evictionPossible || '명도 가능',
+            deposit: existing?.deposit,
+            monthlyRent: existing?.monthlyRent,
+            isVacant: existing?.isVacant || false,
+          };
+        });
+
+        return {
+          ...prev,
+          currentFloor: summary.floorText,
+          buildingArea: summary.totalArea,
+          buildingUse: summary.useText || prev.buildingUse,
+          leaseStatusList: newLeaseList,
+        };
+      });
+    } else if (propertyType === 'STORE') {
+      setStoreData((prev: any) => {
+        const prevList = (prev.leaseStatusList || []) as StoreLeaseUnitItem[];
+        const prevMap = new Map<string, StoreLeaseUnitItem>();
+        prevList.forEach((it) => {
+          if (it.floorHo) prevMap.set(it.floorHo.trim(), it);
+        });
+
+        const newLeaseList: StoreLeaseUnitItem[] = floors.map((f, idx) => {
+          const floorHoName = `${f.floor} (${f.mainUse || f.etcUse || '점포'})`;
+          const existing = prevMap.get(floorHoName);
+          return {
+            id: existing?.id || `ledger-s-selected-${idx}-${Date.now()}`,
+            floorHo: floorHoName,
+            tenantName: existing?.tenantName || '',
+            contractStartDate: existing?.contractStartDate || '',
+            evictionPossible: existing?.evictionPossible || '명도 가능',
+            deposit: existing?.deposit,
+            monthlyRent: existing?.monthlyRent,
+            isVacant: existing?.isVacant || false,
+          };
+        });
+
+        return {
+          ...prev,
+          currentFloor: summary.floorText,
+          buildingArea: summary.totalArea,
+          buildingAreaPyeong: summary.totalAreaPyeong,
+          buildingUse: summary.useText || prev.buildingUse,
+          actualArea: summary.totalArea,
+          actualAreaPyeong: summary.totalAreaPyeong,
+          leaseStatusList: newLeaseList,
+        };
+      });
     } else if (propertyType === 'OFFICE') {
       setOfficeData((prev: any) => ({
         ...prev,
@@ -845,13 +906,6 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         buildingUse: summary.useText || prev.buildingUse,
         actualArea: summary.totalArea,
         actualAreaPyeong: summary.totalAreaPyeong,
-      }));
-    } else if (propertyType === 'HOUSE') {
-      setHouseData((prev: any) => ({
-        ...prev,
-        currentFloor: summary.floorText,
-        buildingArea: summary.totalArea,
-        buildingUse: summary.useText || prev.buildingUse,
       }));
     } else if (propertyType === 'APARTMENT') {
       setApartmentData((prev: any) => ({

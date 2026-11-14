@@ -784,6 +784,8 @@ export interface PublicBuildingFloorInfo {
   area: number; // 면적 (㎡)
   mainUse: string; // 주용도 (예: "제1·2종근린생활시설", "다가구주택")
   etcUse?: string; // 세부/기타용도 (예: "소매점, 일반음식점")
+  dong?: string; // 동명칭 (예: "주1동", "1동", "가동", "본동")
+  bldNm?: string; // 건물명
 }
 
 // 집합건물 전유부(각 동/호수) 정보 규격
@@ -844,6 +846,8 @@ export interface PublicBuildingLedgerResult {
   heatingType?: string; // 난방방식
   // 층수별 용도 및 면적
   floorList?: PublicBuildingFloorInfo[];
+  selectedFloors?: PublicBuildingFloorInfo[]; // 사용자가 층별개요에서 선택한 특정 건물/층 목록
+  selectedDong?: string; // 선택된 건물(동)
   // 집합건물(아파트, 다세대, 연립, 구분상가 등) 여부 및 전유부(각 동호수) 목록
   isCollectiveBuilding?: boolean;
   buildingCategoryName?: '일반건축물' | '집합건축물';

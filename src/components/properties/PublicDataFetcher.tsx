@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   Building,
   Trees,
@@ -66,6 +66,8 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   const [selectedFloorName, setSelectedFloorName] = useState<string | null>(null);
   const [selectedFloorKey, setSelectedFloorKey] = useState<string | null>(null);
   const [selectedFloorKeys, setSelectedFloorKeys] = useState<string[]>([]);
+  // 같은 지번에 여러 개 건물이 있을 때 층별개요 건물(동) 필터 상태
+  const [selectedBuildingDong, setSelectedBuildingDong] = useState<string>('ALL');
   // 집합건물 전유부(동/호수) 선택 상태
   const [selectedDong, setSelectedDong] = useState<string>('');
   const [selectedUnitKey, setSelectedUnitKey] = useState<string | null>(null);
@@ -684,6 +686,50 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     }
     if (onSelectFloor) {
       onSelectFloor(chosenFloors[chosenFloors.length - 1]);
+    }
+  };
+
+  // 같은 지번에 여러 개 건물이 있을 때 동(건물) 목록 추출
+  const distinctDongs = useMemo(() => {
+    const dongs = new Set<string>();
+    if (fetchedData?.dongList) {
+      fetchedData.dongList.forEach((d) => d && dongs.add(d.trim()));
+    }
+    if (fetchedData?.floorList) {
+      fetchedData.floorList.forEach((f) => f.dong && dongs.add(f.dong.trim()));
+    }
+    return Array.from(dongs);
+  }, [fetchedData]);
+
+  // 건물(동) 탭 클릭 시 해당 건물의 층들만 자동으로 선택 및 반영
+  const handleSelectDongForFloors = (dName: string) => {
+    setSelectedBuildingDong(dName);
+    if (!fetchedData?.floorList) return;
+
+    if (dName === 'ALL') {
+      return;
+    }
+
+    const dongFloors = fetchedData.floorList.filter((f) => f.dong === dName);
+    const newKeys = dongFloors.map((f, idx) => {
+      const origIdx = fetchedData.floorList!.indexOf(f);
+      return `${f.floor}_${f.mainUse || ''}_${f.area}_${origIdx >= 0 ? origIdx : idx}`;
+    });
+
+    setSelectedFloorKeys(newKeys);
+    setSelectedFloorKey(newKeys[newKeys.length - 1] || null);
+
+    const totalArea = +dongFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0).toFixed(2);
+    const totalAreaPyeong = +(totalArea * 0.3025).toFixed(2);
+    const floorNames = Array.from(new Set(dongFloors.map((f) => f.floor)));
+    const floorText = floorNames.join(', ');
+    setSelectedFloorName(floorText);
+
+    const useList = Array.from(new Set(dongFloors.map((f) => f.mainUse || f.etcUse).filter(Boolean)));
+    const useText = useList.join(', ');
+
+    if (onSelectFloors) {
+      onSelectFloors(dongFloors, { totalArea, totalAreaPyeong, floorText, useText });
     }
   };
 
@@ -1757,8 +1803,50 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                 );
               })()}
 
+              {/* 같은 지번에 여러 개 건물이 있을 경우: 건물(동) 선택 필터 바 */}
+              {distinctDongs.length > 1 && (
+                <div className="flex items-center gap-1.5 flex-wrap p-2.5 bg-blue-50/80 rounded-xl border border-blue-200 shadow-2xs">
+                  <span className="text-xs font-bold text-slate-700 mr-1 flex items-center gap-1 shrink-0">
+                    <Building className="w-3.5 h-3.5 text-blue-600" />
+                    건물(동) 선택:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDongForFloors('ALL')}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                      selectedBuildingDong === 'ALL'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-2xs font-black'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    전체 건물 ({fetchedData.floorList.length}개 층)
+                  </button>
+                  {distinctDongs.map((dName: string) => {
+                    const count = (fetchedData.floorList || []).filter((f) => f.dong === dName).length;
+                    return (
+                      <button
+                        key={dName}
+                        type="button"
+                        onClick={() => handleSelectDongForFloors(dName)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          selectedBuildingDong === dName
+                            ? 'bg-blue-600 text-white border-blue-700 shadow-2xs font-black'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        {dName} {count > 0 ? `(${count}개 층)` : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {[...fetchedData.floorList]
+                  .filter((item) => {
+                    if (selectedBuildingDong === 'ALL') return true;
+                    return item.dong === selectedBuildingDong;
+                  })
                   .sort((a, b) => {
                     const getFloorScore = (fName: string) => {
                       const isUnder =
@@ -1800,6 +1888,11 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
                           }`}>
                             {item.floor}
                           </span>
+                          {item.dong && (
+                            <span className="text-[10px] font-bold text-indigo-800 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                              {item.dong}
+                            </span>
+                          )}
                           {isSelected && (
                             <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded">
                               선택됨
