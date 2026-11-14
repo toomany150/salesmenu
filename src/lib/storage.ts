@@ -53,7 +53,7 @@ export function saveCustomProperty(property: PropertyItem): void {
     const list = getCustomProperties();
     const cleanProp = sanitizePropertyForStorage(property, true);
     const idx = list.findIndex(
-      (p) => (property.id && p.id === property.id) || (property.propertyNumber && p.propertyNumber === property.propertyNumber)
+      (p) => (property.id && p.id === property.id) || (!property.id && property.propertyNumber && p.propertyNumber === property.propertyNumber)
     );
 
     if (idx >= 0) {
@@ -138,7 +138,7 @@ export function setCustomProperties(list: PropertyItem[]): void {
     const mergedList = [...localOnly, ...list];
     const uniquePropMap = new Map<string, PropertyItem>();
     mergedList.forEach((p) => {
-      const key = (p.propertyNumber || p.id || '').trim();
+      const key = (p.id || p.propertyNumber || '').trim();
       if (key && !uniquePropMap.has(key)) {
         uniquePropMap.set(key, p);
       }
@@ -156,7 +156,7 @@ export function setCustomProperties(list: PropertyItem[]): void {
       const mergedList = [...localOnly, ...list];
       const uniquePropMap = new Map<string, PropertyItem>();
       mergedList.forEach((p) => {
-        const key = (p.propertyNumber || p.id || '').trim();
+        const key = (p.id || p.propertyNumber || '').trim();
         if (key && !uniquePropMap.has(key)) {
           uniquePropMap.set(key, p);
         }
@@ -307,12 +307,12 @@ export function exportDataBundle(liveProperties?: PropertyItem[], liveCustomers?
   const localProps = getCustomProperties();
   const propMap = new Map<string, PropertyItem>();
   localProps.forEach((p) => {
-    const key = p.propertyNumber || p.id;
+    const key = p.id || p.propertyNumber;
     if (key) propMap.set(key, p);
   });
   if (Array.isArray(liveProperties)) {
     liveProperties.forEach((p) => {
-      const key = p.propertyNumber || p.id;
+      const key = p.id || p.propertyNumber;
       if (key) propMap.set(key, { ...propMap.get(key), ...p });
     });
   }
@@ -358,11 +358,11 @@ export function importDataBundle(bundle: Partial<SyncDataBundle>): {
     const currentProps = getCustomProperties();
     const propMap = new Map<string, PropertyItem>();
     currentProps.forEach((p) => {
-      const key = p.propertyNumber || p.id;
+      const key = p.id || p.propertyNumber;
       propMap.set(key, p);
     });
     incomingProps.forEach((p) => {
-      const key = p.propertyNumber || p.id;
+      const key = p.id || p.propertyNumber;
       if (key) {
         propMap.set(key, { ...propMap.get(key), ...p });
       }
