@@ -44,7 +44,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { openDaumPostcode, convertAddressViaGeocoder } from '@/lib/address';
 import { VoiceInput, VoiceTextarea } from '@/components/common/VoiceInput';
 import { KakaoAddressMap } from '@/components/map/KakaoAddressMap';
-import { saveCustomCustomer } from '@/lib/storage';
+import { saveCustomCustomer, getCustomCustomers } from '@/lib/storage';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -872,11 +872,26 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       };
     }
 
-    if (mode === 'EDIT' && initialData?.id) {
-      payload.id = initialData.id;
+    const localCusts = getCustomCustomers();
+    const cleanPhoneDigits = phone.trim().replace(/[^0-9]/g, '');
+    const cleanName = name.trim();
+
+    let existingCustMatch = (mode === 'EDIT' && initialData?.id)
+      ? localCusts.find((c: CustomerItem) => c.id === initialData.id)
+      : null;
+
+    if (!existingCustMatch && cleanPhoneDigits.length >= 8 && cleanPhoneDigits !== '01000000000') {
+      existingCustMatch = localCusts.find((c: CustomerItem) => (c.phone ? c.phone.replace(/[^0-9]/g, '') : '') === cleanPhoneDigits) || null;
+    }
+    if (!existingCustMatch && cleanName) {
+      existingCustMatch = localCusts.find((c: CustomerItem) => (c.name || '').trim() === cleanName) || null;
     }
 
-    const finalCustId = (mode === 'EDIT' && initialData?.id) ? initialData.id : `cust-${Date.now()}`;
+    if (existingCustMatch?.id || (mode === 'EDIT' && initialData?.id)) {
+      payload.id = existingCustMatch?.id || initialData?.id;
+    }
+
+    const finalCustId = existingCustMatch?.id || (mode === 'EDIT' && initialData?.id ? initialData.id : `cust-${Date.now()}`);
     const fallbackSavedCustomer: CustomerItem = {
       id: finalCustId,
       name: payload.name,
@@ -903,10 +918,10 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       assignedAgents: payload.assignedAgents,
       createdById: currentUser?.id,
       creatorName: currentUser?.name,
-      createdAt: (mode === 'EDIT' && initialData?.createdAt) ? initialData.createdAt : new Date().toISOString(),
+      createdAt: existingCustMatch?.createdAt || (mode === 'EDIT' && initialData?.createdAt ? initialData.createdAt : new Date().toISOString()),
       updatedAt: new Date().toISOString(),
       demands: payload.demand ? [{
-        id: (initialData?.demands && initialData.demands[0]?.id) || `dem-${Date.now()}`,
+        id: (initialData?.demands && initialData.demands[0]?.id) || (existingCustMatch?.demands && existingCustMatch.demands[0]?.id) || `dem-${Date.now()}`,
         customerId: finalCustId,
         targetPropertyType: payload.demand.targetPropertyType,
         targetTransactionType: payload.demand.targetTransactionType,
@@ -946,8 +961,9 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     };
 
     try {
+      const isUpdating = Boolean(existingCustMatch?.id || (mode === 'EDIT' && initialData?.id));
       const res = await fetch('/api/customers', {
-        method: mode === 'EDIT' ? 'PUT' : 'POST',
+        method: isUpdating ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -957,7 +973,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       }
       const finalSaved = { ...fallbackSavedCustomer, ...data };
       saveCustomCustomer(finalSaved);
-      alert(mode === 'EDIT' ? '고객 정보가 성공적으로 수정되었습니다.' : '신규 고객이 성공적으로 등록되었습니다.');
+      alert(isUpdating ? '고객 정보가 성공적으로 수정되었습니다.' : '신규 고객이 성공적으로 등록되었습니다.');
       onSuccess(finalSaved);
       onClose();
     } catch (err: any) {

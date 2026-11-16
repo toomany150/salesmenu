@@ -190,11 +190,17 @@ export function saveCustomCustomer(customer: CustomerItem): void {
   try {
     const list = getCustomCustomers();
     const cleanPhone = customer.phone ? customer.phone.replace(/[^0-9]/g, '') : '';
+    const custName = (customer.name || '').trim();
     const idx = list.findIndex((c) => {
       if (c.id === customer.id) return true;
-      if (customer.name && cleanPhone && c.name === customer.name) {
-        const cCleanPhone = c.phone ? c.phone.replace(/[^0-9]/g, '') : '';
-        if (cCleanPhone && cCleanPhone === cleanPhone) return true;
+      const cCleanPhone = c.phone ? c.phone.replace(/[^0-9]/g, '') : '';
+      if (cleanPhone && cleanPhone.length >= 8 && cleanPhone !== '01000000000' && cCleanPhone === cleanPhone) {
+        return true;
+      }
+      if (custName && (c.name || '').trim() === custName) {
+        if (!cleanPhone || cleanPhone === '01000000000' || !cCleanPhone || cCleanPhone === '01000000000' || cCleanPhone === cleanPhone) {
+          return true;
+        }
       }
       return false;
     });

@@ -1315,19 +1315,28 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         autoCustomerSubType = '임대인';
       }
 
-      // [스마트폰 수정 시 중복 등록 방지 핵심]:
-      // 1) 매물 수정 모드(isEditMode)이고 기존 매물에 고객 ID가 연결되어 있는 경우
+      // [수정/등록 시 중복 등록 방지 핵심]:
+      // 1) 기존 매물에 고객 ID가 연결되어 있는 경우
       // 2) 또는 전체 고객 목록 중 전화번호 숫자(하이픈 제거)가 일치하는 기존 고객이 있는 경우
+      // 3) 또는 고객명이 일치하는 기존 고객이 있는 경우
       // 새로 ID를 만들지 않고 기존 고객 ID를 그대로 유지하여 중복 등록 원천 차단!
       const cleanPhoneDigits = customerPhone.replace(/[^0-9]/g, '');
-      const existingMatch = (isEditMode && (initialData?.customerId || initialData?.customer?.id))
+      const trimmedCustomerName = customerName.trim();
+      let existingMatch = (initialData?.customerId || initialData?.customer?.id)
         ? allCustomers.find((c) => c.id === (initialData?.customerId || initialData?.customer?.id))
-        : (cleanPhoneDigits.length >= 8 ? allCustomers.find((c) => (c.phone ? c.phone.replace(/[^0-9]/g, '') : '') === cleanPhoneDigits) : null);
+        : null;
+
+      if (!existingMatch && cleanPhoneDigits.length >= 8 && cleanPhoneDigits !== '01000000000') {
+        existingMatch = allCustomers.find((c) => (c.phone ? c.phone.replace(/[^0-9]/g, '') : '') === cleanPhoneDigits) || null;
+      }
+      if (!existingMatch && trimmedCustomerName && trimmedCustomerName !== '접수 의뢰고객') {
+        existingMatch = allCustomers.find((c) => c.name?.trim() === trimmedCustomerName) || null;
+      }
 
       const custId: string = existingMatch?.id || (isEditMode ? (initialData?.customerId || initialData?.customer?.id || `cust-${Date.now()}`) : `cust-${Date.now()}`);
       const newCustomerItem: CustomerItem = {
         id: custId,
-        name: customerName.trim() || '접수 의뢰고객',
+        name: trimmedCustomerName || '접수 의뢰고객',
         phone: customerPhone.trim() || '010-0000-0000',
         carrier: (customerCarrier.trim() as MobileCarrier) || undefined,
         type: autoCustomerType,
@@ -1357,19 +1366,22 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           monthlyRent: monthlyRent ? parseFloat(monthlyRent) : undefined,
           premium: storePremiumVal || undefined,
         },
-        createdAt: new Date().toISOString(),
+        createdAt: existingMatch?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      // 1. 신규 고객 로컬스토리지 영구 보관 (새고객등록 CRM 탭 즉시 전송/저장)
+      // 1. 신규/수정 고객 로컬스토리지 영구 보관 (새고객등록 CRM 탭 즉시 전송/저장)
       saveCustomCustomer(newCustomerItem);
 
-      // 2. 백그라운드 서버 API 전송 (서버 DB에도 안전 등록)
-      fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCustomerItem),
-      }).catch((err) => console.warn('Customer registration sync notice:', err));
+      // 2. 만약 기존 고객 매칭이 있다면 PUT으로 안전 업데이트
+      // (신규 고객인 경우는 아래 /api/properties payload에 포함되어 서버에서 단 1회 안전 생성됨 -> 이중 POST 호출로 인한 중복 생성 100% 차단!)
+      if (existingMatch && existingMatch.id) {
+        fetch(`/api/customers`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newCustomerItem),
+        }).catch((err) => console.warn('Customer update sync notice:', err));
+      }
 
       customerInput = {
         name: newCustomerItem.name,
@@ -1421,14 +1433,22 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     if (!ownerSameAsCustomer) {
       if (ownerCustomerMode === 'DIRECT' && (ownerName.trim() || ownerPhone.trim())) {
         const cleanOwnerDigits = ownerPhone.replace(/[^0-9]/g, '');
-        const existingOwnerMatch = (isEditMode && initialData?.ownerCustomerId)
+        const trimmedOwnerName = ownerName.trim();
+        let existingOwnerMatch = initialData?.ownerCustomerId
           ? allCustomers.find((c) => c.id === initialData.ownerCustomerId)
-          : (cleanOwnerDigits.length >= 8 ? allCustomers.find((c) => (c.phone ? c.phone.replace(/[^0-9]/g, '') : '') === cleanOwnerDigits) : null);
+          : null;
+
+        if (!existingOwnerMatch && cleanOwnerDigits.length >= 8 && cleanOwnerDigits !== '01000000000') {
+          existingOwnerMatch = allCustomers.find((c) => (c.phone ? c.phone.replace(/[^0-9]/g, '') : '') === cleanOwnerDigits) || null;
+        }
+        if (!existingOwnerMatch && trimmedOwnerName && trimmedOwnerName !== '등기부 소유자') {
+          existingOwnerMatch = allCustomers.find((c) => c.name?.trim() === trimmedOwnerName) || null;
+        }
 
         const ownerCustId: string = existingOwnerMatch?.id || (isEditMode ? (initialData?.ownerCustomerId || `cust-owner-${Date.now()}`) : `cust-owner-${Date.now()}`);
         const newOwnerItem: CustomerItem = {
           id: ownerCustId,
-          name: ownerName.trim() || '등기부 소유자',
+          name: trimmedOwnerName || '등기부 소유자',
           phone: ownerPhone.trim() || '010-0000-0000',
           carrier: (ownerCarrier.trim() as MobileCarrier) || undefined,
           type: transactionType === '매매' ? 'SELLER' : 'LESSOR',
@@ -1439,16 +1459,18 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           receiptDate: receiptDate || new Date().toISOString(),
           memo: `[매물 #${finalPropNumber} (${finalAddress})] 등기부상 소유주`,
           transactionType,
-          createdAt: new Date().toISOString(),
+          createdAt: existingOwnerMatch?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
 
         saveCustomCustomer(newOwnerItem);
-        fetch('/api/customers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newOwnerItem),
-        }).catch((err) => console.warn('Owner registration sync notice:', err));
+        if (existingOwnerMatch && existingOwnerMatch.id) {
+          fetch(`/api/customers`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newOwnerItem),
+          }).catch((err) => console.warn('Owner registration sync notice:', err));
+        }
 
         ownerCustomerInput = {
           name: newOwnerItem.name,

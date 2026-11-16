@@ -266,13 +266,14 @@ export async function POST(request: NextRequest) {
                   group: targetGroup,
                 },
               }).catch(() => null);
-            } else if (!existing && cust.name?.trim()) {
+            }
+            if (!existing && cust.name?.trim()) {
               existing = await prisma.customer.findFirst({
                 where: {
                   name: cust.name.trim(),
                   group: targetGroup,
-                  phone: cleanPhone || '010-0000-0000',
                 },
+                orderBy: { createdAt: 'desc' },
               }).catch(() => null);
             }
 

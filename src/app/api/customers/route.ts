@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
     const cleanName = name.trim();
     const cleanPhone = phone.trim();
     const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
-    let existingCustomer = body.id ? await prisma.customer.findUnique({ where: { id: body.id }, include: { properties: true, demands: true } }) : null;
+    let existingCustomer = body.id ? await prisma.customer.findUnique({ where: { id: body.id }, include: { properties: true, demands: true } }).catch(() => null) : null;
     if (!existingCustomer) {
       if (phoneDigits && phoneDigits.length >= 8 && phoneDigits !== '01000000000') {
         const phoneVariants = Array.from(new Set([
@@ -251,16 +251,32 @@ export async function POST(request: NextRequest) {
             group: finalGroup,
           },
           include: { properties: true, demands: true },
-        });
-      } else if (cleanName) {
+        }).catch(() => null);
+
+        if (!existingCustomer) {
+          existingCustomer = await prisma.customer.findFirst({
+            where: { phone: { in: phoneVariants } },
+            include: { properties: true, demands: true },
+          }).catch(() => null);
+        }
+      }
+      if (!existingCustomer && cleanName) {
         existingCustomer = await prisma.customer.findFirst({
           where: {
             name: cleanName,
             group: finalGroup,
-            phone: cleanPhone || '010-0000-0000',
           },
           include: { properties: true, demands: true },
-        });
+          orderBy: { createdAt: 'desc' },
+        }).catch(() => null);
+
+        if (!existingCustomer) {
+          existingCustomer = await prisma.customer.findFirst({
+            where: { name: cleanName },
+            include: { properties: true, demands: true },
+            orderBy: { createdAt: 'desc' },
+          }).catch(() => null);
+        }
       }
     }
 
@@ -272,7 +288,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: cleanName,
           carrier: finalCarrier !== undefined ? finalCarrier : undefined,
-          phone: cleanPhone,
+          phone: (cleanPhone && cleanPhone !== '010-0000-0000') ? cleanPhone : existingCustomer.phone,
           type: type || undefined,
           subType: finalSubType || undefined,
           inflowPath: inflowPath !== undefined ? (inflowPath?.trim() || null) : undefined,
@@ -280,7 +296,7 @@ export async function POST(request: NextRequest) {
           status: body.status || undefined,
           isPinned: body.isPinned !== undefined ? Boolean(body.isPinned) : undefined,
           receiptDate: body.receiptDate ? new Date(body.receiptDate) : undefined,
-          memo: memo !== undefined ? memo : undefined,
+          memo: memo !== undefined ? (existingCustomer.memo && memo && !existingCustomer.memo.includes(memo) ? `${existingCustomer.memo}\n${memo}` : memo) : undefined,
           price: finalPrice !== undefined ? finalPrice : undefined,
           negotiablePrice: finalNegoPrice !== undefined ? finalNegoPrice : undefined,
           deposit: finalDeposit !== undefined ? finalDeposit : undefined,
@@ -507,15 +523,29 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '고객 ID가 필요합니다.' }, { status: 400 });
     }
 
-    let existingCust = await prisma.customer.findUnique({ where: { id } });
-    if (!existingCust && name && phone) {
-      const cleanPhone = String(phone).replace(/[^0-9]/g, '');
-      existingCust = await prisma.customer.findFirst({
-        where: {
-          name: name.trim(),
-          phone: cleanPhone,
-        },
-      });
+    let existingCust = await prisma.customer.findUnique({ where: { id } }).catch(() => null);
+    if (!existingCust) {
+      const cleanPhone = phone ? String(phone).trim() : '';
+      const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+      if (phoneDigits && phoneDigits.length >= 8 && phoneDigits !== '01000000000') {
+        const phoneVariants = Array.from(new Set([
+          cleanPhone,
+          phoneDigits,
+          phoneDigits.length === 11 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}` : '',
+          phoneDigits.length === 10 ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}` : '',
+        ])).filter(Boolean);
+
+        existingCust = await prisma.customer.findFirst({
+          where: { phone: { in: phoneVariants } },
+          orderBy: { createdAt: 'desc' },
+        }).catch(() => null);
+      }
+      if (!existingCust && name && name.trim()) {
+        existingCust = await prisma.customer.findFirst({
+          where: { name: name.trim() },
+          orderBy: { createdAt: 'desc' },
+        }).catch(() => null);
+      }
     }
 
     if (!existingCust) {

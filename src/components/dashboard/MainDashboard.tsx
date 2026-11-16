@@ -243,9 +243,10 @@ const DashboardContent: React.FC = () => {
           cData.forEach((c: any) => {
             const cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
             const grp = c.group || (c.type === 'SELLER' || c.type === 'LESSOR' ? 'RECEIVED' : 'SEARCHING');
-            if (cleanPhone && cleanPhone !== '01000000000') {
+            if (cleanPhone && cleanPhone.length >= 8 && cleanPhone !== '01000000000') {
               serverPhoneMap.set(`${grp}_${cleanPhone}`, c.id);
-            } else if (c.name) {
+            }
+            if (c.name && c.name.trim()) {
               serverNameMap.set(`${grp}_${c.name.trim()}`, c.id);
             }
           });
@@ -619,11 +620,17 @@ const DashboardContent: React.FC = () => {
       saveCustomCustomer(createdCustomer);
       setCustomers((prev) => {
         const cleanPhone = (createdCustomer.phone || '').replace(/[^0-9]/g, '');
+        const custName = (createdCustomer.name || '').trim();
         const idx = prev.findIndex((c) => {
           if (c.id === createdCustomer.id) return true;
           const cClean = (c.phone || '').replace(/[^0-9]/g, '');
-          if (cleanPhone && cleanPhone !== '01000000000' && cClean === cleanPhone) return true;
-          if ((!cleanPhone || cleanPhone === '01000000000') && c.name === createdCustomer.name) return true;
+          const cName = (c.name || '').trim();
+          if (cleanPhone && cleanPhone.length >= 8 && cleanPhone !== '01000000000' && cClean === cleanPhone) return true;
+          if (custName && cName === custName) {
+            if (!cleanPhone || cleanPhone === '01000000000' || !cClean || cClean === '01000000000' || cClean === cleanPhone) {
+              return true;
+            }
+          }
           return false;
         });
         if (idx >= 0) {
@@ -663,9 +670,18 @@ const DashboardContent: React.FC = () => {
     saveCustomCustomer(savedCust);
     setCustomers((prev) => {
       // ID 일치 또는 동일 고객(이름+전화번호 일치) 기존 항목 제거하여 중복 생성 방지
+      const cleanSavedPhone = (savedCust.phone || '').replace(/[^0-9]/g, '');
+      const savedName = (savedCust.name || '').trim();
       const filtered = prev.filter((c) => {
         if (c.id === savedCust.id) return false;
-        if (savedCust.name && savedCust.phone && c.name === savedCust.name && c.phone === savedCust.phone) return false;
+        const cClean = (c.phone || '').replace(/[^0-9]/g, '');
+        const cName = (c.name || '').trim();
+        if (cleanSavedPhone && cleanSavedPhone.length >= 8 && cleanSavedPhone !== '01000000000' && cClean === cleanSavedPhone) return false;
+        if (savedName && cName === savedName) {
+          if (!cleanSavedPhone || cleanSavedPhone === '01000000000' || !cClean || cClean === '01000000000' || cClean === cleanSavedPhone) {
+            return false;
+          }
+        }
         return true;
       });
       const next = [savedCust, ...filtered];
