@@ -32,7 +32,7 @@ import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms }
 import { PropertyMapView } from '../map/PropertyMapView';
 import { PropertyFilterPanel, PropertyFilterCriteria } from './PropertyFilterPanel';
 import { SharePropertyModal } from './SharePropertyModal';
-import { PropertyTextSummaryModal } from './PropertyTextSummaryModal';
+import { PropertyTextSummaryModal, SummaryViewMode } from './PropertyTextSummaryModal';
 import { useAuth } from '../auth/AuthContext';
 import { canEditItem } from '@/lib/auth';
 
@@ -60,6 +60,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [highlightedPropertyId, setHighlightedPropertyId] = useState<string | undefined>();
   const [sharingProperty, setSharingProperty] = useState<PropertyItem | null>(null);
   const [textSummaryProperty, setTextSummaryProperty] = useState<PropertyItem | null>(null);
+  const [summaryMode, setSummaryMode] = useState<SummaryViewMode>('BRIEF');
 
   // 매물 목록 카드에서 원클릭으로 판매완료/진행중 상태를 즉시 토글하는 핸들러
   const handleQuickToggleStatus = async (e: React.MouseEvent, property: PropertyItem, targetStatus: any) => {
@@ -419,18 +420,33 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                   {formatShortDate(property.receiptDate)}
                                 </span>
                               )}
-                              {/* 접수일 옆 매물 텍스트 요약 버튼 */}
+                              {/* 접수일 옆 매물 기본 요약 버튼 */}
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  setSummaryMode('BRIEF');
                                   setTextSummaryProperty(property);
                                 }}
-                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs flex items-center gap-1 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-                                title="해당 매물 정보 텍스트 요약 보기 및 복사"
+                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                                title="해당 매물 안내 요약 보기 및 복사"
                               >
                                 <FileText className="w-3 h-3 text-indigo-600" />
                                 <span>요약</span>
+                              </button>
+                              {/* 그 옆 전부요약 버튼 */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSummaryMode('FULL');
+                                  setTextSummaryProperty(property);
+                                }}
+                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 shadow-2xs flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                                title="매물 등록 전체 내용 및 상담메모 전부 요약 보기"
+                              >
+                                <FileSpreadsheet className="w-3 h-3 text-purple-600" />
+                                <span>전부요약</span>
                               </button>
                               <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-600 text-white shrink-0">
                                 {PROPERTY_TYPE_LABELS[property.propertyType]}
@@ -722,6 +738,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  setSummaryMode('BRIEF');
                                   setTextSummaryProperty(property);
                                 }}
                                 className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-white/95 hover:bg-white text-indigo-700 shadow-xs border border-indigo-200 flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
@@ -729,6 +746,19 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               >
                                 <FileText className="w-3 h-3 text-indigo-600" />
                                 <span>요약</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSummaryMode('FULL');
+                                  setTextSummaryProperty(property);
+                                }}
+                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-white/95 hover:bg-white text-purple-700 shadow-xs border border-purple-200 flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                                title="매물 등록 전체 내용 및 상담메모 전부 요약 보기"
+                              >
+                                <FileSpreadsheet className="w-3 h-3 text-purple-600" />
+                                <span>전부요약</span>
                               </button>
                               <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-xs">
                                 {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
@@ -756,6 +786,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  setSummaryMode('BRIEF');
                                   setTextSummaryProperty(property);
                                 }}
                                 className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-white hover:bg-slate-50 text-indigo-700 shadow-xs border border-indigo-200 flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
@@ -763,6 +794,19 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               >
                                 <FileText className="w-3 h-3 text-indigo-600" />
                                 <span>요약</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSummaryMode('FULL');
+                                  setTextSummaryProperty(property);
+                                }}
+                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-white hover:bg-slate-50 text-purple-700 shadow-xs border border-purple-200 flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                                title="매물 등록 전체 내용 및 상담메모 전부 요약 보기"
+                              >
+                                <FileSpreadsheet className="w-3 h-3 text-purple-600" />
+                                <span>전부요약</span>
                               </button>
                               <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white">
                                 {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
@@ -1084,6 +1128,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
       {/* 매물 텍스트 요약 모달 */}
       <PropertyTextSummaryModal
         property={textSummaryProperty}
+        initialMode={summaryMode}
         onClose={() => setTextSummaryProperty(null)}
       />
     </div>
