@@ -10,7 +10,7 @@ export const DEFAULT_USERS: Array<Omit<UserItem, 'createdAt' | 'updatedAt'> & { 
     password: '1234',
     name: '개업공인중개사 (대표)',
     role: 'ADMIN',
-    phone: '010-1234-5678',
+    phone: '010-9667-4201',
     isActive: true,
   },
 ];

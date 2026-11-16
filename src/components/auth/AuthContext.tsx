@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     username: 'admin',
     name: '개업공인중개사 (대표)',
     role: 'ADMIN',
-    phone: '010-1234-5678',
+    phone: '010-9667-4201',
     isActive: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

@@ -102,10 +102,10 @@ export type AddressShareMode = 'full' | 'dong' | 'hidden';
 export const BROKER_OFFICE_INFO = {
   officeName: '참좋은 공인중개사사무소',
   ceoName: '개업공인중개사 (대표)',
-  registrationNumber: '제 11680-2024-00000 호',
-  tel: '010-1234-5678',
-  officeTel: '02-1234-5678',
-  address: '서울특별시 강남구 테헤란로',
+  registrationNumber: '제 26530-2024-00000 호',
+  tel: '010-9667-4201',
+  officeTel: '051-911-8249',
+  address: '부산광역시 사상구 덕포동 426-16 1층',
 };
 
 /**

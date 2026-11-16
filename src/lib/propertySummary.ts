@@ -507,10 +507,9 @@ export function generateFullPropertyDetailsSummary(
   if (options.includeBrokerInfo) {
     lines.push(``);
     lines.push(`========================================`);
-    lines.push(`■ 중개업소: ${BROKER_OFFICE_INFO.officeName} (대표: ${BROKER_OFFICE_INFO.ceoName})`);
-    lines.push(`■ 대표전화: ${BROKER_OFFICE_INFO.tel} (${BROKER_OFFICE_INFO.officeTel || ''})`);
-    lines.push(`■ 등록번호: ${BROKER_OFFICE_INFO.registrationNumber}`);
-    lines.push(`■ 사무소 주소: ${BROKER_OFFICE_INFO.address}`);
+    lines.push(`☎ 문의처: ${BROKER_OFFICE_INFO.officeName} (대표: ${BROKER_OFFICE_INFO.ceoName})`);
+    lines.push(`📞 대표전화: ${BROKER_OFFICE_INFO.tel} (${BROKER_OFFICE_INFO.officeTel || ''})`);
+    lines.push(`🏢 사무소 위치: ${BROKER_OFFICE_INFO.address}`);
     lines.push(`========================================`);
   }
 
