@@ -66,6 +66,30 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   const [selectedFloorName, setSelectedFloorName] = useState<string | null>(null);
   const [selectedFloorKey, setSelectedFloorKey] = useState<string | null>(null);
   const [selectedFloorKeys, setSelectedFloorKeys] = useState<string[]>([]);
+
+  // 층별개요 정렬 (지하층 -> 지상 1층 -> ... -> 최고층 -> 옥탑)
+  const sortedFloorList = useMemo(() => {
+    if (!fetchedData?.floorList) return [];
+    return [...fetchedData.floorList].sort((a, b) => {
+      const getFloorScore = (fName: string) => {
+        const isUnder =
+          fName.includes('지하') ||
+          fName.includes('B') ||
+          fName.includes('b') ||
+          /^지\s*\d+/.test(fName) ||
+          (fName.startsWith('지') && !fName.startsWith('지상'));
+        const match = fName.match(/\d+/);
+        const val = match ? parseInt(match[0], 10) : 0;
+        if (isUnder) return -val;
+        if (fName.includes('옥탑')) return 1000 + val;
+        return val;
+      };
+      const scoreA = getFloorScore(a.floor);
+      const scoreB = getFloorScore(b.floor);
+      if (scoreA !== scoreB) return scoreA - scoreB;
+      return a.floor.localeCompare(b.floor, 'ko');
+    });
+  }, [fetchedData?.floorList]);
   // 같은 지번에 여러 개 건물이 있을 때 층별개요 건물(동) 필터 상태
   const [selectedBuildingDong, setSelectedBuildingDong] = useState<string>('ALL');
   // 집합건물 전유부(동/호수) 선택 상태
@@ -655,9 +679,9 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     setSelectedFloorKeys(nextKeys);
     setSelectedFloorKey(nextKeys[nextKeys.length - 1] || null);
 
-    const allFloors = fetchedData?.floorList || [];
-    const chosenFloors = allFloors.filter((f, idx) => {
-      const key = `${f.floor}_${f.mainUse || ''}_${f.area}_${idx}`;
+    const chosenFloors = sortedFloorList.filter((f) => {
+      const idx = sortedFloorList.indexOf(f);
+      const key = `${f.dong || ''}_${f.floor}_${f.mainUse || ''}_${f.area}_${idx}`;
       return nextKeys.includes(key);
     });
 
@@ -672,20 +696,24 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     const totalArea = +chosenFloors.reduce((sum, f) => sum + (Number(f.area) || 0), 0).toFixed(2);
     const totalAreaPyeong = +(totalArea * 0.3025).toFixed(2);
 
-    // 층수 중복 제거 및 연결 (예: "1층, 2층")
+    // 층수 중복 제거 및 연결 (예: "1층, 2층, 3층")
     const floorNames = Array.from(new Set(chosenFloors.map((f) => f.floor)));
     const floorText = floorNames.join(', ');
     setSelectedFloorName(floorText);
 
-    // 용도 중복 제거 및 연결 (예: "금융업소, 휴게음식점")
-    const useList = Array.from(new Set(chosenFloors.map((f) => f.mainUse || f.etcUse).filter(Boolean)));
-    const useText = useList.join(', ');
+    // 대장상 주용도 포맷팅: 각 층별 용도를 명확히 표기 (예: "1층 여관, 2층 여관, 3층 단독주택")
+    const useText = chosenFloors
+      .map((f) => {
+        const use = (f.mainUse || f.etcUse || '').trim();
+        if (!use) return f.floor;
+        if (use.startsWith(f.floor)) return use;
+        return `${f.floor} ${use}`;
+      })
+      .filter(Boolean)
+      .join(', ');
 
     if (onSelectFloors) {
       onSelectFloors(chosenFloors, { totalArea, totalAreaPyeong, floorText, useText });
-    }
-    if (onSelectFloor) {
-      onSelectFloor(chosenFloors[chosenFloors.length - 1]);
     }
   };
 
@@ -710,10 +738,10 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
       return;
     }
 
-    const dongFloors = fetchedData.floorList.filter((f) => f.dong === dName);
-    const newKeys = dongFloors.map((f, idx) => {
-      const origIdx = fetchedData.floorList!.indexOf(f);
-      return `${f.floor}_${f.mainUse || ''}_${f.area}_${origIdx >= 0 ? origIdx : idx}`;
+    const dongFloors = sortedFloorList.filter((f) => f.dong === dName);
+    const newKeys = dongFloors.map((f) => {
+      const origIdx = sortedFloorList.indexOf(f);
+      return `${f.dong || ''}_${f.floor}_${f.mainUse || ''}_${f.area}_${origIdx}`;
     });
 
     setSelectedFloorKeys(newKeys);
@@ -725,8 +753,15 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
     const floorText = floorNames.join(', ');
     setSelectedFloorName(floorText);
 
-    const useList = Array.from(new Set(dongFloors.map((f) => f.mainUse || f.etcUse).filter(Boolean)));
-    const useText = useList.join(', ');
+    const useText = dongFloors
+      .map((f) => {
+        const use = (f.mainUse || f.etcUse || '').trim();
+        if (!use) return f.floor;
+        if (use.startsWith(f.floor)) return use;
+        return `${f.floor} ${use}`;
+      })
+      .filter(Boolean)
+      .join(', ');
 
     if (onSelectFloors) {
       onSelectFloors(dongFloors, { totalArea, totalAreaPyeong, floorText, useText });
@@ -1842,37 +1877,19 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {[...fetchedData.floorList]
+                {sortedFloorList
                   .filter((item) => {
                     if (selectedBuildingDong === 'ALL') return true;
                     return item.dong === selectedBuildingDong;
                   })
-                  .sort((a, b) => {
-                    const getFloorScore = (fName: string) => {
-                      const isUnder =
-                        fName.includes('지하') ||
-                        fName.includes('B') ||
-                        fName.includes('b') ||
-                        /^지\s*\d+/.test(fName) ||
-                        (fName.startsWith('지') && !fName.startsWith('지상'));
-                      const match = fName.match(/\d+/);
-                      const val = match ? parseInt(match[0], 10) : 0;
-                      if (isUnder) return -val;
-                      if (fName.includes('옥탑')) return 1000 + val;
-                      return val;
-                    };
-                    const scoreA = getFloorScore(a.floor);
-                    const scoreB = getFloorScore(b.floor);
-                    if (scoreA !== scoreB) return scoreA - scoreB;
-                    return a.floor.localeCompare(b.floor, 'ko');
-                  })
-                  .map((item, idx) => {
-                  const itemKey = `${item.floor}_${item.mainUse || ''}_${item.area}_${idx}`;
-                  const isSelected = selectedFloorKeys.includes(itemKey);
-                  return (
-                    <div
-                      key={itemKey}
-                      onClick={() => handleFloorClick(item, itemKey)}
+                  .map((item) => {
+                    const idx = sortedFloorList.indexOf(item);
+                    const itemKey = `${item.dong || ''}_${item.floor}_${item.mainUse || ''}_${item.area}_${idx}`;
+                    const isSelected = selectedFloorKeys.includes(itemKey);
+                    return (
+                      <div
+                        key={itemKey}
+                        onClick={() => handleFloorClick(item, itemKey)}
                       className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex flex-col justify-between ${
                         isSelected
                           ? 'bg-blue-50/95 border-blue-600 ring-2 ring-blue-400 shadow-sm'

@@ -788,15 +788,20 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
   // 대장상 층수 단일 클릭 시 자동 입력 (호환성 유지)
   const handleSelectFloorFromLedger = (floorInfo: PublicBuildingFloorInfo) => {
     setDetailAddress(floorInfo.floor);
+    setFloorText(floorInfo.floor);
+    const use = (floorInfo.mainUse || floorInfo.etcUse || '').trim();
+    const formattedUse = use ? (use.startsWith(floorInfo.floor) ? use : `${floorInfo.floor} ${use}`) : floorInfo.floor;
+    if (formattedUse) setBuildingRegisterUse(formattedUse);
     const pyeong = +(floorInfo.area * 0.3025).toFixed(2);
+    setBuildingArea(floorInfo.area);
     if (propertyType === 'STORE') {
       setStoreData((prev: any) => ({
         ...prev,
         currentFloor: floorInfo.floor,
         buildingArea: floorInfo.area,
         buildingAreaPyeong: pyeong,
-        buildingUse: floorInfo.mainUse,
-        actualArea: floorInfo.area, // 층 클릭 시 실평수 초기값도 해당 층 면적으로 즉시 갱신
+        buildingUse: formattedUse,
+        actualArea: floorInfo.area,
         actualAreaPyeong: pyeong,
       }));
     } else if (propertyType === 'OFFICE') {
@@ -805,8 +810,8 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         currentFloor: floorInfo.floor,
         buildingArea: floorInfo.area,
         buildingAreaPyeong: pyeong,
-        buildingUse: floorInfo.mainUse,
-        actualArea: floorInfo.area, // 층 클릭 시 실평수 초기값도 해당 층 면적으로 즉시 갱신
+        buildingUse: formattedUse,
+        actualArea: floorInfo.area,
         actualAreaPyeong: pyeong,
       }));
     } else if (propertyType === 'HOUSE') {
@@ -814,7 +819,20 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         ...prev,
         currentFloor: floorInfo.floor,
         buildingArea: floorInfo.area,
-        buildingUse: floorInfo.mainUse,
+        buildingAreaPyeong: pyeong,
+        buildingUse: formattedUse,
+        actualArea: floorInfo.area,
+        actualAreaPyeong: pyeong,
+      }));
+    } else if (propertyType === 'FACTORY_WAREHOUSE') {
+      setFactoryWarehouseData((prev: any) => ({
+        ...prev,
+        currentFloor: floorInfo.floor,
+        buildingArea: floorInfo.area,
+        buildingAreaPyeong: pyeong,
+        buildingUse: formattedUse,
+        actualArea: floorInfo.area,
+        actualAreaPyeong: pyeong,
       }));
     }
   };
@@ -830,6 +848,9 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     if (!floors || floors.length === 0) return;
 
     setDetailAddress(summary.floorText);
+    setFloorText(summary.floorText);
+    if (summary.useText) setBuildingRegisterUse(summary.useText);
+    if (summary.totalArea) setBuildingArea(summary.totalArea);
 
     // 2. 선택된 건물/층만을 기반으로 층별·호수별 임대차 및 점포 현황 자동 갱신 (선택한 건물만 나오도록 반영)
     if (propertyType === 'HOUSE') {
@@ -859,6 +880,9 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
           ...prev,
           currentFloor: summary.floorText,
           buildingArea: summary.totalArea,
+          buildingAreaPyeong: summary.totalAreaPyeong,
+          actualArea: summary.totalArea,
+          actualAreaPyeong: summary.totalAreaPyeong,
           buildingUse: summary.useText || prev.buildingUse,
           leaseStatusList: newLeaseList,
         };
@@ -907,11 +931,22 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         actualArea: summary.totalArea,
         actualAreaPyeong: summary.totalAreaPyeong,
       }));
+    } else if (propertyType === 'FACTORY_WAREHOUSE') {
+      setFactoryWarehouseData((prev: any) => ({
+        ...prev,
+        currentFloor: summary.floorText,
+        buildingArea: summary.totalArea,
+        buildingAreaPyeong: summary.totalAreaPyeong,
+        buildingUse: summary.useText || prev.buildingUse,
+        actualArea: summary.totalArea,
+        actualAreaPyeong: summary.totalAreaPyeong,
+      }));
     } else if (propertyType === 'APARTMENT') {
       setApartmentData((prev: any) => ({
         ...prev,
         currentFloor: summary.floorText,
         supplyArea: summary.totalArea,
+        supplyAreaPyeong: summary.totalAreaPyeong,
       }));
     }
   };
@@ -933,9 +968,17 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
     }));
     if (landResult.landArea) {
       setLandArea(landResult.landArea);
+      setHouseData((prev: any) => ({ ...prev, landArea: landResult.landArea || prev.landArea }));
+      setStoreData((prev: any) => ({ ...prev, landArea: landResult.landArea || prev.landArea }));
+      setOfficeData((prev: any) => ({ ...prev, landArea: landResult.landArea || prev.landArea }));
+      setFactoryWarehouseData((prev: any) => ({ ...prev, landArea: landResult.landArea || prev.landArea }));
     }
     if (landResult.zoningArea) {
       setZoningArea(landResult.zoningArea);
+      setHouseData((prev: any) => ({ ...prev, zoningArea: landResult.zoningArea || prev.zoningArea }));
+      setStoreData((prev: any) => ({ ...prev, zoningArea: landResult.zoningArea || prev.zoningArea }));
+      setOfficeData((prev: any) => ({ ...prev, zoningArea: landResult.zoningArea || prev.zoningArea }));
+      setFactoryWarehouseData((prev: any) => ({ ...prev, zoningArea: landResult.zoningArea || prev.zoningArea }));
     }
     if (landResult.landCategory) {
       setBuildingRegisterUse(landResult.landCategory);
@@ -1031,6 +1074,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         actualArea: area || prev.actualArea,
         actualAreaPyeong: pyeong || prev.actualAreaPyeong,
         buildingUse: initialUse || prev.buildingUse,
+        zoningArea: data.zoningArea || prev.zoningArea,
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: initialFloorText || prev.currentFloor,
@@ -1050,6 +1094,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         actualArea: area || prev.actualArea,
         actualAreaPyeong: pyeong || prev.actualAreaPyeong,
         buildingUse: initialUse || prev.buildingUse,
+        zoningArea: data.zoningArea || prev.zoningArea,
         approvalDate: data.approvalDate || prev.approvalDate,
         totalFloors: data.floorCount || prev.totalFloors,
         currentFloor: initialFloorText || prev.currentFloor,

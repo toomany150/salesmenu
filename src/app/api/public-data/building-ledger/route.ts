@@ -472,6 +472,38 @@ async function fetchBuildingLedgerFromGov(
 ): Promise<PublicBuildingLedgerResult | null> {
   const { sigunguCd, bjdongCd, platGbCd, bun, ji, targetDong, targetHo } = params;
 
+  // 브이월드(VWorld) 토지특성정보(용도지역 / 대지면적) 실시간 조회
+  const gubun = platGbCd === '1' || platGbCd === '2' ? '2' : '1';
+  const pnu = `${sigunguCd}${bjdongCd}${gubun}${bun.padStart(4, '0')}${ji.padStart(4, '0')}`;
+  let realZoningArea: string | undefined = undefined;
+  let realLandArea: number | undefined = undefined;
+
+  if (pnu.length === 19) {
+    try {
+      const vworldUrl = `https://api.vworld.kr/ned/data/getLandCharacteristics?key=98A53FD9-F542-32C4-9589-78A54E531AF7&pnu=${pnu}&format=json&numOfRows=10`;
+      const vRes = await fetch(vworldUrl, { next: { revalidate: 86400 } });
+      if (vRes.ok) {
+        const vData = await vRes.json().catch(() => null);
+        const fields = vData?.landCharacteristicss?.field || [];
+        if (fields.length > 0) {
+          fields.sort((a: any, b: any) => Number(b.stdrYear || 0) - Number(a.stdrYear || 0));
+          const latest = fields[0];
+          if (latest) {
+            const z1 = latest.prposArea1Nm?.trim();
+            const z2 = latest.prposArea2Nm?.trim();
+            const zArr = [z1, (z2 && z2 !== '지정되지않음' ? z2 : null)].filter(Boolean);
+            if (zArr.length > 0) realZoningArea = zArr.join(' / ');
+            if (latest.lndpclAr && parseFloat(latest.lndpclAr) > 0) {
+              realLandArea = parseFloat(latest.lndpclAr);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('VWorld building-ledger zoning lookup error:', e);
+    }
+  }
+
   // 1. 표제부 API 호출 (getBrTitleInfo) - 503 타임아웃 방지 3회 재시도
   const titleUrl = `https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey=${encodeURIComponent(
     apiKey
@@ -1068,11 +1100,11 @@ async function fetchBuildingLedgerFromGov(
 
   return {
     address: cleanAddr,
-    landArea: parseFloat(chosenItem.platArea) || (parseFloat(recapData?.platArea) || 0),
+    landArea: parseFloat(chosenItem.platArea) || (parseFloat(recapData?.platArea) || 0) || realLandArea || 0,
     totalFloorArea: parseFloat(chosenItem.totArea) || (parseFloat(recapData?.totArea) || 0),
     buildingArea: bldArea || (parseFloat(recapData?.archArea) || 0),
     buildingRegisterUse: matchedUnit?.mainUse || mainPurps,
-    zoningArea: chosenItem.etcJiga || '일반주거지역',
+    zoningArea: realZoningArea || (chosenItem.etcJiga && chosenItem.etcJiga.trim() !== '' ? chosenItem.etcJiga : '일반주거지역'),
     structureName,
     floorCount: grnd,
     underFloorCount: ugrnd,

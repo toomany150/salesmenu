@@ -211,35 +211,76 @@ export async function GET(request: NextRequest) {
   const currentYear = new Date().getFullYear();
   let livePriceYear: string = `${currentYear}년`;
   let apiSuccess = false;
+  let realZoningArea: string | null = null;
+  let realLandCategory: string | null = null;
+  let realLandArea: number | null = null;
+  let realRoadAccess: string | null = null;
 
   const apiKey = process.env.DATA_GO_KR_API_KEY || DEFAULT_DATA_GO_KR_KEY;
 
   if (pnu && pnu.length === 19) {
+    // 1) 브이월드(VWorld) 토지특성정보(용도지역 / 지목 / 면적 / 공시지가 / 도로접면) 실시간 연동
     try {
-      // 국토교통부 공시지가 서비스 호출 시도
-      const tryUrls = [
-        `https://apis.data.go.kr/1611000/nsdi/IndvdLandPriceService/attr/getIndvdLandPriceAttr?serviceKey=${encodeURIComponent(apiKey)}&pnu=${pnu}&format=json&numOfRows=1`,
-        `https://apis.data.go.kr/1613000/IndvdLandPriceService/getIndvdLandPriceAttr?serviceKey=${encodeURIComponent(apiKey)}&pnu=${pnu}&format=json&numOfRows=1`
-      ];
-
-      for (const u of tryUrls) {
-        const res = await fetch(u, { headers: { Accept: 'application/json' }, next: { revalidate: 86400 } });
-        if (res.ok) {
-          const json = await res.json().catch(() => null);
-          const item = json?.indvdLandPrices?.field?.[0] || json?.response?.body?.items?.item?.[0] || json?.response?.body?.items?.item;
-          if (item) {
-            const price = parseFloat(item.pblntfPclnd || item.indvdLandPrice || item.price || 0);
+      const vworldUrl = `https://api.vworld.kr/ned/data/getLandCharacteristics?key=98A53FD9-F542-32C4-9589-78A54E531AF7&pnu=${pnu}&format=json&numOfRows=10`;
+      const vRes = await fetch(vworldUrl, { next: { revalidate: 86400 } });
+      if (vRes.ok) {
+        const vData = await vRes.json().catch(() => null);
+        const fields = vData?.landCharacteristicss?.field || [];
+        if (fields.length > 0) {
+          fields.sort((a: any, b: any) => Number(b.stdrYear || 0) - Number(a.stdrYear || 0));
+          const latest = fields[0];
+          if (latest) {
+            const z1 = latest.prposArea1Nm?.trim();
+            const z2 = latest.prposArea2Nm?.trim();
+            const zArr = [z1, (z2 && z2 !== '지정되지않음' ? z2 : null)].filter(Boolean);
+            if (zArr.length > 0) realZoningArea = zArr.join(' / ');
+            if (latest.lndcgrCodeNm) realLandCategory = latest.lndcgrCodeNm.trim();
+            if (latest.lndpclAr && parseFloat(latest.lndpclAr) > 0) {
+              realLandArea = parseFloat(latest.lndpclAr);
+            }
+            if (latest.roadSideCodeNm) {
+              realRoadAccess = `${latest.roadSideCodeNm} 접`;
+            }
+            const price = parseFloat(latest.pblntfPclnd || 0);
             if (price > 0) {
               liveOfficialPrice = price;
-              livePriceYear = `${item.stdrYear || String(currentYear)}년`;
+              livePriceYear = `${latest.stdrYear || String(currentYear)}년`;
               apiSuccess = true;
-              break;
             }
           }
         }
       }
     } catch (e) {
-      console.warn('Gov API call failed, using fallback:', e);
+      console.warn('VWorld land characteristics API call failed:', e);
+    }
+
+    // 2) 국토교통부 공시지가 서비스 호출 시도 (추가 보완)
+    if (!liveOfficialPrice) {
+      try {
+        const tryUrls = [
+          `https://apis.data.go.kr/1611000/nsdi/IndvdLandPriceService/attr/getIndvdLandPriceAttr?serviceKey=${encodeURIComponent(apiKey)}&pnu=${pnu}&format=json&numOfRows=1`,
+          `https://apis.data.go.kr/1613000/IndvdLandPriceService/getIndvdLandPriceAttr?serviceKey=${encodeURIComponent(apiKey)}&pnu=${pnu}&format=json&numOfRows=1`
+        ];
+
+        for (const u of tryUrls) {
+          const res = await fetch(u, { headers: { Accept: 'application/json' }, next: { revalidate: 86400 } });
+          if (res.ok) {
+            const json = await res.json().catch(() => null);
+            const item = json?.indvdLandPrices?.field?.[0] || json?.response?.body?.items?.item?.[0] || json?.response?.body?.items?.item;
+            if (item) {
+              const price = parseFloat(item.pblntfPclnd || item.indvdLandPrice || item.price || 0);
+              if (price > 0) {
+                liveOfficialPrice = price;
+                livePriceYear = `${item.stdrYear || String(currentYear)}년`;
+                apiSuccess = true;
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Gov API call failed, using fallback:', e);
+      }
     }
   }
 
@@ -251,25 +292,32 @@ export async function GET(request: NextRequest) {
   const finalPricePyeong = Math.round(finalPriceM2 * 3.305785);
 
   // 용도지역 추정 (시/도 및 지목 기준)
-  let zoningArea = '자연녹지지역';
-  if (confirmedJibun.includes('서울') || confirmedJibun.includes('부산 사상')) {
-    zoningArea = category === '대' ? '제2종일반주거지역' : '자연녹지지역';
-  } else if (confirmedJibun.includes('경기 양평') || confirmedJibun.includes('경기 가평')) {
-    zoningArea = '계획관리지역';
-  } else if (category === '임야') {
-    zoningArea = '농림지역 / 보전산지';
+  let zoningArea = realZoningArea || '자연녹지지역';
+  if (!realZoningArea) {
+    if (confirmedJibun.includes('서울') || confirmedJibun.includes('부산 사상')) {
+      zoningArea = category === '대' ? '제2종일반주거지역' : '자연녹지지역';
+    } else if (confirmedJibun.includes('경기 양평') || confirmedJibun.includes('경기 가평')) {
+      zoningArea = '계획관리지역';
+    } else if (category === '임야') {
+      zoningArea = '농림지역 / 보전산지';
+    }
   }
 
   // 대장 면적 기본값 설정 (단위: ㎡)
-  let standardArea = 660.0; // 기본 약 200평
-  if (category === '임야') standardArea = 3300.0; // 1,000평
-  if (category === '대') standardArea = 330.0; // 100평
+  let standardArea = realLandArea || 660.0; // 기본 약 200평
+  if (!realLandArea) {
+    if (category === '임야') standardArea = 3300.0; // 1,000평
+    if (category === '대') standardArea = 330.0; // 100평
+  }
+
+  const finalCategory = realLandCategory || category;
+  const finalCategoryName = realLandCategory ? `${realLandCategory} (대장)` : categoryName;
 
   const result: PublicLandLedgerResult = {
     address: confirmedJibun,
     pnu: pnu || undefined,
-    landCategory: category,
-    landCategoryName: categoryName,
+    landCategory: finalCategory,
+    landCategoryName: finalCategoryName,
     landArea: standardArea,
     landAreaPyeong: +(standardArea * 0.3025).toFixed(1),
     officialLandPrice: finalPriceM2,
@@ -277,7 +325,7 @@ export async function GET(request: NextRequest) {
     officialPriceYear: livePriceYear,
     ownership: confirmedJibun.includes('국유') ? '국유지' : '개인',
     zoningArea: zoningArea,
-    roadAccess: '폭 4~6m 도로 접 (건축 가능)',
+    roadAccess: realRoadAccess || '폭 4~6m 도로 접 (건축 가능)',
     source: apiSuccess ? 'GOV_API' : 'KAKAO_CALC',
     message: apiSuccess
       ? '국토교통부 공공데이터포털 개별공시지가 실시간 연동 성공'
