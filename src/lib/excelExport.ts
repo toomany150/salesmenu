@@ -82,6 +82,71 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
       ? `${p.officeDetail.bathroomCount}개${p.officeDetail.toiletGenderType ? ` (${p.officeDetail.toiletGenderType})` : ''}`
       : '';
 
+    // 면적 추출 (공급/공용면적 및 전용면적)
+    let commonAreaM2: number | undefined;
+    let commonAreaPy: number | undefined;
+    let exclusiveAreaM2: number | undefined;
+    let exclusiveAreaPy: number | undefined;
+
+    if (p.propertyType === 'STORE') {
+      exclusiveAreaM2 = p.storeDetail?.actualArea ?? p.actualArea;
+      exclusiveAreaPy = p.storeDetail?.actualAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.storeDetail?.buildingArea ?? p.buildingArea;
+      commonAreaPy = p.storeDetail?.buildingAreaPyeong;
+    } else if (p.propertyType === 'APARTMENT') {
+      exclusiveAreaM2 = p.apartmentDetail?.exclusiveArea ?? p.actualArea;
+      exclusiveAreaPy = p.apartmentDetail?.exclusiveAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.apartmentDetail?.supplyArea ?? p.buildingArea;
+      commonAreaPy = p.apartmentDetail?.supplyAreaPyeong;
+    } else if (p.propertyType === 'OFFICE') {
+      exclusiveAreaM2 = p.officeDetail?.actualArea ?? p.actualArea;
+      exclusiveAreaPy = p.officeDetail?.actualAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.officeDetail?.buildingArea ?? p.buildingArea;
+      commonAreaPy = p.officeDetail?.buildingAreaPyeong;
+    } else if (p.propertyType === 'HOUSE') {
+      exclusiveAreaM2 = p.houseDetail?.actualArea ?? p.houseDetail?.exclusiveArea ?? p.actualArea;
+      exclusiveAreaPy = p.houseDetail?.actualAreaPyeong ?? p.houseDetail?.exclusiveAreaPyeong ?? p.actualAreaPyeong;
+      commonAreaM2 = p.houseDetail?.buildingArea ?? p.buildingArea;
+      commonAreaPy = p.houseDetail?.buildingAreaPyeong;
+    } else {
+      exclusiveAreaM2 = p.actualArea;
+      exclusiveAreaPy = p.actualAreaPyeong;
+      commonAreaM2 = p.buildingArea;
+    }
+
+    // 평수 자동 계산 (㎡만 있는 경우)
+    if (exclusiveAreaM2 && !exclusiveAreaPy) {
+      exclusiveAreaPy = +(exclusiveAreaM2 * 0.3025).toFixed(1);
+    }
+    if (commonAreaM2 && !commonAreaPy) {
+      commonAreaPy = +(commonAreaM2 * 0.3025).toFixed(1);
+    }
+
+    // 카드에 표시되는 면적 요약 문자열 (예: 공용 74.91㎡(22.7평) / 전용 74.91㎡(22.7평))
+    let areaSummaryText = '';
+    if (p.propertyType === 'LAND') {
+      const landM2 = p.landArea ?? p.landDetail?.landArea;
+      if (landM2) {
+        const landPy = (landM2 * 0.3025).toFixed(1);
+        areaSummaryText = `토지 ${landM2.toLocaleString()}㎡ (${landPy}평)`;
+      }
+    } else {
+      const areaParts: string[] = [];
+      if (commonAreaM2) {
+        areaParts.push(`공용 ${commonAreaM2}㎡(${commonAreaPy}평)`);
+      }
+      if (exclusiveAreaM2) {
+        areaParts.push(`전용 ${exclusiveAreaM2}㎡(${exclusiveAreaPy}평)`);
+      }
+      areaSummaryText = areaParts.join(' / ');
+    }
+
+    // 대지면적 및 연면적
+    const landAreaM2 = p.landArea ?? p.landDetail?.landArea ?? p.houseDetail?.landArea;
+    const landAreaPy = landAreaM2 ? +(landAreaM2 * 0.3025).toFixed(1) : '';
+    const totalFloorAreaM2 = p.totalFloorArea ?? p.houseDetail?.totalFloorArea ?? p.storeDetail?.totalFloorArea;
+    const totalFloorAreaPy = totalFloorAreaM2 ? +(totalFloorAreaM2 * 0.3025).toFixed(1) : '';
+
     return {
       '연번': index + 1,
       '매물번호': p.propertyNumber || '',
@@ -91,6 +156,8 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
       '거래형태': p.transactionType || '',
       '상호명/단지명': titleOrName,
       '소재지(주소)': p.address || '',
+      '도로명주소': p.roadAddress || p.address || '',
+      '지번주소': p.jibunAddress || '',
       '상세주소(동호수)': p.detailAddress || '',
       '매매가(만원)': p.price ?? '',
       '조정매매가(만원)': p.negotiablePrice ?? '',
@@ -104,10 +171,15 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
       '관리비상세내역': feeDetails,
       '권리금(만원)': premium,
       '조정권리금(만원)': negotiablePremium,
-      '전용면적(㎡)': p.actualArea ?? '',
-      '전용실평수(평)': p.actualAreaPyeong ?? '',
-      '연면적(㎡)': p.totalFloorArea ?? '',
-      '대지면적(㎡)': p.landArea ?? '',
+      '공급(공용)면적(㎡)': commonAreaM2 ?? '',
+      '공급(공용)평수(평)': commonAreaPy ?? '',
+      '전용면적(㎡)': exclusiveAreaM2 ?? '',
+      '전용실평수(평)': exclusiveAreaPy ?? '',
+      '면적요약': areaSummaryText,
+      '대지면적(㎡)': landAreaM2 ?? '',
+      '대지면적(평)': landAreaPy ?? '',
+      '연면적(㎡)': totalFloorAreaM2 ?? '',
+      '연면적(평)': totalFloorAreaPy ?? '',
       '해당층/총층': p.floorText ?? '',
       '방향': directionStr,
       '입주가능일': availableDateStr,
@@ -132,7 +204,9 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
     { wch: 10 }, // 매물종류
     { wch: 8 },  // 거래형태
     { wch: 16 }, // 상호명/단지명
-    { wch: 30 }, // 주소
+    { wch: 30 }, // 소재지(주소)
+    { wch: 30 }, // 도로명주소
+    { wch: 25 }, // 지번주소
     { wch: 16 }, // 상세주소
     { wch: 12 }, // 매매가
     { wch: 14 }, // 조정매매가
@@ -146,10 +220,15 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
     { wch: 25 }, // 관리비상세
     { wch: 12 }, // 권리금
     { wch: 14 }, // 조정권리금
-    { wch: 12 }, // 전용면적
-    { wch: 12 }, // 전용실평수
-    { wch: 12 }, // 연면적
-    { wch: 12 }, // 대지면적
+    { wch: 16 }, // 공급(공용)면적
+    { wch: 16 }, // 공급(공용)평수
+    { wch: 14 }, // 전용면적
+    { wch: 14 }, // 전용실평수
+    { wch: 35 }, // 면적요약
+    { wch: 14 }, // 대지면적
+    { wch: 14 }, // 대지면적(평)
+    { wch: 14 }, // 연면적
+    { wch: 14 }, // 연면적(평)
     { wch: 12 }, // 층수
     { wch: 16 }, // 방향
     { wch: 14 }, // 입주가능일
@@ -158,7 +237,7 @@ export function exportPropertiesToExcel(properties: PropertyItem[], customFilena
     { wch: 14 }, // 고객명
     { wch: 16 }, // 연락처
     { wch: 12 }, // 담당자
-    { wch: 40 }, // 메모
+    { wch: 45 }, // 메모
   ];
   worksheet['!cols'] = colWidths;
 
