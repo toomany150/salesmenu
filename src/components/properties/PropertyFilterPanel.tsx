@@ -285,14 +285,15 @@ const normalizeTransactionType = (val?: string): string => {
       // 1. Text Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchNum = p.propertyNumber.toLowerCase().includes(q);
-        const matchAddr = p.address.toLowerCase().includes(q);
-        const matchRoad = p.roadAddress?.toLowerCase().includes(q);
-        const matchJibun = p.jibunAddress?.toLowerCase().includes(q);
-        const matchDetail = p.detailAddress?.toLowerCase().includes(q);
-        const matchCust = p.customer?.name.toLowerCase().includes(q);
-        const matchNotes = p.consultationNotes?.toLowerCase().includes(q);
-        if (!matchNum && !matchAddr && !matchRoad && !matchJibun && !matchDetail && !matchCust && !matchNotes) {
+        const matchNum = (p.propertyNumber || '').toLowerCase().includes(q);
+        const matchAddr = (p.address || '').toLowerCase().includes(q);
+        const matchRoad = p.roadAddress?.toLowerCase().includes(q) || false;
+        const matchJibun = p.jibunAddress?.toLowerCase().includes(q) || false;
+        const matchDetail = p.detailAddress?.toLowerCase().includes(q) || false;
+        const matchCust = p.customer?.name ? p.customer.name.toLowerCase().includes(q) : false;
+        const matchOwner = p.ownerName ? p.ownerName.toLowerCase().includes(q) : false;
+        const matchNotes = p.consultationNotes?.toLowerCase().includes(q) || false;
+        if (!matchNum && !matchAddr && !matchRoad && !matchJibun && !matchDetail && !matchCust && !matchOwner && !matchNotes) {
           return false;
         }
       }
