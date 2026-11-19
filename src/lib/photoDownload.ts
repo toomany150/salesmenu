@@ -30,15 +30,47 @@ export async function imageSourceToBlob(source: string): Promise<{ blob: Blob; e
     }
   }
 
-  // 2. 일반 URL 또는 Blob URL인 경우
-  const res = await fetch(source);
-  if (!res.ok) {
-    throw new Error(`이미지를 가져오는데 실패했습니다 (${res.status} ${res.statusText})`);
+  // 2. Blob URL(blob:http...)인 경우: 브라우저 내부 메모리 URL이므로 직접 fetch
+  if (source.startsWith('blob:')) {
+    const res = await fetch(source);
+    if (!res.ok) {
+      throw new Error(`이미지를 가져오는데 실패했습니다 (${res.status} ${res.statusText})`);
+    }
+    const blob = await res.blob();
+    const mime = blob.type || 'image/jpeg';
+    const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+    return { blob, ext, mime };
   }
-  const blob = await res.blob();
-  const mime = blob.type || 'image/jpeg';
-  const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
-  return { blob, ext, mime };
+
+  // 3. 일반 웹 URL (Cloudflare R2, 외부 CDN 등)인 경우
+  // 브라우저에서 직접 fetch 시 CORS 정책 위반("Failed to fetch")이 발생할 수 있으므로,
+  // 1차로 직접 시도하고 실패하면 동일 도메인의 서버 이미지 프록시(/api/proxy-image)를 통해 100% 안전하게 다운로드합니다.
+  try {
+    const res = await fetch(source);
+    if (res.ok) {
+      const blob = await res.blob();
+      const mime = blob.type || 'image/jpeg';
+      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+      return { blob, ext, mime };
+    }
+  } catch (directErr) {
+    console.warn('[photoDownload] 이미지 직접 fetch 실패(CORS 등), 서버 프록시로 전환합니다:', directErr);
+  }
+
+  // 4. 서버 이미지 프록시 폴백
+  if (source.startsWith('http://') || source.startsWith('https://')) {
+    const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(source)}`;
+    const res = await fetch(proxyUrl);
+    if (!res.ok) {
+      throw new Error(`이미지 프록시 다운로드 실패 (${res.status} ${res.statusText})`);
+    }
+    const blob = await res.blob();
+    const mime = blob.type || 'image/jpeg';
+    const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+    return { blob, ext, mime };
+  }
+
+  throw new Error('지원하지 않는 이미지 주소 형식입니다.');
 }
 
 /**
