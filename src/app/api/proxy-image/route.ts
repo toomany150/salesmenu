@@ -14,7 +14,14 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Invalid URL protocol', { status: 400 });
     }
 
-    const response = await fetch(imageUrl);
+    let targetUrl = imageUrl;
+    try {
+      targetUrl = new URL(imageUrl).toString();
+    } catch {
+      targetUrl = encodeURI(imageUrl);
+    }
+
+    const response = await fetch(targetUrl);
     if (!response.ok) {
       return new NextResponse(`Failed to fetch upstream image: ${response.status} ${response.statusText}`, {
         status: response.status,

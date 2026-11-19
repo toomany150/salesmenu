@@ -43,31 +43,41 @@ export async function imageSourceToBlob(source: string): Promise<{ blob: Blob; e
   }
 
   // 3. 일반 웹 URL (Cloudflare R2, 외부 CDN 등)인 경우
-  // 브라우저에서 직접 fetch 시 CORS 정책 위반("Failed to fetch")이 발생할 수 있으므로,
-  // 1차로 직접 시도하고 실패하면 동일 도메인의 서버 이미지 프록시(/api/proxy-image)를 통해 100% 안전하게 다운로드합니다.
-  try {
-    const res = await fetch(source);
-    if (res.ok) {
-      const blob = await res.blob();
-      const mime = blob.type || 'image/jpeg';
-      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
-      return { blob, ext, mime };
-    }
-  } catch (directErr) {
-    console.warn('[photoDownload] 이미지 직접 fetch 실패(CORS 등), 서버 프록시로 전환합니다:', directErr);
-  }
-
-  // 4. 서버 이미지 프록시 폴백
+  // 외부 도메인(R2 등)은 브라우저 CORS 제한으로 클라이언트에서 직접 fetch 시 'Failed to fetch' 오류가 발생합니다.
+  // 따라서 서버 이미지 프록시(/api/proxy-image)를 1순위로 호출하여 100% 안전하게 다운로드합니다.
   if (source.startsWith('http://') || source.startsWith('https://')) {
-    const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(source)}`;
-    const res = await fetch(proxyUrl);
-    if (!res.ok) {
-      throw new Error(`이미지 프록시 다운로드 실패 (${res.status} ${res.statusText})`);
+    const isSameOrigin = typeof window !== 'undefined' && source.startsWith(window.location.origin);
+
+    if (!isSameOrigin) {
+      // 외부 도메인 (Cloudflare R2 등): 서버 프록시 우선
+      try {
+        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(source)}`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          const mime = blob.type || 'image/jpeg';
+          const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+          return { blob, ext, mime };
+        }
+      } catch (proxyErr) {
+        console.warn('[photoDownload] 프록시 fetch 오류, 직접 fetch 시도:', proxyErr);
+      }
     }
-    const blob = await res.blob();
-    const mime = blob.type || 'image/jpeg';
-    const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
-    return { blob, ext, mime };
+
+    // 동일 오리진이거나 프록시 폴백인 경우 직접 fetch
+    try {
+      const res = await fetch(source);
+      if (res.ok) {
+        const blob = await res.blob();
+        const mime = blob.type || 'image/jpeg';
+        const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+        return { blob, ext, mime };
+      }
+    } catch (directErr: any) {
+      console.warn('[photoDownload] 직접 fetch 실패:', directErr);
+    }
+
+    throw new Error('사진 원본을 불러오지 못했습니다. 즉시 ZIP 다운로드를 이용해주세요.');
   }
 
   throw new Error('지원하지 않는 이미지 주소 형식입니다.');
@@ -90,6 +100,52 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
       URL.revokeObjectURL(blobUrl);
     } catch {}
   }, 60000);
+}
+
+/**
+ * 서버에 저장된 매물 ID 기반 초고속 ZIP 다운로드 트리거
+ */
+export function triggerServerZipDownload(propertyId: string, filename?: string) {
+  const url = `/api/properties/download-zip?id=${encodeURIComponent(propertyId)}`;
+  const a = document.createElement('a');
+  a.href = url;
+  if (filename) {
+    a.download = filename.endsWith('.zip') ? filename : `${filename}.zip`;
+  }
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a);
+    } catch {}
+  }, 2000);
+}
+
+/**
+ * 이미지 URL 배열을 서버로 전송하여 고속 ZIP으로 받아 즉시 다운로드
+ */
+export async function triggerServerZipDownloadFromImages(
+  images: string[],
+  title: string,
+  propertyNumber?: string
+): Promise<void> {
+  const res = await fetch('/api/properties/download-zip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ images, title, propertyNumber }),
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => '');
+    throw new Error(errorText || `서버 ZIP 다운로드 실패 (${res.status})`);
+  }
+  const blob = await res.blob();
+  const cleanTitle = (title || propertyNumber || '매물사진')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, '_')
+    .trim();
+  const propNo = propertyNumber ? `_${propertyNumber}` : '';
+  const filename = `${cleanTitle}${propNo}_사진모음_${images.length}장.zip`;
+  triggerBlobDownload(blob, filename);
 }
 
 /**

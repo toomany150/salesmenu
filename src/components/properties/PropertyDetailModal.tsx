@@ -3395,6 +3395,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         images={images}
         titleName={titleName}
         propertyNumber={property.propertyNumber}
+        propertyId={property.id}
       />
 
       {/* 사진 업로드용 숨겨진 File Input */}

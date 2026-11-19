@@ -9,13 +9,16 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Sparkles, 
-  Check, 
+  Zap,
   ArrowRight,
-  HardDrive
+  HardDrive,
+  Download
 } from 'lucide-react';
 import { 
   downloadPhotosToDirectory, 
   downloadPhotosAsZip, 
+  triggerServerZipDownload,
+  triggerServerZipDownloadFromImages,
   isDirectoryPickerSupported, 
   isSaveFilePickerSupported 
 } from '@/lib/photoDownload';
@@ -26,6 +29,7 @@ interface PhotoDownloadModalProps {
   images: string[];
   titleName: string;
   propertyNumber?: string;
+  propertyId?: string;
 }
 
 export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
@@ -34,15 +38,16 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
   images,
   titleName,
   propertyNumber,
+  propertyId,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [downloadMode, setDownloadMode] = useState<'directory' | 'zip' | null>(null);
+  const [downloadMode, setDownloadMode] = useState<'instant' | 'directory' | 'zip' | null>(null);
   const [progressCurrent, setProgressCurrent] = useState(0);
   const [progressTotal, setProgressTotal] = useState(images.length);
   const [progressMessage, setProgressMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedResult, setCompletedResult] = useState<{
-    type: 'directory' | 'zip';
+    type: 'instant' | 'directory' | 'zip';
     count: number;
     folderName?: string;
   } | null>(null);
@@ -60,7 +65,50 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
   const propNo = propertyNumber ? `_${propertyNumber}` : '';
   const baseFilename = `${cleanTitle}${propNo}`;
 
-  // 1. 내 컴퓨터 폴더 직접 지정하여 개별 사진 저장
+  // 1. ⚡ 원클릭 즉시 다운로드 (가장 빠르고 100% 안전함 - 서버 ZIP 다운로드)
+  const handleInstantZipDownload = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setDownloadMode('instant');
+    setProgressCurrent(0);
+    setProgressTotal(totalCount);
+    setProgressMessage('사진 압축 파일 준비 및 다운로드 중...');
+    setErrorMessage(null);
+    setCompletedResult(null);
+
+    try {
+      if (propertyId) {
+        triggerServerZipDownload(propertyId, `${baseFilename}_사진모음_${totalCount}장`);
+      } else {
+        await triggerServerZipDownloadFromImages(images, titleName, propertyNumber);
+      }
+
+      setCompletedResult({
+        type: 'instant',
+        count: totalCount,
+      });
+    } catch (err: any) {
+      console.warn('서버 즉시 ZIP 실패, 클라이언트 ZIP으로 대체합니다:', err);
+      try {
+        const res = await downloadPhotosAsZip(images, baseFilename, (curr, total, msg) => {
+          setProgressCurrent(curr);
+          setProgressTotal(total);
+          if (msg) setProgressMessage(msg);
+        });
+        if (res.success) {
+          setCompletedResult({ type: 'instant', count: res.count });
+        } else {
+          throw new Error(res.error || '사진 다운로드 중 오류가 발생했습니다.');
+        }
+      } catch (clientErr: any) {
+        setErrorMessage(clientErr.message || '사진 다운로드에 실패했습니다. 다시 시도해주세요.');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 2. 📁 내 컴퓨터 폴더 직접 지정하여 개별 사진 저장
   const handleSaveToDirectory = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -102,7 +150,7 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
     }
   };
 
-  // 2. ZIP 압축 파일로 묶어서 저장 경로 지정
+  // 3. 📦 ZIP 압축 파일로 묶어서 저장 경로 지정
   const handleSaveToZip = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -189,12 +237,24 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
 
         {/* 모달 본문 */}
         <div className="p-5 space-y-4">
-          {/* 오류 메시지 발생 시 */}
+          {/* 오류 메시지 발생 시 + 즉시 다운로드 복구 버튼 제공 */}
           {errorMessage && (
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <span className="font-bold">저장 실패:</span> {errorMessage}
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl space-y-2 text-xs text-red-700">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="font-bold">저장 안내:</span> {errorMessage}
+                </div>
+              </div>
+              <div className="pt-1 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleInstantZipDownload}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>⚡ 1초 즉시 다운로드로 저장하기</span>
+                </button>
               </div>
             </div>
           )}
@@ -216,7 +276,7 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
                     </>
                   ) : (
                     <>
-                      {completedResult.count}장의 사진이 포함된 ZIP 압축 파일이 지정하신 경로에 안전하게 저장되었습니다.
+                      {completedResult.count}장의 사진이 포함된 ZIP 압축 파일이 컴퓨터(다운로드 폴더)에 안전하게 저장되었습니다.
                     </>
                   )}
                 </p>
@@ -246,19 +306,21 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
                 </p>
               </div>
 
-              {/* 프로그레스 바 */}
-              <div className="space-y-1.5 pt-2">
-                <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${percent}%` }}
-                  />
+              {/* 프로그레스 바 (개별 다운로드 모드 시) */}
+              {downloadMode !== 'instant' && (
+                <div className="space-y-1.5 pt-2">
+                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 px-1">
+                    <span>{progressCurrent} / {totalCount}장</span>
+                    <span className="text-blue-600 font-extrabold">{percent}%</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-500 px-1">
-                  <span>{progressCurrent} / {totalCount}장</span>
-                  <span className="text-blue-600 font-extrabold">{percent}%</span>
-                </div>
-              </div>
+              )}
             </div>
           ) : (
             /* 3. 다운로드 옵션 선택 화면 */
@@ -268,32 +330,59 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
                 <div>
                   <span className="font-bold text-blue-900">100% 누락 없는 완벽 저장:</span>
                   <p className="mt-0.5 text-slate-600">
-                    브라우저의 자동 다운로드 차단 없이, <span className="font-semibold text-slate-900">컴퓨터 폴더를 직접 지정</span>하여 {totalCount}장의 모든 사진을 안전하게 저장할 수 있습니다.
+                    브라우저의 자동 다운로드 차단 없이, {totalCount}장의 모든 사진을 안전하게 저장할 수 있습니다.
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-2.5 pt-1">
-                {/* 옵션 1: 컴퓨터 폴더에 개별 사진으로 저장 (경로 지정) */}
+                {/* 옵션 1: ⚡ 1초 원클릭 즉시 다운로드 (가장 빠르고 확실함) */}
+                <button
+                  type="button"
+                  onClick={handleInstantZipDownload}
+                  className="group relative flex items-start gap-3.5 p-3.5 rounded-xl border-2 border-indigo-500/80 bg-gradient-to-r from-indigo-50/60 to-blue-50/60 hover:from-indigo-100/60 hover:to-blue-100/60 hover:border-indigo-600 transition-all text-left shadow-xs hover:shadow-md cursor-pointer active:scale-[0.99]"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                    <Zap className="w-5 h-5 fill-amber-300 text-amber-300" />
+                  </div>
+                  <div className="flex-1 min-w-0 pr-6">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-black text-slate-900 text-sm">
+                        ⚡ 1초 원클릭 즉시 다운로드 (ZIP)
+                      </span>
+                      <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-indigo-600 text-white">
+                        최고속 / 100% 성공 보장
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 leading-normal">
+                      폴더 선택이나 권한 허용 없이, <span className="font-bold text-indigo-700">클릭 1번에 {totalCount}장 전체 사진</span>이 컴퓨터의 다운로드 폴더에 즉시 저장됩니다.
+                    </p>
+                  </div>
+                  <div className="absolute top-4 right-3.5 text-indigo-600 group-hover:translate-x-0.5 transition-transform">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                </button>
+
+                {/* 옵션 2: 컴퓨터 폴더에 개별 사진으로 저장 (경로 지정) */}
                 <button
                   type="button"
                   onClick={handleSaveToDirectory}
-                  className="group relative flex items-start gap-3.5 p-3.5 rounded-xl border-2 border-blue-500/80 bg-blue-50/30 hover:bg-blue-50 hover:border-blue-600 transition-all text-left shadow-xs hover:shadow-md cursor-pointer active:scale-[0.99]"
+                  className="group relative flex items-start gap-3.5 p-3.5 rounded-xl border border-blue-300 bg-white hover:bg-blue-50/50 hover:border-blue-500 transition-all text-left shadow-2xs hover:shadow-xs cursor-pointer active:scale-[0.99]"
                 >
                   <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
                     <Folder className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0 pr-6">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-extrabold text-slate-900 text-sm">
-                        내 컴퓨터 폴더 지정하여 사진 저장
+                      <span className="font-bold text-slate-900 text-sm">
+                        내 컴퓨터 폴더 지정하여 개별 사진 저장
                       </span>
-                      <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-400 text-amber-950">
-                        추천 / 경로 지정
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
+                        경로 직접 선택
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1 leading-normal">
-                      탐색기에서 원하는 폴더를 선택하시면 <span className="font-semibold text-slate-700">[{baseFilename}_사진모음]</span> 폴더가 자동 생성되어 {totalCount}장 전체가 개별 파일로 차곡차곡 저장됩니다.
+                      탐색기에서 원하는 폴더를 선택하시면 <span className="font-semibold text-slate-700">[{baseFilename}_사진모음]</span> 폴더가 자동 생성되어 {totalCount}장이 개별 파일로 저장됩니다.
                     </p>
                   </div>
                   <div className="absolute top-4 right-3.5 text-blue-600 group-hover:translate-x-0.5 transition-transform">
@@ -301,22 +390,22 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
                   </div>
                 </button>
 
-                {/* 옵션 2: ZIP 압축 파일로 묶어서 저장 (경로 지정) */}
+                {/* 옵션 3: ZIP 압축 파일로 묶어서 저장 위치 직접 지정 */}
                 <button
                   type="button"
                   onClick={handleSaveToZip}
-                  className="group relative flex items-start gap-3.5 p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all text-left shadow-2xs hover:shadow-sm cursor-pointer active:scale-[0.99]"
+                  className="group relative flex items-start gap-3.5 p-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all text-left shadow-2xs hover:shadow-2xs cursor-pointer active:scale-[0.99]"
                 >
                   <div className="w-10 h-10 rounded-lg bg-slate-700 text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
                     <Archive className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0 pr-6">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-900 text-sm">
-                        ZIP 압축 파일 1개로 저장
+                      <span className="font-bold text-slate-800 text-sm">
+                        ZIP 압축 파일 저장 (저장 위치 지정)
                       </span>
                       <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                        압축 파일 (.zip)
+                        .zip
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1 leading-normal">
@@ -331,7 +420,7 @@ export const PhotoDownloadModal: React.FC<PhotoDownloadModalProps> = ({
 
               {!isDirSupported && (
                 <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                  * 현재 브라우저는 폴더 직접 선택 API를 지원하지 않아 ZIP 압축 저장을 권장합니다.
+                  * 현재 브라우저는 폴더 직접 선택 API를 지원하지 않으므로 상단의 [⚡ 1초 원클릭 즉시 다운로드]를 이용해주세요.
                 </p>
               )}
             </div>

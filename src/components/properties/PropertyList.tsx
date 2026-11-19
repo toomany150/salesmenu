@@ -77,8 +77,9 @@ export const PropertyList: React.FC<PropertyListProps> = ({
         const res = await fetch(`/api/properties?id=${prop.id}&fullPhotos=true`);
         if (res.ok) {
           const data = await res.json();
-          if (data?.images && Array.isArray(data.images) && data.images.length > 0) {
-            setDownloadPhotoTarget({ ...prop, images: data.images });
+          const item = Array.isArray(data) ? data[0] : data;
+          if (item?.images && Array.isArray(item.images) && item.images.length > 0) {
+            setDownloadPhotoTarget({ ...prop, images: item.images });
             return;
           }
         }
@@ -1374,6 +1375,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
           images={downloadPhotoTarget.images || []}
           titleName={downloadPhotoTarget.roadAddress || downloadPhotoTarget.address || downloadPhotoTarget.propertyNumber}
           propertyNumber={downloadPhotoTarget.propertyNumber}
+          propertyId={downloadPhotoTarget.id}
         />
       )}
     </div>
