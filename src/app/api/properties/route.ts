@@ -36,8 +36,9 @@ function formatPropertyOutput(p: any, options: { fullPhotos?: boolean } = { full
     }
   }
   const totalPhotoCount = parsedImages.length;
-  // 목록 조회 시 대표사진 1장만 반환하여 속도 극대화, 상세 조회 시 전체 사진 반환
-  const returnedImages = options.fullPhotos ? parsedImages : parsedImages.slice(0, 1);
+  // 등록된 전체 사진 반환 (Cloudflare R2 클라우드 URL 형태이므로 전체를 반환해도 데이터 크기가 극히 작으며,
+  // 매물장 카드에서 등록된 전체 사진 장수 표시 및 일괄 다운로드, 수정 시 누락 방지를 100% 보장합니다)
+  const returnedImages = parsedImages;
 
   let parsedAssignedAgents: string[] = [];
   if (p.assignedAgents) {
@@ -298,12 +299,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const fullPhotosParam = searchParams.get('fullPhotos');
-    // 단건 상세 조회(propertyIdParam 있음)이거나 명시적으로 fullPhotos=true인 경우 전체 사진 반환
-    // 전체 목록 조회 시에는 fullPhotos=false로 대표사진(1장)만 반환하여 속도를 수십 배 향상
-    const shouldLoadFullPhotos = !!propertyIdParam || fullPhotosParam === 'true';
-
-    let formattedProperties = properties.map((p: any) => formatPropertyOutput(p, { fullPhotos: shouldLoadFullPhotos }));
+    // 전체 사진 반환 (목록 및 상세 모두 전체 사진을 전달하여 매물장 카드에서 정확한 장수 표시 및 일괄 다운로드 보장)
+    let formattedProperties = properties.map((p: any) => formatPropertyOutput(p, { fullPhotos: true }));
 
     const rawCanAccessAll = request.headers.get('x-user-can-access-all') || searchParams.get('canAccessAll');
     let canAccessAllData = rawCanAccessAll === 'true' || rawCanAccessAll === '1';

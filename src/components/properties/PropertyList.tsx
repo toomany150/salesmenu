@@ -19,7 +19,8 @@ import {
   Check,
   FileSpreadsheet,
   CheckCircle2,
-  FileText
+  FileText,
+  Download
 } from 'lucide-react';
 import { 
   PropertyItem, 
@@ -34,6 +35,7 @@ import { PropertyMapView } from '../map/PropertyMapView';
 import { PropertyFilterPanel, PropertyFilterCriteria } from './PropertyFilterPanel';
 import { SharePropertyModal } from './SharePropertyModal';
 import { PropertyTextSummaryModal, SummaryViewMode } from './PropertyTextSummaryModal';
+import { PhotoDownloadModal } from './PhotoDownloadModal';
 import { useAuth } from '../auth/AuthContext';
 import { canEditItem } from '@/lib/auth';
 
@@ -63,6 +65,29 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [textSummaryProperty, setTextSummaryProperty] = useState<PropertyItem | null>(null);
   const [summaryMode, setSummaryMode] = useState<SummaryViewMode>('BRIEF');
   const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
+  const [downloadPhotoTarget, setDownloadPhotoTarget] = useState<PropertyItem | null>(null);
+
+  // 매물 사진 전체 다운로드 모달 오픈 핸들러 (사진 누락 방지: 혹시 단건 축약 상태라면 전체 사진 조회 후 오픈)
+  const handleOpenPhotoDownload = async (e: React.MouseEvent, prop: PropertyItem) => {
+    e.stopPropagation();
+    if (!prop.images || prop.images.length === 0) return;
+
+    if (prop.id && ((prop as any).photoCount || 0) > prop.images.length) {
+      try {
+        const res = await fetch(`/api/properties?id=${prop.id}&fullPhotos=true`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.images && Array.isArray(data.images) && data.images.length > 0) {
+            setDownloadPhotoTarget({ ...prop, images: data.images });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Full photos fetch warning:', err);
+      }
+    }
+    setDownloadPhotoTarget(prop);
+  };
 
   // 주소 원클릭 복사 핸들러
   const handleCopyAddress = async (e: React.MouseEvent, text: string, key: string) => {
@@ -386,6 +411,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                 const statusInfo = STATUS_LABELS[property.status] || { label: property.status, color: 'bg-slate-100 text-slate-800' };
                 const isSelected = highlightedPropertyId === property.id;
                 const hasImages = property.images && property.images.length > 0;
+                const photoCount = (property as any).photoCount ?? property.images?.length ?? 0;
                 const isContracted = property.status === 'CONTRACTED';
 
                 return (
@@ -413,10 +439,17 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               alt=""
                               className="w-full h-full object-cover"
                             />
-                            <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                              <Camera className="w-2.5 h-2.5" />
-                              {property.images!.length}
-                            </span>
+                            {/* 사진 장수 표시 & 원클릭 일괄 다운로드 버튼 */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenPhotoDownload(e, property)}
+                              className="absolute bottom-1 right-1 bg-black/75 hover:bg-blue-600 active:scale-95 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm transition-all cursor-pointer z-10"
+                              title={`등록된 사진 전체(${photoCount}장) 컴퓨터 폴더/ZIP 다운로드`}
+                            >
+                              <Camera className="w-2.5 h-2.5 text-blue-300" />
+                              <span>{photoCount}</span>
+                              <Download className="w-2.5 h-2.5 ml-0.5" />
+                            </button>
                           </>
                         ) : (
                           <div className="flex flex-col items-center justify-center text-slate-400">
@@ -474,6 +507,18 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
+                              {/* 사진 전체 다운로드 버튼 (경로 지정 & ZIP) */}
+                              {hasImages && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenPhotoDownload(e, property)}
+                                  className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 shadow-2xs flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                                  title={`등록된 사진 전체(${photoCount}장) 컴퓨터 폴더 지정 / ZIP 다운로드`}
+                                >
+                                  <Download className="w-3 h-3 text-sky-600" />
+                                  <span>사진({photoCount})</span>
+                                </button>
+                              )}
                               <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-600 text-white shrink-0">
                                 {PROPERTY_TYPE_LABELS[property.propertyType]}
                               </span>
@@ -782,6 +827,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
               {sortedFiltered.map((property) => {
                 const statusInfo = STATUS_LABELS[property.status] || { label: property.status, color: 'bg-slate-100 text-slate-800' };
                 const hasImages = property.images && property.images.length > 0;
+                const photoCount = (property as any).photoCount ?? property.images?.length ?? 0;
                 const isContracted = property.status === 'CONTRACTED';
 
                 const smsLink = generateSmsLink({
@@ -858,6 +904,18 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
+                              {/* 사진 전체 다운로드 버튼 (경로 지정 & ZIP) */}
+                              {hasImages && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenPhotoDownload(e, property)}
+                                  className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-white/95 hover:bg-white text-sky-700 shadow-xs border border-sky-200 flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                                  title={`등록된 사진 전체(${photoCount}장) 컴퓨터 폴더 지정 / ZIP 다운로드`}
+                                >
+                                  <Download className="w-3 h-3 text-sky-600" />
+                                  <span>사진({photoCount})</span>
+                                </button>
+                              )}
                               <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-xs">
                                 {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
                               </span>
@@ -865,10 +923,16 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 {property.transactionType}
                               </span>
                             </div>
-                            <span className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <Camera className="w-3 h-3 text-blue-400" />
-                              <span>{property.images!.length}장</span>
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenPhotoDownload(e, property)}
+                              className="absolute bottom-2.5 right-2.5 bg-black/75 hover:bg-blue-600 active:scale-95 backdrop-blur-xs text-white text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-md transition-all cursor-pointer z-10"
+                              title={`등록된 사진 전체(${photoCount}장) 컴퓨터 폴더 지정 / ZIP 다운로드`}
+                            >
+                              <Camera className="w-3.5 h-3.5 text-blue-300" />
+                              <span>{photoCount}장 다운로드</span>
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
                           </>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50">
@@ -1301,6 +1365,17 @@ export const PropertyList: React.FC<PropertyListProps> = ({
         initialMode={summaryMode}
         onClose={() => setTextSummaryProperty(null)}
       />
+
+      {/* 매물 사진 전체 다운로드 모달 (컴퓨터 폴더 지정 및 ZIP 압축 지원) */}
+      {downloadPhotoTarget && (
+        <PhotoDownloadModal
+          isOpen={!!downloadPhotoTarget}
+          onClose={() => setDownloadPhotoTarget(null)}
+          images={downloadPhotoTarget.images || []}
+          titleName={downloadPhotoTarget.roadAddress || downloadPhotoTarget.address || downloadPhotoTarget.propertyNumber}
+          propertyNumber={downloadPhotoTarget.propertyNumber}
+        />
+      )}
     </div>
   );
 };
