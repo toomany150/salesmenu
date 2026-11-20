@@ -643,12 +643,21 @@ const DashboardContent: React.FC = () => {
     }
     setProperties((prev) => {
       const idx = prev.findIndex((p) => p.id === savedProp.id || p.propertyNumber === savedProp.propertyNumber);
+      let next: PropertyItem[];
       if (idx >= 0) {
-        const next = [...prev];
+        next = [...prev];
         next[idx] = savedProp;
-        return next;
+      } else {
+        next = [savedProp, ...prev];
       }
-      return [savedProp, ...prev];
+      return next.sort((a, b) => {
+        const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+        const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+        if (tB !== tA) return tB - tA;
+        const cA = new Date(a.createdAt || 0).getTime();
+        const cB = new Date(b.createdAt || 0).getTime();
+        return cB - cA;
+      });
     });
     fetchData();
   };
@@ -720,12 +729,21 @@ const DashboardContent: React.FC = () => {
     setSelectedProperty((prev) => (prev && (prev.id === updated.id || prev.propertyNumber === updated.propertyNumber) ? updated : prev));
     setProperties((prev) => {
       const idx = prev.findIndex((p) => p.id === updated.id || p.propertyNumber === updated.propertyNumber);
+      let next: PropertyItem[];
       if (idx >= 0) {
-        const next = [...prev];
+        next = [...prev];
         next[idx] = updated;
-        return next;
+      } else {
+        next = [updated, ...prev];
       }
-      return [updated, ...prev];
+      return next.sort((a, b) => {
+        const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+        const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+        if (tB !== tA) return tB - tA;
+        const cA = new Date(a.createdAt || 0).getTime();
+        const cB = new Date(b.createdAt || 0).getTime();
+        return cB - cA;
+      });
     });
     saveCustomProperty(updated);
   };

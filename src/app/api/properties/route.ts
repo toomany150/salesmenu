@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
           factoryWarehouseDetail: true,
           landDetail: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
       });
     } catch (queryErr: any) {
       if (queryErr?.code === 'P2022') {
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
             factoryWarehouseDetail: true,
             landDetail: true,
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
         });
       } else {
         throw queryErr;
@@ -295,7 +295,7 @@ export async function GET(request: NextRequest) {
           factoryWarehouseDetail: true,
           landDetail: true,
         },
-        orderBy: [{ createdAt: 'desc' }, { receiptDate: 'desc' }],
+        orderBy: [{ receiptDate: 'desc' }, { createdAt: 'desc' }],
       });
     }
 

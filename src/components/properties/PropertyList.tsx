@@ -146,12 +146,15 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     onPropertyUpdated(updated);
   };
 
-  // 최근 등록된 일시(createdAt 또는 receiptDate) 기준 최신순 내림차순 정렬 (최신 등록 매물이 맨 처음)
+  // 최근 등록된 매물접수일(receiptDate) 기준 최신순 내림차순 정렬 (접수일이 같으면 createdAt 순)
   const sortedFiltered = React.useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const tA = new Date(a.createdAt || a.receiptDate || 0).getTime();
-      const tB = new Date(b.createdAt || b.receiptDate || 0).getTime();
-      return tB - tA;
+      const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+      const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+      if (tB !== tA) return tB - tA;
+      const cA = new Date(a.createdAt || 0).getTime();
+      const cB = new Date(b.createdAt || 0).getTime();
+      return cB - cA;
     });
   }, [filtered]);
 

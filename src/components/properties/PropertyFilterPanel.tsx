@@ -419,6 +419,13 @@ const normalizeTransactionType = (val?: string): string => {
       }
 
       return true;
+    }).sort((a, b) => {
+      const tA = new Date(a.receiptDate || a.createdAt || 0).getTime();
+      const tB = new Date(b.receiptDate || b.createdAt || 0).getTime();
+      if (tB !== tA) return tB - tA;
+      const cA = new Date(a.createdAt || 0).getTime();
+      const cB = new Date(b.createdAt || 0).getTime();
+      return cB - cA;
     });
   }, [
     properties,
