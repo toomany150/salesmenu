@@ -823,6 +823,8 @@ export interface PublicBuildingLedgerResult {
   isViolation?: boolean; // 위반건축물 여부
   source: 'API' | 'MOCK_DEMO' | 'USER_CUSTOM';
   message?: string;
+  isMatchedByRoadAddress?: boolean; // 도로명 주소 기준으로 동/건물 자동 선별 여부
+  roadAddressMatchedBuilding?: string; // 도로명 매칭된 건물/동 상세
   // 소유자 정보 (Image 2 연동)
   ownerName?: string; // 소유자 성명 (예: "임정원")
   ownerRegNo?: string; // 주민(법인)등록번호 (예: "590917-1******")

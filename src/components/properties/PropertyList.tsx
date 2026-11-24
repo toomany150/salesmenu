@@ -20,7 +20,11 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   FileText,
-  Download
+  Download,
+  Users,
+  UserCheck,
+  Loader2,
+  X
 } from 'lucide-react';
 import { 
   PropertyItem, 
@@ -56,7 +60,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   onEditProperty,
   onPropertyUpdated,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, availableAgents, addCustomAgent } = useAuth();
   const [filtered, setFiltered] = useState<PropertyItem[]>(properties);
   const [filterCriteria, setFilterCriteria] = useState<PropertyFilterCriteria | null>(null);
   const [viewMode, setViewMode] = useState<'SPLIT' | 'GRID' | 'MAP'>('SPLIT');
@@ -66,6 +70,126 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [summaryMode, setSummaryMode] = useState<SummaryViewMode>('BRIEF');
   const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
   const [downloadPhotoTarget, setDownloadPhotoTarget] = useState<PropertyItem | null>(null);
+
+  // 일괄 담당 권한자 추가/지정 모달 상태
+  const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
+  const [isBatchAssignModalOpen, setIsBatchAssignModalOpen] = useState(false);
+  const [batchTarget, setBatchTarget] = useState<'ALL' | 'SELECTED'>('ALL');
+  const [batchMode, setBatchMode] = useState<'ADD_ASSIGNED' | 'SET_MAIN'>('ADD_ASSIGNED');
+  const [batchSelectedAgent, setBatchSelectedAgent] = useState('하승원팀장');
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [customBatchAgentInput, setCustomBatchAgentInput] = useState('');
+  const [isAddingBatchCustomAgent, setIsAddingBatchCustomAgent] = useState(false);
+
+  const allBatchAgentOptions = Array.from(
+    new Set([
+      '하승원팀장',
+      '개업공인중개사 (대표)',
+      '사무실',
+      ...(availableAgents || []),
+    ].filter(Boolean))
+  );
+
+  const handleToggleSelectProperty = (e: React.MouseEvent | React.ChangeEvent, propId: string) => {
+    e.stopPropagation();
+    setSelectedPropertyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(propId)) next.delete(propId);
+      else next.add(propId);
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = (targetList: PropertyItem[]) => {
+    if (selectedPropertyIds.size === targetList.length && targetList.length > 0) {
+      setSelectedPropertyIds(new Set());
+    } else {
+      setSelectedPropertyIds(new Set(targetList.map((p) => p.id)));
+    }
+  };
+
+  const handleApplyBatchAssign = async () => {
+    const targetAgent = batchSelectedAgent.trim();
+    if (!targetAgent) {
+      alert('반영할 담당 권한자 이름을 선택하거나 입력해주세요.');
+      return;
+    }
+
+    const isAll = batchTarget === 'ALL';
+    const targetIds = isAll ? [] : Array.from(selectedPropertyIds);
+
+    if (!isAll && targetIds.length === 0) {
+      alert('선택된 매물이 없습니다. 매물을 체크박스로 선택하거나 [전체 매물]을 선택해주세요.');
+      return;
+    }
+
+    const targetCount = isAll ? properties.length : targetIds.length;
+    const confirmMsg = isAll
+      ? `현재 등록된 모든 매물(총 ${targetCount}건)에 [${targetAgent}] 님을 담당 권한자(${
+          batchMode === 'ADD_ASSIGNED' ? '추가 권한자' : '주 담당자'
+        })로 일괄 반영하시겠습니까?\n\n※ 매물의 기존 데이터(가격, 주소, 옵션, 고객연결 등)는 100% 완벽히 보존됩니다.`
+      : `선택하신 매물 ${targetCount}건에 [${targetAgent}] 님을 담당 권한자(${
+          batchMode === 'ADD_ASSIGNED' ? '추가 권한자' : '주 담당자'
+        })로 일괄 반영하시겠습니까?\n\n※ 기존 데이터는 100% 안전하게 보존됩니다.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setIsBatchProcessing(true);
+    try {
+      const res = await fetch('/api/properties/batch-assign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': encodeURIComponent(currentUser?.name || ''),
+          'x-user-role': currentUser?.role || 'ADMIN',
+        },
+        body: JSON.stringify({
+          all: isAll,
+          propertyIds: targetIds,
+          agentName: targetAgent,
+          mode: batchMode,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || '일괄 처리에 실패했습니다.');
+      }
+
+      const result = await res.json();
+
+      // 로컬 필터링 목록 갱신
+      setFiltered((prev) =>
+        prev.map((p) => {
+          const isTarget = isAll || targetIds.includes(p.id) || targetIds.includes(p.propertyNumber);
+          if (!isTarget) return p;
+
+          if (batchMode === 'ADD_ASSIGNED') {
+            const currentAssigned = Array.isArray(p.assignedAgents) ? p.assignedAgents : [];
+            if (!currentAssigned.includes(targetAgent) && p.managerName !== targetAgent) {
+              const updated = { ...p, assignedAgents: [...currentAssigned, targetAgent] };
+              if (onPropertyUpdated) onPropertyUpdated(updated);
+              return updated;
+            }
+            return p;
+          } else {
+            const updated = { ...p, managerName: targetAgent };
+            if (onPropertyUpdated) onPropertyUpdated(updated);
+            return updated;
+          }
+        })
+      );
+
+      setIsBatchAssignModalOpen(false);
+      setSelectedPropertyIds(new Set());
+      alert(result.message || '담당 권한자 일괄 반영이 성공적으로 완료되었습니다. (기존 데이터 보존 완료)');
+    } catch (err: any) {
+      alert(err.message || '일괄 처리 중 오류가 발생했습니다.');
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  };
 
   // 매물 사진 전체 다운로드 모달 오픈 핸들러 (사진 누락 방지: 혹시 단건 축약 상태라면 전체 사진 조회 후 오픈)
   const handleOpenPhotoDownload = async (e: React.MouseEvent, prop: PropertyItem) => {
@@ -373,6 +497,51 @@ export const PropertyList: React.FC<PropertyListProps> = ({
             </button>
           </div>
 
+          {/* 전체 선택 토글 버튼 */}
+          {sortedFiltered.length > 0 && (
+            <button
+              type="button"
+              onClick={() => handleToggleSelectAll(sortedFiltered)}
+              title={selectedPropertyIds.size === sortedFiltered.length ? '선택 전체 해제' : '현재 목록 전체 선택'}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shrink-0 ${
+                selectedPropertyIds.size === sortedFiltered.length && sortedFiltered.length > 0
+                  ? 'bg-purple-100 text-purple-900 border-purple-400'
+                  : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selectedPropertyIds.size === sortedFiltered.length && sortedFiltered.length > 0}
+                onChange={() => handleToggleSelectAll(sortedFiltered)}
+                className="w-3.5 h-3.5 rounded text-purple-600 cursor-pointer pointer-events-none"
+              />
+              <span>
+                {selectedPropertyIds.size > 0
+                  ? `${selectedPropertyIds.size}개 선택됨`
+                  : '전체 선택'}
+              </span>
+            </button>
+          )}
+
+          {/* 모든 매물에 담당권한자 일괄 추가/지정 버튼 */}
+          <button
+            type="button"
+            onClick={() => {
+              setBatchTarget(selectedPropertyIds.size > 0 ? 'SELECTED' : 'ALL');
+              setIsBatchAssignModalOpen(true);
+            }}
+            title="전체 또는 선택 매물에 담당 권한자(관리 주체 및 추가 권한자)를 일괄 추가/지정합니다 (기존 데이터 100% 보존)"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-purple-700 bg-purple-50 hover:bg-purple-600 hover:text-white border border-purple-300 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>👥 담당 권한자 일괄 추가</span>
+            {selectedPropertyIds.size > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[10px] font-black">
+                {selectedPropertyIds.size}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => exportPropertiesToExcel(sortedFiltered)}
@@ -436,6 +605,14 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                     <div className="flex gap-3">
                       {/* Photo Thumbnail */}
                       <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-200 flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedPropertyIds.has(property.id)}
+                          onChange={(e) => handleToggleSelectProperty(e, property.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          title="일괄 권한자 지정을 위한 매물 선택"
+                          className="absolute top-1 left-1 z-20 w-4 h-4 rounded text-purple-600 cursor-pointer bg-white/95 border-slate-400 shadow-sm accent-purple-600"
+                        />
                         {hasImages ? (
                           <>
                             <img
@@ -869,6 +1046,14 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                     <div>
                       {/* Top Photo Banner */}
                       <div className="relative aspect-16/9 bg-slate-100 overflow-hidden flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedPropertyIds.has(property.id)}
+                          onChange={(e) => handleToggleSelectProperty(e, property.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          title="일괄 권한자 지정을 위한 매물 선택"
+                          className="absolute top-2 left-2 z-20 w-4 h-4 rounded text-purple-600 cursor-pointer bg-white/95 border-slate-400 shadow-sm accent-purple-600"
+                        />
                         {hasImages ? (
                           <>
                             <img
@@ -1380,6 +1565,257 @@ export const PropertyList: React.FC<PropertyListProps> = ({
           propertyNumber={downloadPhotoTarget.propertyNumber}
           propertyId={downloadPhotoTarget.id}
         />
+      )}
+
+      {/* 담당 권한자 일괄 추가/지정 모달 */}
+      {isBatchAssignModalOpen && (
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-purple-100 text-purple-700 rounded-lg">
+                  <Users className="w-5 h-5" />
+                </span>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    매물 담당 권한자 일괄 추가 / 지정
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    여러 매물 또는 전체 매물에 담당자 및 추가 권한자를 한 번에 적용합니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchAssignModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 기존 데이터 100% 보존 보장 배너 */}
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 font-medium space-y-1">
+              <div className="font-bold flex items-center gap-1.5 text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>기존 데이터 100% 보존 보장</span>
+              </div>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                권한자를 일괄 추가하더라도 각 매물의 고유번호, 주소, 가격, 사진, 건축물대장, 고객 연결 등 기존 상세 데이터는 <strong>절대 삭제되거나 변경되지 않고 안전하게 보존</strong>됩니다.
+              </p>
+            </div>
+
+            {/* 1. 대상 매물 선택 */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 block">
+                1. 적용 대상 매물 선택
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBatchTarget('ALL')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    batchTarget === 'ALL'
+                      ? 'bg-purple-50 border-purple-500 text-purple-900 ring-2 ring-purple-200 font-bold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-extrabold">
+                    <span>🏢 모든 매물 전체</span>
+                    <span className="px-1.5 py-0.2 rounded bg-purple-200 text-purple-800 text-[10px]">
+                      {properties.length}건
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                    현재 등록된 {properties.length}개 전체 매물에 반영
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBatchTarget('SELECTED')}
+                  disabled={selectedPropertyIds.size === 0}
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                    selectedPropertyIds.size === 0
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : batchTarget === 'SELECTED'
+                      ? 'bg-purple-50 border-purple-500 text-purple-900 ring-2 ring-purple-200 font-bold cursor-pointer'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-extrabold">
+                    <span>☑️ 선택된 매물만</span>
+                    <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 text-[10px]">
+                      {selectedPropertyIds.size}건
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                    체크박스로 선택한 {selectedPropertyIds.size}개 매물에만 반영
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* 2. 적용 방식 선택 */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-xs font-bold text-slate-800 block">
+                2. 권한 반영 방식 선택
+              </label>
+              <div className="space-y-1.5">
+                <label className="flex items-start gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name="batchMode"
+                    value="ADD_ASSIGNED"
+                    checked={batchMode === 'ADD_ASSIGNED'}
+                    onChange={() => setBatchMode('ADD_ASSIGNED')}
+                    className="mt-0.5 w-4 h-4 text-purple-600 accent-purple-600 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <span>[권장] 함께 관리할 추가 권한자로 더하기</span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
+                        기존 권한자 유지
+                      </span>
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      기존 주 담당자는 그대로 두고, 선택한 직원을 '함께 관리할 추가 권한자' 목록에 안전하게 추가합니다.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name="batchMode"
+                    value="SET_MAIN"
+                    checked={batchMode === 'SET_MAIN'}
+                    onChange={() => setBatchMode('SET_MAIN')}
+                    className="mt-0.5 w-4 h-4 text-purple-600 accent-purple-600 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900">
+                      주 담당 권한자(관리 주체)로 변경하기
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      매물의 주 관리자를 선택한 직원으로 변경합니다. (매물 상세 정보는 그대로 유지됩니다)
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* 3. 추가/지정할 담당 권한자 선택 */}
+            <div className="space-y-2 pt-1 border-t border-slate-100">
+              <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>3. 지정할 담당 권한자 선택 *</span>
+                <span className="text-[11px] text-purple-700 font-bold">현재 선택: {batchSelectedAgent}</span>
+              </label>
+
+              <div className="flex flex-wrap gap-1.5">
+                {allBatchAgentOptions.map((agent) => {
+                  const isSelected = batchSelectedAgent === agent;
+                  return (
+                    <button
+                      key={agent}
+                      type="button"
+                      onClick={() => setBatchSelectedAgent(agent)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
+                        isSelected
+                          ? 'bg-purple-600 text-white border-purple-700 shadow-sm font-black'
+                          : 'bg-slate-50 hover:bg-purple-50 text-slate-700 border-slate-200 hover:border-purple-300'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      <span>
+                        {agent === '개업공인중개사 (대표)'
+                          ? '👑 개업공인중개사 (대표)'
+                          : agent === '사무실'
+                          ? '🏢 사무실 (공용)'
+                          : `👤 ${agent}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 새 권한자 직접 입력 */}
+              <div className="pt-1.5">
+                {!isAddingBatchCustomAgent ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingBatchCustomAgent(true)}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  >
+                    ＋ 새 권한자명 직접 등록하기
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <input
+                      type="text"
+                      value={customBatchAgentInput}
+                      onChange={(e) => setCustomBatchAgentInput(e.target.value)}
+                      placeholder="새 담당자 이름 입력 (예: 박소공 실장)"
+                      className="text-xs px-2.5 py-1.5 border border-purple-400 rounded-lg flex-1 font-bold text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = customBatchAgentInput.trim();
+                        if (!trimmed) return;
+                        if (addCustomAgent) addCustomAgent(trimmed);
+                        setBatchSelectedAgent(trimmed);
+                        setCustomBatchAgentInput('');
+                        setIsAddingBatchCustomAgent(false);
+                      }}
+                      className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold cursor-pointer"
+                    >
+                      선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomBatchAgentInput('');
+                        setIsAddingBatchCustomAgent(false);
+                      }}
+                      className="px-2 py-1.5 text-slate-500 text-xs cursor-pointer"
+                    >
+                      취소
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 하단 확인 버튼 */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsBatchAssignModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={isBatchProcessing}
+                onClick={handleApplyBatchAssign}
+                className="px-4 py-2 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                {isBatchProcessing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4 stroke-[3]" />
+                )}
+                <span>
+                  {batchTarget === 'ALL'
+                    ? `모든 매물 (${properties.length}건)에 즉시 반영`
+                    : `선택한 매물 (${selectedPropertyIds.size}건)에 즉시 반영`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

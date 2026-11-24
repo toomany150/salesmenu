@@ -367,6 +367,103 @@ function cleanAddressQuery(address: string): string {
     .trim();
 }
 
+interface RoadAddressParts {
+  roadName: string;
+  mainNo: number;
+  subNo: number;
+  fullRoadAddress: string;
+}
+
+// 도로명 주소에서 도로명(로, 길, 대로) 및 건물번호(본번-부번) 추출
+function parseRoadAddressParts(roadAddr?: string): RoadAddressParts | null {
+  if (!roadAddr || !roadAddr.trim()) return null;
+  const clean = roadAddr.replace(/\s+/g, ' ').trim();
+  const match = clean.match(/([가-힣0-9a-zA-Z]+(?:로|길|대로))\s*([0-9]+)(?:-([0-9]+))?/);
+  if (match) {
+    return {
+      roadName: match[1],
+      mainNo: parseInt(match[2], 10),
+      subNo: match[3] ? parseInt(match[3], 10) : 0,
+      fullRoadAddress: clean,
+    };
+  }
+  return {
+    roadName: '',
+    mainNo: 0,
+    subNo: 0,
+    fullRoadAddress: clean,
+  };
+}
+
+interface RoadMatchFilterResult {
+  titleList: any[];
+  isMatchedByRoad: boolean;
+  roadMatchSummary: string;
+}
+
+// 동일 지번에 여러 건물이 있을 때 도로명 주소 기준으로 해당 건물만 3단계 정밀 선별
+function filterTitleListByRoadAddress(rawTitleList: any[], roadAddr?: string): RoadMatchFilterResult {
+  if (!roadAddr || !roadAddr.trim()) {
+    return { titleList: rawTitleList, isMatchedByRoad: false, roadMatchSummary: '' };
+  }
+
+  const parts = parseRoadAddressParts(roadAddr);
+  if (!parts || !parts.roadName) {
+    return { titleList: rawTitleList, isMatchedByRoad: false, roadMatchSummary: '' };
+  }
+
+  const { roadName, mainNo, subNo, fullRoadAddress } = parts;
+
+  // 1단계: 도로명 + 본번 + 부번(있는 경우) 완전 일치
+  const exactMatches = rawTitleList.filter((it) => {
+    const newPlat = (it.newPlatPlc || '').replace(/\s+/g, ' ').trim();
+    const naMain = parseInt(it.naMainBun || '0', 10);
+    const naSub = parseInt(it.naSubBun || '0', 10);
+    const hasRoad = newPlat.includes(roadName);
+    if (!hasRoad) return false;
+    if (mainNo > 0) {
+      if (naMain !== mainNo) return false;
+      if (subNo > 0) return naSub === subNo;
+      // subNo가 0(부번 없음)인 경우, naSub도 0인 본건물만 선별 (예: 13-1 등 부속/타건물 제외)
+      return naSub === 0;
+    }
+    return true;
+  });
+
+  if (exactMatches.length > 0) {
+    const top = exactMatches[0];
+    const summary = top.newPlatPlc || `${fullRoadAddress} (건물: ${top.bldNm || top.dongNm || '본동'})`;
+    return { titleList: exactMatches, isMatchedByRoad: true, roadMatchSummary: summary };
+  }
+
+  // 2단계: 본번 일치 (부번이 일치하지 않거나 대장에 부번이 0으로만 등록된 경우)
+  if (mainNo > 0) {
+    const mainMatches = rawTitleList.filter((it) => {
+      const newPlat = (it.newPlatPlc || '').replace(/\s+/g, ' ').trim();
+      const naMain = parseInt(it.naMainBun || '0', 10);
+      return newPlat.includes(roadName) && naMain === mainNo;
+    });
+    if (mainMatches.length > 0) {
+      const top = mainMatches[0];
+      const summary = top.newPlatPlc || `${fullRoadAddress} (건물: ${top.bldNm || top.dongNm || '본동'})`;
+      return { titleList: mainMatches, isMatchedByRoad: true, roadMatchSummary: summary };
+    }
+  }
+
+  // 3단계: 도로명만 포함된 건물군
+  const roadMatches = rawTitleList.filter((it) => {
+    const newPlat = (it.newPlatPlc || '').replace(/\s+/g, ' ').trim();
+    return newPlat.includes(roadName);
+  });
+  if (roadMatches.length > 0) {
+    const top = roadMatches[0];
+    const summary = top.newPlatPlc || `${fullRoadAddress} (건물: ${top.bldNm || top.dongNm || '본동'})`;
+    return { titleList: roadMatches, isMatchedByRoad: true, roadMatchSummary: summary };
+  }
+
+  return { titleList: rawTitleList, isMatchedByRoad: false, roadMatchSummary: '' };
+}
+
 // 카카오 로컬 검색 API를 통해 주소 문자열에서 시군구코드(5자리), 법정동코드(5자리), 번(4자리), 지(4자리) 정확히 추출
 async function parseAddressToGovParams(address: string, detailAddress?: string, requestedDong?: string): Promise<GovAddressParams | null> {
   const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY || process.env.NEXT_PUBLIC_KAKAO_MAP_KEY || 'ab4074f3fc327e405a625fc856bee022';
@@ -525,51 +622,79 @@ async function fetchBuildingLedgerFromGov(
   const rawItems = titleData?.response?.body?.items?.item;
   if (!rawItems) return null;
 
-  const titleList: any[] = Array.isArray(rawItems) ? rawItems : [rawItems];
-  if (titleList.length === 0) return null;
+  const rawTitleList: any[] = Array.isArray(rawItems) ? rawItems : [rawItems];
+  if (rawTitleList.length === 0) return null;
 
-  // 표제부 여러 동 중 최적의 대표 동 선택
-  // 1) 사용자가 지정한 동(targetDong)이 있으면 해당 동 우선 선택
-  // 2) 없으면 주건축물(mainAtchGbCd === '0') 중 주거/상업 메인 동 선택 (경비실/관리동 등 부속건물 제외)
-  let chosenItem = titleList[0];
-  const allDongNames: string[] = [];
+  // 도로명 주소 기준 필터링 및 선별 로직
+  // 사용자가 지번주소와 함께 도로명 주소를 제공한 경우:
+  // 한 지번에 여러 건물이 있을 때, 도로명 주소 및 건물번호와 일치하는 건물(동)만 정확하게 선별!
+  const effectiveRoadAddress = (params.roadAddress || '').trim() || (cleanAddr.includes('로') || cleanAddr.includes('길') ? cleanAddr : '');
 
-  for (const it of titleList) {
-    const dNm = (it.dongNm || '').trim();
-    if (!dNm) continue;
+  let titleList = rawTitleList;
+  let isMatchedByRoad = false;
+  let roadMatchSummary = '';
 
-    // 부속건물 및 비주거 편의시설 제외 (경로당, 지하주차장, 외부계단, 경비실 등)
-    const isAuxiliary =
-      it.mainAtchGbCd === '1' ||
-      /주차장|경로당|계단|경비실|관리사무소|변전실|어린이집|기계실|펌프실|정화조/i.test(dNm);
-    if (isAuxiliary) continue;
-
-    // 동 명칭 정규화 (중복 '동' 접미사 방지)
-    const cleanDong = dNm.includes('동') ? dNm : `${dNm}동`;
-    if (!allDongNames.includes(cleanDong)) {
-      allDongNames.push(cleanDong);
+  if (effectiveRoadAddress) {
+    const filterRes = filterTitleListByRoadAddress(rawTitleList, effectiveRoadAddress);
+    if (filterRes.isMatchedByRoad && filterRes.titleList.length > 0) {
+      titleList = filterRes.titleList;
+      isMatchedByRoad = true;
+      roadMatchSummary = filterRes.roadMatchSummary;
     }
   }
 
-  // 필터링 후 남은 동이 없으면 원본으로 복구
-  if (allDongNames.length === 0) {
+  // 표제부 여러 동 중 최적의 대표 동 선택
+  // 1) 사용자가 지정한 동(targetDong)이 있으면 해당 동 우선 선택
+  // 2) 도로명 주소로 단일 건물이 특정된 경우, 해당 건물 대장 단독 선택 및 동 목록 단독 구성
+  // 3) 없으면 주건축물(mainAtchGbCd === '0') 중 주거/상업 메인 동 선택 (경비실/관리동 등 부속건물 제외)
+  let chosenItem = titleList[0];
+  const allDongNames: string[] = [];
+
+  if (isMatchedByRoad && titleList.length === 1) {
+    // 도로명 주소로 특정된 단일 건물인 경우, 다른 건물의 동 목록이 일체 노출되지 않도록 처리
+    const dNm = (chosenItem.dongNm || '').trim();
+    if (dNm) {
+      const cleanDong = dNm.includes('동') ? dNm : `${dNm}동`;
+      allDongNames.push(cleanDong);
+    }
+  } else {
     for (const it of titleList) {
       const dNm = (it.dongNm || '').trim();
       if (!dNm) continue;
+
+      // 부속건물 및 비주거 편의시설 제외 (경로당, 지하주차장, 외부계단, 경비실 등)
+      const isAuxiliary =
+        it.mainAtchGbCd === '1' ||
+        /주차장|경로당|계단|경비실|관리사무소|변전실|어린이집|기계실|펌프실|정화조/i.test(dNm);
+      if (isAuxiliary) continue;
+
+      // 동 명칭 정규화 (중복 '동' 접미사 방지)
       const cleanDong = dNm.includes('동') ? dNm : `${dNm}동`;
       if (!allDongNames.includes(cleanDong)) {
         allDongNames.push(cleanDong);
       }
     }
-  }
 
-  // 숫자 기준 자연스러운 오름차순 정렬 (예: 101동, 102동 ... 402동)
-  allDongNames.sort((a, b) => {
-    const numA = parseInt(a.replace(/[^0-9]/g, '') || '0', 10);
-    const numB = parseInt(b.replace(/[^0-9]/g, '') || '0', 10);
-    if (numA !== numB) return numA - numB;
-    return a.localeCompare(b, 'ko');
-  });
+    // 필터링 후 남은 동이 없으면 원본으로 복구
+    if (allDongNames.length === 0) {
+      for (const it of titleList) {
+        const dNm = (it.dongNm || '').trim();
+        if (!dNm) continue;
+        const cleanDong = dNm.includes('동') ? dNm : `${dNm}동`;
+        if (!allDongNames.includes(cleanDong)) {
+          allDongNames.push(cleanDong);
+        }
+      }
+    }
+
+    // 숫자 기준 자연스러운 오름차순 정렬 (예: 101동, 102동 ... 402동)
+    allDongNames.sort((a, b) => {
+      const numA = parseInt(a.replace(/[^0-9]/g, '') || '0', 10);
+      const numB = parseInt(b.replace(/[^0-9]/g, '') || '0', 10);
+      if (numA !== numB) return numA - numB;
+      return a.localeCompare(b, 'ko');
+    });
+  }
 
   if (targetDong) {
     const cleanTargetDong = targetDong.replace(/동$/, '').trim();
@@ -589,8 +714,11 @@ async function fetchBuildingLedgerFromGov(
     if (matchedByDong) {
       chosenItem = matchedByDong;
     }
+  } else if (isMatchedByRoad && titleList.length > 0) {
+    // 도로명 주소가 함께 제공되어 매칭된 경우, 도로명 매칭 최우선 건물을 대표 건물로 선정!
+    chosenItem = titleList[0];
   } else {
-    // 사용자가 동을 지정하지 않은 경우: 정렬된 첫번째 동 매칭 시도, 없으면 주건축물 우선
+    // 사용자가 동을 지정하지 않고 도로명도 없는 순수 지번 조회 시: 정렬된 첫번째 동 매칭 시도, 없으면 주건축물 우선
     if (allDongNames.length > 0) {
       const firstDongClean = allDongNames[0].replace(/동$/, '').trim();
       const firstDongFull = allDongNames[0];
@@ -677,7 +805,39 @@ async function fetchBuildingLedgerFromGov(
 
     if (flrItems) {
       const arr = Array.isArray(flrItems) ? flrItems : [flrItems];
-      floorList = arr.map((f: any) => ({
+      let matchedFlrItems = arr;
+
+      // 만약 chosenItem이 특정되었고, 여러 건물의 층 정보가 섞여있다면
+      // chosenItem의 mgmBldrgstPk 또는 dongNm/bldNm과 일치하는 층만 정밀 필터링!
+      if (chosenItem) {
+        const targetPk = String(chosenItem.mgmBldrgstPk || '').trim();
+        const targetDongNm = String(chosenItem.dongNm || '').trim();
+        const targetBldNm = String(chosenItem.bldNm || '').trim();
+
+        // 1) mgmBldrgstPk 일치 검사 (숫자/문자열 안전 String 비교)
+        if (targetPk) {
+          const byPk = arr.filter((f: any) => String(f.mgmBldrgstPk || '').trim() === targetPk);
+          if (byPk.length > 0) {
+            matchedFlrItems = byPk;
+          }
+        }
+
+        // 2) PK로 필터되지 않고 동명칭 또는 건물명이 존재하는 경우
+        if (matchedFlrItems === arr && (targetDongNm || targetBldNm)) {
+          const byDongOrBld = arr.filter((f: any) => {
+            const fDong = String(f.dongNm || '').trim();
+            const fBld = String(f.bldNm || '').trim();
+            if (targetDongNm && fDong && fDong === targetDongNm) return true;
+            if (targetBldNm && fBld && fBld === targetBldNm) return true;
+            return false;
+          });
+          if (byDongOrBld.length > 0) {
+            matchedFlrItems = byDongOrBld;
+          }
+        }
+      }
+
+      floorList = matchedFlrItems.map((f: any) => ({
         floor: f.flrNoNm || (f.flrGbCd === '10' ? `지하 ${f.flrNo}층` : `지상 ${f.flrNo}층`),
         area: parseFloat(f.area) || 0,
         mainUse: f.mainPurpsCdNm || f.etcPurps || '근린생활시설',
@@ -1115,7 +1275,11 @@ async function fetchBuildingLedgerFromGov(
     height: parseFloat(chosenItem.heit) || 0,
     isViolation: chosenItem.vlRatEstmYn === 'Y',
     source: 'API',
-    message: '공공데이터포털(국토교통부 건축HUB 오픈API) 실시간 100% 정밀 연동 완료',
+    message: isMatchedByRoad
+      ? `공공데이터포털(건축HUB) 도로명주소 기준 매칭 완료 (동일 지번 내 해당 건물 대장 자동 선별: ${roadMatchSummary})`
+      : '공공데이터포털(국토교통부 건축HUB 오픈API) 실시간 100% 정밀 연동 완료',
+    isMatchedByRoadAddress: isMatchedByRoad,
+    roadAddressMatchedBuilding: roadMatchSummary || undefined,
     ownerName: '소유자(등기부/대장 실확인 필요)',
     ownerRegNo: '******-*******',
     ownershipChangeDate: approvalDate,
@@ -1173,13 +1337,15 @@ export async function GET(request: NextRequest) {
       : DEFAULT_DATA_GO_KR_KEY;
 
   if (apiKey) {
-    // 지번주소가 있으면 국토교통부 건축물대장 지번 매칭 성공률이 가장 높으므로 지번주소도 함께 시도
+    // 도로명 주소와 지번 주소가 같이 있는 경우:
+    // 도로명 주소를 최우선 기준으로 하여 건축물대장 및 좌표를 조회하고, 동일 지번 내 해당 건물만 자동 선별
+    const effectiveRoad = roadAddress.trim() || (cleanAddr.includes('로') || cleanAddr.includes('길') ? cleanAddr : '');
     const addressCandidates = Array.from(
       new Set(
         [
+          effectiveRoad,
           cleanAddr,
           jibunAddress.trim(),
-          roadAddress.trim(),
         ].filter(Boolean)
       )
     );
@@ -1188,6 +1354,14 @@ export async function GET(request: NextRequest) {
       try {
         const govParams = await parseAddressToGovParams(candAddr, detailAddress, dong);
         if (govParams) {
+          if (effectiveRoad) {
+            govParams.roadAddress = effectiveRoad;
+          } else {
+            govParams.roadAddress = undefined;
+          }
+          if (jibunAddress.trim() && !govParams.jibunAddress) {
+            govParams.jibunAddress = jibunAddress.trim();
+          }
           const liveGovData = await fetchBuildingLedgerFromGov(apiKey, govParams, cleanAddr, propertyType);
           if (liveGovData) {
             return NextResponse.json(liveGovData);

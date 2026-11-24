@@ -34,7 +34,9 @@ import {
   Loader2,
   Star,
   RotateCcw,
-  FileText
+  FileText,
+  UserCheck,
+  Users
 } from 'lucide-react';
 import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS, getPropertyDisplayName } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -63,7 +65,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onPropertyDeleted,
   onPropertyUpdated,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, availableAgents, addCustomAgent } = useAuth();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isPhotoLightboxOpen, setIsPhotoLightboxOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -78,6 +80,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [photoActionNotice, setPhotoActionNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // 담당 권한자 빠른 추가 및 관리 모달 상태
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedManager, setSelectedManager] = useState<string>('개업공인중개사 (대표)');
+  const [selectedAssigned, setSelectedAssigned] = useState<string[]>([]);
+  const [isSavingAssign, setIsSavingAssign] = useState(false);
+  const [newAgentInput, setNewAgentInput] = useState('');
+  const [isAddingAgent, setIsAddingAgent] = useState(false);
+
   // 마우스 드래그 앤 드롭 및 마우스 스와이프 상태
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
   const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
@@ -87,6 +97,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   React.useEffect(() => {
     if (isOpen && property) {
+      setSelectedManager(property.managerName || '개업공인중개사 (대표)');
+      setSelectedAssigned(Array.isArray(property.assignedAgents) ? [...property.assignedAgents] : []);
       setFullImages(null);
       const photoCount = property.photoCount || (property.images ? property.images.length : 0);
       const currentlyLoaded = property.images ? property.images.length : 0;
@@ -142,6 +154,53 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const canDelete = canDeleteItem(currentUser);
   const canViewContact = canViewCustomerContact(currentUser, property) || (property.customer ? canViewCustomerContact(currentUser, property.customer as any) : false);
   const managerName = property.managerName || '사무실';
+
+  const allAgentOptions = Array.from(
+    new Set([
+      '개업공인중개사 (대표)',
+      '사무실',
+      ...(availableAgents || []),
+      '하승원팀장',
+      property.managerName || '',
+      ...(Array.isArray(property.assignedAgents) ? property.assignedAgents : []),
+    ].filter(Boolean))
+  );
+
+  const handleSaveManagerAssign = async () => {
+    if (!property) return;
+    setIsSavingAssign(true);
+    try {
+      const payload = {
+        ...property,
+        managerName: selectedManager,
+        assignedAgents: selectedAssigned,
+      };
+      const res = await fetch('/api/properties', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser?.id || '',
+          'x-user-name': encodeURIComponent(currentUser?.name || ''),
+          'x-user-role': currentUser?.role || 'ADMIN',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || '담당 권한자 저장에 실패했습니다.');
+      }
+      const updated = await res.json();
+      if (onPropertyUpdated) {
+        onPropertyUpdated(updated);
+      }
+      setIsAssignModalOpen(false);
+      alert('매물 담당 권한자가 성공적으로 변경되었습니다. (기존 데이터 100% 보존 완료)');
+    } catch (err: any) {
+      alert(err.message || '저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSavingAssign(false);
+    }
+  };
 
   const handleDeleteProperty = async () => {
     if (!canDelete) {
@@ -1045,6 +1104,23 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <span>👥 추가권한:</span>
                 <span className="font-bold">{property.assignedAgents.join(', ')}</span>
               </span>
+            )}
+
+            {/* 담당 권한자 빠른 추가/지정 버튼 (대표 또는 권한자) */}
+            {canEdit && onPropertyUpdated && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedManager(property.managerName || '개업공인중개사 (대표)');
+                  setSelectedAssigned(Array.isArray(property.assignedAgents) ? [...property.assignedAgents] : []);
+                  setIsAssignModalOpen(true);
+                }}
+                title="이 매물의 담당 권한자 및 추가 권한자를 바로 추가/지정합니다 (기존 데이터 100% 보존)"
+                className="px-2 py-0.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-300 rounded-md shadow-2xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shrink-0"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-purple-600" />
+                <span>＋ 권한자 추가/관리</span>
+              </button>
             )}
           </div>
 
@@ -3397,6 +3473,189 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         propertyNumber={property.propertyNumber}
         propertyId={property.id}
       />
+
+      {/* 담당 권한자 빠른 추가/관리 모달 */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-purple-100 text-purple-700 rounded-lg">
+                  <UserCheck className="w-5 h-5" />
+                </span>
+                <div>
+                  <h4 className="text-sm font-extrabold text-slate-900">
+                    매물 #{property.propertyNumber} 담당 권한자 관리
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium truncate max-w-xs">
+                    {property.address || property.roadAddress || property.jibunAddress}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 기존 데이터 100% 보존 안내 배너 */}
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 font-medium space-y-1">
+              <div className="font-bold flex items-center gap-1.5 text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>기존 데이터 100% 보존 보장</span>
+              </div>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                권한자를 추가하거나 변경해도 매물의 가격, 주소, 사진, 건축물대장, 고객 연결 등 모든 기존 데이터는 안전하게 그대로 보존됩니다.
+              </p>
+            </div>
+
+            {/* 1. 주 담당 권한자 (관리 주체) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>1. 주 담당 권한자 (관리 주체) *</span>
+                <span className="text-[11px] font-normal text-slate-500">메인 관리자</span>
+              </label>
+              <select
+                value={selectedManager}
+                onChange={(e) => setSelectedManager(e.target.value)}
+                className="w-full text-xs px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 font-bold text-slate-900 cursor-pointer"
+              >
+                {allAgentOptions.map((agent) => (
+                  <option key={agent} value={agent}>
+                    {agent === '개업공인중개사 (대표)'
+                      ? '👑 개업공인중개사 (대표)'
+                      : agent === '사무실'
+                      ? '🏢 사무실 (공용)'
+                      : `👤 ${agent}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. 함께 관리할 추가 권한자 (복수 지정) */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5 text-blue-600" />
+                    <span>2. 함께 관리할 추가 권한자 (복수 지정)</span>
+                  </span>
+                  <p className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                    대표 외에 함께 열람 및 수정 권한을 가질 동료 직원이나 사무실(공용)을 클릭하여 추가합니다.
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shrink-0">
+                  {selectedAssigned.length > 0 ? `${selectedAssigned.length}명 지정됨` : '선택사항'}
+                </span>
+              </div>
+
+              {/* 추가 권한자 버튼 칩들 */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {allAgentOptions
+                  .filter((agent) => agent !== selectedManager)
+                  .map((agent) => {
+                    const isAssigned = selectedAssigned.includes(agent);
+                    return (
+                      <button
+                        key={agent}
+                        type="button"
+                        onClick={() => {
+                          setSelectedAssigned((prev) =>
+                            isAssigned ? prev.filter((a) => a !== agent) : [...prev, agent]
+                          );
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                          isAssigned
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                      >
+                        {isAssigned ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <span>＋</span>}
+                        <span>
+                          {agent === '개업공인중개사 (대표)'
+                            ? '👑 개업공인중개사 (대표)'
+                            : agent === '사무실'
+                            ? '🏢 사무실 (공용)'
+                            : `👤 ${agent}`}
+                        </span>
+                      </button>
+                    );
+                  })}
+              </div>
+
+              {/* 새 권한자 직접 입력란 */}
+              <div className="pt-2">
+                {!isAddingAgent ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingAgent(true)}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  >
+                    ＋ 새 권한자명 직접 등록하기
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <input
+                      type="text"
+                      value={newAgentInput}
+                      onChange={(e) => setNewAgentInput(e.target.value)}
+                      placeholder="권한자 이름 입력 (예: 하승원팀장, 김실장)"
+                      className="text-xs px-2.5 py-1.5 border border-blue-400 rounded-lg flex-1 font-bold text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = newAgentInput.trim();
+                        if (!trimmed) return;
+                        if (addCustomAgent) addCustomAgent(trimmed);
+                        setSelectedAssigned((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+                        setNewAgentInput('');
+                        setIsAddingAgent(false);
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold cursor-pointer"
+                    >
+                      추가
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewAgentInput('');
+                        setIsAddingAgent(false);
+                      }}
+                      className="px-2 py-1.5 text-slate-500 text-xs cursor-pointer"
+                    >
+                      취소
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 하단 확인 버튼 */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(false)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                disabled={isSavingAssign}
+                onClick={handleSaveManagerAssign}
+                className="px-4 py-2 text-xs font-black text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                {isSavingAssign ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                <span>저장 완료 (기존 데이터 보존)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 사진 업로드용 숨겨진 File Input */}
       <input

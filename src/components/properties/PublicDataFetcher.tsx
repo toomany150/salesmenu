@@ -721,10 +721,10 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
   const distinctDongs = useMemo(() => {
     const dongs = new Set<string>();
     if (fetchedData?.dongList) {
-      fetchedData.dongList.forEach((d) => d && dongs.add(d.trim()));
+      fetchedData.dongList.forEach((d) => d && d.trim() && dongs.add(d.trim()));
     }
     if (fetchedData?.floorList) {
-      fetchedData.floorList.forEach((f) => f.dong && dongs.add(f.dong.trim()));
+      fetchedData.floorList.forEach((f) => f.dong && f.dong.trim() && dongs.add(f.dong.trim()));
     }
     return Array.from(dongs);
   }, [fetchedData]);
@@ -1233,6 +1233,11 @@ export const PublicDataFetcher: React.FC<PublicDataFetcherProps> = ({
               {fetchedData.complexName && (
                 <span className="text-[11px] font-black text-blue-900 bg-blue-100/90 px-2 py-0.5 rounded border border-blue-300">
                   건물명: {fetchedData.complexName}
+                </span>
+              )}
+              {fetchedData.isMatchedByRoadAddress && (
+                <span className="text-[11px] font-black text-indigo-900 bg-indigo-100 px-2 py-0.5 rounded border border-indigo-300">
+                  📍 도로명주소 일치 건물 자동 선별 완료 ({fetchedData.roadAddressMatchedBuilding || fetchedData.address})
                 </span>
               )}
             </div>
