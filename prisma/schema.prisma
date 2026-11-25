@@ -247,6 +247,9 @@ model Property {
   approvalDate        DateTime? // 사용승인일
   buildingRegisterUse String?   // 건축물대장상 주용도
 
+  // 광고진행 플랫폼 채널 (홈페이지, 블로그, 네이버, 당근, 직방, 한방, 기타 JSON 문자열)
+  advertisingPlatforms String?
+
   // 접수한 고객 (매도인/임대인 연결)
   customerId          String?
   // 등기부상 소유주 정보 (접수고객과 다를 경우)

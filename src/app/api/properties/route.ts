@@ -122,6 +122,7 @@ function formatPropertyOutput(p: any, options: { fullPhotos?: boolean } = { full
     photoCount: totalPhotoCount,
     allPhotosLoaded: options.fullPhotos || totalPhotoCount <= 1,
     assignedAgents: parsedAssignedAgents,
+    advertisingPlatforms: p.advertisingPlatforms || undefined,
   };
 }
 
@@ -720,6 +721,7 @@ export async function POST(request: NextRequest) {
         totalFloorArea: totalFloorArea ? parseFloat(totalFloorArea) : null,
         approvalDate: safeDate(approvalDate),
         buildingRegisterUse,
+        advertisingPlatforms: body.advertisingPlatforms ? (typeof body.advertisingPlatforms === 'string' ? body.advertisingPlatforms : JSON.stringify(body.advertisingPlatforms)) : null,
         customerId: validCustomerId,
         managerName: managerName || '사무실',
         assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : null,
@@ -1419,6 +1421,7 @@ export async function PUT(request: NextRequest) {
         totalFloorArea: totalFloorArea !== undefined ? (totalFloorArea ? parseFloat(totalFloorArea) : null) : undefined,
         approvalDate: approvalDate !== undefined ? safeDate(approvalDate) : undefined,
         buildingRegisterUse: buildingRegisterUse !== undefined ? buildingRegisterUse : undefined,
+        advertisingPlatforms: body.advertisingPlatforms !== undefined ? (typeof body.advertisingPlatforms === 'string' ? body.advertisingPlatforms : JSON.stringify(body.advertisingPlatforms)) : undefined,
         customerId: validCustomerId !== undefined ? validCustomerId : undefined,
         managerName: managerName !== undefined ? managerName : undefined,
         assignedAgents: assignedAgents !== undefined ? (Array.isArray(assignedAgents) ? JSON.stringify(assignedAgents) : (assignedAgents || null)) : undefined,

@@ -582,6 +582,8 @@ export interface PropertyItem {
   floorCount?: number;
   underFloorCount?: number;
   floorText?: string;
+  // 광고진행 채널 (JSON 문자열: {"channels":["홈페이지","블로그"...], "etcText":"..."})
+  advertisingPlatforms?: string;
   customerId?: string;
   // 등기부상 소유주 정보 (접수고객과 다를 경우)
   ownerSameAsCustomer?: boolean;
@@ -939,5 +941,43 @@ export function getPropertyDisplayName(property: PropertyItem | null | undefined
     property.propertyNumber ||
     '매물'
   );
+}
+
+export interface AdvertisingProgressData {
+  channels: string[]; // '홈페이지' | '블로그' | '네이버' | '당근' | '직방' | '한방' | '기타'
+  etcText?: string;
+}
+
+export const ADVERTISING_PLATFORMS = [
+  { id: '홈페이지', label: '홈페이지', badgeClass: 'bg-purple-100 text-purple-800 border-purple-300', dotClass: 'bg-purple-500' },
+  { id: '블로그', label: '블로그', badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300', dotClass: 'bg-indigo-500' },
+  { id: '네이버', label: '네이버', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300', dotClass: 'bg-emerald-500' },
+  { id: '당근', label: '당근', badgeClass: 'bg-orange-100 text-orange-800 border-orange-300', dotClass: 'bg-orange-500' },
+  { id: '직방', label: '직방', badgeClass: 'bg-blue-100 text-blue-800 border-blue-300', dotClass: 'bg-blue-500' },
+  { id: '한방', label: '한방', badgeClass: 'bg-teal-100 text-teal-800 border-teal-300', dotClass: 'bg-teal-500' },
+  { id: '기타', label: '기타', badgeClass: 'bg-slate-100 text-slate-800 border-slate-300', dotClass: 'bg-slate-500' },
+] as const;
+
+export function parseAdvertisingPlatforms(val?: string | null): AdvertisingProgressData {
+  if (!val) return { channels: [] };
+  try {
+    const parsed = JSON.parse(val);
+    if (Array.isArray(parsed)) {
+      const channels = parsed.map((c: string) => c.startsWith('기타') ? '기타' : c);
+      const etcItem = parsed.find((c: string) => c.startsWith('기타:'));
+      const etcText = etcItem ? etcItem.replace('기타:', '').trim() : '';
+      return { channels, etcText };
+    }
+    if (typeof parsed === 'object' && parsed !== null) {
+      return {
+        channels: Array.isArray(parsed.channels) ? parsed.channels : [],
+        etcText: parsed.etcText || '',
+      };
+    }
+  } catch {
+    const channels = val.split(',').map((s) => s.trim()).filter(Boolean);
+    return { channels };
+  }
+  return { channels: [] };
 }
 

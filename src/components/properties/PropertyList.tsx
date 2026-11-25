@@ -24,14 +24,16 @@ import {
   Users,
   UserCheck,
   Loader2,
-  X
+  X,
+  Megaphone
 } from 'lucide-react';
 import { 
   PropertyItem, 
   CustomerItem,
   PROPERTY_TYPE_LABELS, 
   STATUS_LABELS,
-  getPropertyDisplayName
+  getPropertyDisplayName,
+  parseAdvertisingPlatforms
 } from '@/lib/types';
 import { exportPropertiesToExcel } from '@/lib/excelExport';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
@@ -40,8 +42,9 @@ import { PropertyFilterPanel, PropertyFilterCriteria } from './PropertyFilterPan
 import { SharePropertyModal } from './SharePropertyModal';
 import { PropertyTextSummaryModal, SummaryViewMode } from './PropertyTextSummaryModal';
 import { PhotoDownloadModal } from './PhotoDownloadModal';
+import { PropertyAdProgressModal } from './PropertyAdProgressModal';
 import { useAuth } from '../auth/AuthContext';
-import { canEditItem } from '@/lib/auth';
+import { canEditItem, canViewCustomerContact, maskPhoneNumber } from '@/lib/auth';
 
 interface PropertyListProps {
   properties: PropertyItem[];
@@ -70,6 +73,16 @@ export const PropertyList: React.FC<PropertyListProps> = ({
   const [summaryMode, setSummaryMode] = useState<SummaryViewMode>('BRIEF');
   const [copiedAddressKey, setCopiedAddressKey] = useState<string | null>(null);
   const [downloadPhotoTarget, setDownloadPhotoTarget] = useState<PropertyItem | null>(null);
+  const [adProgressProperty, setAdProgressProperty] = useState<PropertyItem | null>(null);
+
+  const handleAdProgressSaved = (updatedProperty: PropertyItem) => {
+    setFiltered((prev) =>
+      prev.map((p) => (p.id === updatedProperty.id ? updatedProperty : p))
+    );
+    if (onPropertyUpdated) {
+      onPropertyUpdated(updatedProperty);
+    }
+  };
 
   // 일괄 담당 권한자 추가/지정 모달 상태
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<Set<string>>(new Set());
@@ -427,6 +440,156 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     };
   };
 
+  // 고객 및 등기부상 소유자 연락처 파싱 헬퍼
+  const getContactInfo = (property: PropertyItem) => {
+    const cust = property.customer || (property.customerId ? customers.find((c) => c.id === property.customerId) : undefined);
+    const canView = canViewCustomerContact(currentUser, property) || (cust ? canViewCustomerContact(currentUser, cust as any) : false);
+
+    const customerName = cust?.name;
+    const customerCarrier = cust?.carrier;
+    const customerPhone = cust?.phone;
+
+    // 소유주 정보 (주인이 일치하지 않는 경우: ownerSameAsCustomer false 이거나 이름/연락처가 다른 경우)
+    const ownerCust = property.ownerCustomer || (property.ownerCustomerId ? customers.find((c) => c.id === property.ownerCustomerId) : undefined);
+    const ownerName = property.ownerName || ownerCust?.name;
+    const ownerCarrier = property.ownerCarrier || ownerCust?.carrier;
+    const ownerPhone = property.ownerPhone || ownerCust?.phone;
+
+    const isDifferentOwner =
+      property.ownerSameAsCustomer === false ||
+      (!!ownerName && ownerName !== customerName) ||
+      (!!ownerPhone && ownerPhone !== customerPhone);
+
+    return {
+      canView,
+      customerName,
+      customerCarrier,
+      customerPhone,
+      isDifferentOwner,
+      ownerName,
+      ownerCarrier,
+      ownerPhone,
+    };
+  };
+
+  // 고객 및 소유주 연락처 (원클릭 전화걸기 지원) 컴포넌트 렌더러
+  const renderContactBlock = (property: PropertyItem, align: 'right' | 'left' = 'right') => {
+    const contact = getContactInfo(property);
+    const hasCustomer = !!(contact.customerName || contact.customerPhone);
+    const hasOwner = contact.isDifferentOwner && !!(contact.ownerName || contact.ownerPhone);
+
+    if (!hasCustomer && !hasOwner) return null;
+
+    return (
+      <div className={`flex flex-col ${align === 'right' ? 'items-end text-right' : 'items-start text-left'} gap-1 mt-1 shrink-0`}>
+        {/* 1) 의뢰 고객 연락처 */}
+        {hasCustomer && (
+          <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
+            <span className="text-[10px] font-bold text-slate-500">고객:</span>
+            <span className="font-bold text-slate-800">
+              {contact.canView ? (contact.customerName || '고객') : '*** (비공개)'}
+            </span>
+            {contact.canView && contact.customerCarrier && (
+              <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-700 font-semibold rounded border border-slate-200">
+                {contact.customerCarrier}
+              </span>
+            )}
+            {contact.customerPhone && (
+              contact.canView ? (
+                <a
+                  href={`tel:${contact.customerPhone}`}
+                  onClick={(e) => e.stopPropagation()}
+                  title="클릭 시 전화 걸기"
+                  className="font-mono font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200 transition-all flex items-center gap-1 group/phone cursor-pointer"
+                >
+                  <Phone className="w-2.5 h-2.5 text-emerald-600 group-hover/phone:scale-110" />
+                  <span>{contact.customerPhone}</span>
+                </a>
+              ) : (
+                <span className="font-mono text-slate-400">
+                  {maskPhoneNumber(contact.customerPhone)}
+                </span>
+              )
+            )}
+          </div>
+        )}
+
+        {/* 2) 등기부상 주인이 일치하지 않는 경우: 등기부상 고객이름 통신사 연락처 */}
+        {hasOwner && (
+          <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
+            <span className="text-[10px] font-bold text-indigo-600">등기부:</span>
+            <span className="font-bold text-slate-800">
+              {contact.canView ? (contact.ownerName || '소유자') : '*** (비공개)'}
+            </span>
+            {contact.canView && contact.ownerCarrier && (
+              <span className="text-[10px] px-1.5 py-0.2 bg-indigo-50 text-indigo-700 font-semibold rounded border border-indigo-200">
+                {contact.ownerCarrier}
+              </span>
+            )}
+            {contact.ownerPhone && (
+              contact.canView ? (
+                <a
+                  href={`tel:${contact.ownerPhone}`}
+                  onClick={(e) => e.stopPropagation()}
+                  title="등기부상 소유자에게 전화 걸기"
+                  className="font-mono font-bold text-indigo-700 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.2 rounded border border-indigo-200 transition-all flex items-center gap-1 group/phone cursor-pointer"
+                >
+                  <Phone className="w-2.5 h-2.5 text-indigo-600 group-hover/phone:scale-110" />
+                  <span>{contact.ownerPhone}</span>
+                </a>
+              ) : (
+                <span className="font-mono text-slate-400">
+                  {maskPhoneNumber(contact.ownerPhone)}
+                </span>
+              )
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // 광고진행 버튼 및 활성 채널 배지 컴포넌트 렌더러
+  const renderAdProgressButton = (property: PropertyItem) => {
+    const adInfo = parseAdvertisingPlatforms(property.advertisingPlatforms);
+    const hasAds = adInfo.channels && adInfo.channels.length > 0;
+
+    return (
+      <div className="flex items-center gap-1 shrink-0 flex-wrap">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setAdProgressProperty(property);
+          }}
+          className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded-md shadow-2xs flex items-center gap-1 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0 border ${
+            hasAds
+              ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 ring-1 ring-amber-300/50'
+              : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+          }`}
+          title="광고진행 상황 (홈페이지, 블로그, 네이버, 당근, 직방, 한방, 기타) 확인 및 설정"
+        >
+          <Megaphone className={`w-3 h-3 ${hasAds ? 'text-amber-700 fill-amber-500' : 'text-amber-600'}`} />
+          <span>광고진행{hasAds ? `(${adInfo.channels.length})` : ''}</span>
+        </button>
+
+        {/* 활성 광고 채널 미니 배지들 */}
+        {hasAds && (
+          <div className="hidden sm:flex items-center gap-0.5 flex-wrap">
+            {adInfo.channels.map((ch) => (
+              <span
+                key={ch}
+                className="px-1 py-0.2 text-[9px] font-bold rounded bg-amber-50 text-amber-800 border border-amber-200/80 shrink-0"
+              >
+                {ch === '기타' && adInfo.etcText ? adInfo.etcText : ch}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       
@@ -688,6 +851,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
+                              {/* 요약 옆 광고진행 버튼 & 진행상황 뱃지 */}
+                              {renderAdProgressButton(property)}
                               {/* 사진 전체 다운로드 버튼 (경로 지정 & ZIP) */}
                               {hasImages && (
                                 <button
@@ -731,7 +896,7 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                           </div>
 
                           {/* 2행: 소재지/매물명 (좌측) + 매매가/보증금/월세 (한칸 밑으로 내림) & 관리비 (우측) */}
-                          <div className="flex items-center justify-between gap-2 flex-wrap mt-0.5 mb-1">
+                          <div className="flex items-start justify-between gap-2 flex-wrap mt-0.5 mb-1">
                             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                               <h4 className={`font-black text-xs sm:text-sm line-clamp-1 ${
                                 isContracted ? 'text-slate-800' : 'text-slate-900'
@@ -745,20 +910,24 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               )}
                             </div>
 
-                            {/* 우측: 매매가/보증금/월세 & 관리비 */}
-                            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                              <span className="text-sm font-black text-blue-900">
-                                {getPriceDisplay(property)}
-                              </span>
-                              {(() => {
-                                const feeText = getMaintenanceFeeDisplay(property);
-                                if (!feeText) return null;
-                                return (
-                                  <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                    {feeText}
-                                  </span>
-                                );
-                              })()}
+                            {/* 우측: 매매가/보증금/월세 & 관리비 + 2번째 첨부한 파일(면적) 밑 고객/소유자 연락처 */}
+                            <div className="flex flex-col items-end shrink-0 ml-auto">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-black text-blue-900">
+                                  {getPriceDisplay(property)}
+                                </span>
+                                {(() => {
+                                  const feeText = getMaintenanceFeeDisplay(property);
+                                  if (!feeText) return null;
+                                  return (
+                                    <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                      {feeText}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                              {/* 2번째 첨부한 파일 밑 고객 및 등기부상 소유자 연락처 (클릭 시 원클릭 통화) */}
+                              {renderContactBlock(property, 'right')}
                             </div>
                           </div>
 
@@ -1093,6 +1262,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
+                              {/* 요약 옆 광고진행 버튼 & 진행상황 뱃지 */}
+                              {renderAdProgressButton(property)}
                               {/* 사진 전체 다운로드 버튼 (경로 지정 & ZIP) */}
                               {hasImages && (
                                 <button
@@ -1159,6 +1330,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
+                              {/* 요약 옆 광고진행 버튼 & 진행상황 뱃지 */}
+                              {renderAdProgressButton(property)}
                               <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white">
                                 {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
                               </span>
@@ -1320,6 +1493,9 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             })()}
                           </div>
                         </div>
+
+                        {/* 고객 및 등기부상 소유자 연락처 (클릭 시 원클릭 통화) */}
+                        {renderContactBlock(property, 'left')}
 
                         {property.propertyType === 'STORE' && (
                           <div className="mt-2 flex items-center gap-1.5 flex-wrap">
@@ -1817,6 +1993,14 @@ export const PropertyList: React.FC<PropertyListProps> = ({
           </div>
         </div>
       )}
+
+      {/* 5. 광고진행 상황 관리 모달 (홈페이지, 블로그, 네이버, 당근, 직방, 한방, 기타) */}
+      <PropertyAdProgressModal
+        property={adProgressProperty}
+        isOpen={!!adProgressProperty}
+        onClose={() => setAdProgressProperty(null)}
+        onSaved={handleAdProgressSaved}
+      />
     </div>
   );
 };

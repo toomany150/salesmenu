@@ -36,9 +36,10 @@ import {
   RotateCcw,
   FileText,
   UserCheck,
-  Users
+  Users,
+  Megaphone
 } from 'lucide-react';
-import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS, getPropertyDisplayName } from '@/lib/types';
+import { PropertyItem, PROPERTY_TYPE_LABELS, STATUS_LABELS, getPropertyDisplayName, parseAdvertisingPlatforms } from '@/lib/types';
 import { shareViaKakao, generateSmsLink, copyPropertyShareLink, handleSmartSms } from '@/lib/kakao';
 import { getKakaoMapUrl, getNaverMapUrl } from '@/lib/geo';
 import { useAuth } from '../auth/AuthContext';
@@ -1501,6 +1502,24 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     접수: {property.receiptDate ? property.receiptDate.slice(0, 10) : property.createdAt?.slice(0, 10)}
                   </span>
                 )}
+                {/* 광고진행 현황 배지 */}
+                {(() => {
+                  const adData = parseAdvertisingPlatforms(property.advertisingPlatforms);
+                  if (!adData.channels || adData.channels.length === 0) return null;
+                  return (
+                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md text-xs font-bold text-amber-900 shadow-2xs">
+                      <Megaphone className="w-3.5 h-3.5 text-amber-600 fill-amber-500 shrink-0" />
+                      <span>광고:</span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {adData.channels.map((ch) => (
+                          <span key={ch} className="px-1.5 py-0.2 bg-amber-100 rounded text-[11px] text-amber-800 font-extrabold">
+                            {ch === '기타' && adData.etcText ? adData.etcText : ch}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

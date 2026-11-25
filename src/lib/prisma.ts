@@ -237,6 +237,7 @@ export async function ensureDatabaseSchema(force = false): Promise<void> {
         if (!existingPropCols.has('ownerName')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerName" TEXT;`);
         if (!existingPropCols.has('ownerPhone')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerPhone" TEXT;`);
         if (!existingPropCols.has('ownerCarrier')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "ownerCarrier" TEXT;`);
+        if (!existingPropCols.has('advertisingPlatforms')) await prisma.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN "advertisingPlatforms" TEXT;`);
       } catch (colErr) {}
 
       // PostgreSQL 환경 대응 안전 마이그레이션 (ADD COLUMN IF NOT EXISTS)
@@ -317,6 +318,7 @@ export async function ensureDatabaseSchema(force = false): Promise<void> {
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerPhone" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "ownerCarrier" TEXT;`,
         `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "inflowPath" TEXT;`,
+        `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "advertisingPlatforms" TEXT;`,
         `ALTER TABLE "ApartmentDetail" ADD COLUMN IF NOT EXISTS "pyeongType" TEXT;`,
       ];
       await Promise.allSettled(pgQueries.map(q => prisma.$executeRawUnsafe(q)));
