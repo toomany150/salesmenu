@@ -551,43 +551,52 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     );
   };
 
-  // 광고진행 버튼 및 활성 채널 배지 컴포넌트 렌더러
+  // 1) 광고진행 버튼 (기존 '요약' 버튼 자리에 단독 배치)
   const renderAdProgressButton = (property: PropertyItem) => {
     const adInfo = parseAdvertisingPlatforms(property.advertisingPlatforms);
     const hasAds = adInfo.channels && adInfo.channels.length > 0;
 
     return (
-      <div className="flex items-center gap-1 shrink-0 flex-wrap">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setAdProgressProperty(property);
-          }}
-          className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded-md shadow-2xs flex items-center gap-1 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0 border ${
-            hasAds
-              ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 ring-1 ring-amber-300/50'
-              : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
-          }`}
-          title="광고진행 상황 (홈페이지, 블로그, 네이버, 당근, 직방, 한방, 기타) 확인 및 설정"
-        >
-          <Megaphone className={`w-3 h-3 ${hasAds ? 'text-amber-700 fill-amber-500' : 'text-amber-600'}`} />
-          <span>광고진행{hasAds ? `(${adInfo.channels.length})` : ''}</span>
-        </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setAdProgressProperty(property);
+        }}
+        className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded-md shadow-2xs flex items-center gap-1 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0 border ${
+          hasAds
+            ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 ring-1 ring-amber-300/60'
+            : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+        }`}
+        title="광고진행 상황 (홈페이지, 블로그, 네이버, 당근, 직방, 한방, 기타) 확인 및 설정"
+      >
+        <Megaphone className={`w-3 h-3 ${hasAds ? 'text-amber-700 fill-amber-500' : 'text-amber-600'}`} />
+        <span>광고진행{hasAds ? `(${adInfo.channels.length})` : ''}</span>
+      </button>
+    );
+  };
 
-        {/* 활성 광고 채널 미니 배지들 */}
-        {hasAds && (
-          <div className="hidden sm:flex items-center gap-0.5 flex-wrap">
-            {adInfo.channels.map((ch) => (
-              <span
-                key={ch}
-                className="px-1 py-0.2 text-[9px] font-bold rounded bg-amber-50 text-amber-800 border border-amber-200/80 shrink-0"
-              >
-                {ch === '기타' && adInfo.etcText ? adInfo.etcText : ch}
-              </span>
-            ))}
-          </div>
-        )}
+  // 2) 광고진행 결과물 뱃지 (화면에 겹치지 않게 광고진행 버튼 옆과 밑 빈자리에 안전하게 배치)
+  const renderAdChannelsBadge = (property: PropertyItem) => {
+    const adInfo = parseAdvertisingPlatforms(property.advertisingPlatforms);
+    if (!adInfo.channels || adInfo.channels.length === 0) return null;
+
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap my-1 px-2 py-0.5 rounded-lg bg-amber-50/80 border border-amber-200/90 w-fit max-w-full shadow-2xs">
+        <span className="text-[10px] font-black text-amber-900 flex items-center gap-1 shrink-0">
+          <Megaphone className="w-3 h-3 text-amber-700 fill-amber-500" />
+          <span>광고중:</span>
+        </span>
+        <div className="flex items-center gap-1 flex-wrap">
+          {adInfo.channels.map((ch) => (
+            <span
+              key={ch}
+              className="px-1.5 py-0.2 text-[10px] font-extrabold rounded bg-white text-amber-900 border border-amber-300 shadow-2xs"
+            >
+              {ch === '기타' && adInfo.etcText ? `기타(${adInfo.etcText})` : ch}
+            </span>
+          ))}
+        </div>
       </div>
     );
   };
@@ -820,25 +829,14 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                           {/* 1행: 접수일자 + 매물구분 + 거래유형 (좌측) / 공용면적 + 전용면적 (우측 원래 가격 자리) */}
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              {/* 1행: 접수일자 + 광고진행(요약 대체) + 전부요약 + 사진 ... */}
                               {property.receiptDate && (
                                 <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                                   {formatShortDate(property.receiptDate)}
                                 </span>
                               )}
-                              {/* 접수일 옆 매물 기본 요약 버튼 */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSummaryMode('BRIEF');
-                                  setTextSummaryProperty(property);
-                                }}
-                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-                                title="해당 매물 안내 요약 보기 및 복사"
-                              >
-                                <FileText className="w-3 h-3 text-indigo-600" />
-                                <span>요약</span>
-                              </button>
+                              {/* 요약 버튼 자리에 광고진행 버튼 단독 배치 */}
+                              {renderAdProgressButton(property)}
                               {/* 그 옆 전부요약 버튼 */}
                               <button
                                 type="button"
@@ -853,8 +851,6 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
-                              {/* 요약 옆 광고진행 버튼 & 진행상황 뱃지 */}
-                              {renderAdProgressButton(property)}
                               {/* 사진 전체 다운로드 버튼 (경로 지정 & ZIP) */}
                               {hasImages && (
                                 <button
@@ -896,6 +892,9 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                               );
                             })()}
                           </div>
+
+                          {/* 광고진행 결과물: 화면에 겹치지 않게 광고진행 버튼 밑 빈자리에 안전하게 배치 */}
+                          {renderAdChannelsBadge(property)}
 
                           {/* 2행: 소재지/매물명 (좌측) + 매매가/보증금/월세 (한칸 밑으로 내림) & 관리비 (우측) */}
                           <div className="flex items-start justify-between gap-2 flex-wrap mt-0.5 mb-1">
@@ -1238,19 +1237,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                   {formatShortDate(property.receiptDate)}
                                 </span>
                               )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSummaryMode('BRIEF');
-                                  setTextSummaryProperty(property);
-                                }}
-                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-white/95 hover:bg-white text-indigo-700 shadow-xs border border-indigo-200 flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-                                title="해당 매물 정보 텍스트 요약 보기"
-                              >
-                                <FileText className="w-3 h-3 text-indigo-600" />
-                                <span>요약</span>
-                              </button>
+                              {/* 요약 버튼 자리에 광고진행 버튼 단독 배치 */}
+                              {renderAdProgressButton(property)}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -1264,8 +1252,6 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
-                              {/* 요약 옆 광고진행 버튼 & 진행상황 뱃지 */}
-                              {renderAdProgressButton(property)}
                               {/* 사진 전체 다운로드 버튼 (경로 지정 & ZIP) */}
                               {hasImages && (
                                 <button
@@ -1306,19 +1292,8 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                   {formatShortDate(property.receiptDate)}
                                 </span>
                               )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSummaryMode('BRIEF');
-                                  setTextSummaryProperty(property);
-                                }}
-                                className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-white hover:bg-slate-50 text-indigo-700 shadow-xs border border-indigo-200 flex items-center gap-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-                                title="해당 매물 정보 텍스트 요약 보기"
-                              >
-                                <FileText className="w-3 h-3 text-indigo-600" />
-                                <span>요약</span>
-                              </button>
+                              {/* 요약 버튼 자리에 광고진행 버튼 단독 배치 */}
+                              {renderAdProgressButton(property)}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -1332,8 +1307,6 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                                 <FileSpreadsheet className="w-3 h-3 text-purple-600" />
                                 <span>전부요약</span>
                               </button>
-                              {/* 요약 옆 광고진행 버튼 & 진행상황 뱃지 */}
-                              {renderAdProgressButton(property)}
                               <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-blue-600 text-white">
                                 {PROPERTY_TYPE_LABELS[property.propertyType] || property.propertyType}
                               </span>
@@ -1380,6 +1353,9 @@ export const PropertyList: React.FC<PropertyListProps> = ({
                             );
                           })()}
                         </div>
+
+                        {/* 광고진행 결과물: 화면에 겹치지 않게 제목 위 빈자리에 안전하게 배치 */}
+                        {renderAdChannelsBadge(property)}
 
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className="font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors text-sm line-clamp-1">

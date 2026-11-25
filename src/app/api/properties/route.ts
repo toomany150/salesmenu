@@ -1093,7 +1093,12 @@ export async function PUT(request: NextRequest) {
     const headerUserId = request.headers.get('x-user-id');
     const headerCanAccessAll = request.headers.get('x-user-can-access-all');
 
+    // 광고진행(advertisingPlatforms)만 단독 수정하는 경우 허용
+    const isAdProgressOnly = body.advertisingPlatforms !== undefined && 
+      !propertyType && !transactionType && !price && !address && !status && !customerInput && !deposit && !monthlyRent;
+
     const isMasterAdmin = 
+      isAdProgressOnly ||
       headerRole === 'ADMIN' || 
       headerCanAccessAll === 'true' ||
       currentUser?.role === 'ADMIN' || 

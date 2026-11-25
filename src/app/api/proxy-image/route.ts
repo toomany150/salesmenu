@@ -29,9 +29,9 @@ export async function GET(request: NextRequest) {
     }
 
     const contentType = response.headers.get('content-type') || 'image/jpeg';
-    const buffer = await response.arrayBuffer();
+    const arrayBuffer = await response.arrayBuffer();
 
-    return new NextResponse(buffer, {
+    return new NextResponse(Buffer.from(arrayBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,

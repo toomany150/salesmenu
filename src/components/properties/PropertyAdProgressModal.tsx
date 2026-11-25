@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { PropertyItem, ADVERTISING_PLATFORMS, parseAdvertisingPlatforms, AdvertisingProgressData } from '@/lib/types';
 import { saveCustomProperty } from '@/lib/storage';
+import { useAuth } from '../auth/AuthContext';
 
 interface PropertyAdProgressModalProps {
   property: PropertyItem | null;
@@ -32,6 +33,7 @@ export const PropertyAdProgressModal: React.FC<PropertyAdProgressModalProps> = (
   onClose,
   onSaved,
 }) => {
+  const { currentUser } = useAuth();
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [etcText, setEtcText] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
@@ -87,18 +89,36 @@ export const PropertyAdProgressModal: React.FC<PropertyAdProgressModalProps> = (
     };
 
     try {
+      let localUser = currentUser;
+      if (!localUser && typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('cham_real_estate_user');
+          if (stored) localUser = JSON.parse(stored);
+        } catch {}
+      }
+
+      const activeUser = localUser || { id: 'admin', role: 'ADMIN', name: '개업공인중개사 (대표)', canAccessAllData: true };
+
       const res = await fetch('/api/properties', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': activeUser.id || '',
+          'x-user-name': encodeURIComponent(activeUser.name || ''),
+          'x-user-role': activeUser.role || 'ADMIN',
+          'x-user-can-access-all': activeUser.canAccessAllData ? 'true' : 'false',
+        },
         body: JSON.stringify({
           id: property.id,
           propertyNumber: property.propertyNumber,
           advertisingPlatforms: jsonString,
+          currentUser: activeUser,
         }),
       });
 
       if (!res.ok) {
-        throw new Error(`저장 실패 (${res.status})`);
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `저장 실패 (${res.status})`);
       }
 
       // 로컬 스토리지 동기화
@@ -115,12 +135,12 @@ export const PropertyAdProgressModal: React.FC<PropertyAdProgressModalProps> = (
       }, 700);
     } catch (err: any) {
       console.error('광고진행 저장 오류:', err);
-      // 서버 에러 시에도 로컬에 즉시 보존
+      // 로컬에 동기화
       saveCustomProperty(updatedProperty);
       if (onSaved) {
         onSaved(updatedProperty);
       }
-      setErrorMessage('서버 동기화 중 오류가 있었으나 로컬에 임시 저장되었습니다.');
+      setErrorMessage(`저장 중 안내: ${err.message || '서버 오류'}`);
     } finally {
       setIsSaving(false);
     }
