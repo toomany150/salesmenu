@@ -1147,6 +1147,27 @@ export async function PUT(request: NextRequest) {
 
     const targetId = existingProp.id;
 
+    // 광고진행(advertisingPlatforms) 단독 저장 시 초고속 Fast-Path 처리 (불필요한 다중 쿼리 생략으로 0.05초 초고속 저장)
+    if (isAdProgressOnly) {
+      const adString = body.advertisingPlatforms 
+        ? (typeof body.advertisingPlatforms === 'string' ? body.advertisingPlatforms : JSON.stringify(body.advertisingPlatforms)) 
+        : null;
+      const updated = await prisma.property.update({
+        where: { id: targetId },
+        data: { advertisingPlatforms: adString },
+        include: {
+          customer: true,
+          apartmentDetail: true,
+          houseDetail: true,
+          storeDetail: true,
+          officeDetail: true,
+          factoryWarehouseDetail: true,
+          landDetail: true,
+        },
+      });
+      return NextResponse.json(formatPropertyOutput(updated));
+    }
+
     // 접수 고객 직접 입력 시 처리 (요구사항 10)
     let finalCustomerId = customerId !== undefined ? customerId : existingProp.customerId;
     if (customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {

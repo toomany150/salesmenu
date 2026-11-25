@@ -88,6 +88,12 @@ export const PropertyAdProgressModal: React.FC<PropertyAdProgressModalProps> = (
       advertisingPlatforms: jsonString,
     };
 
+    // 1. 로컬 스토리지 및 상위 화면 즉시 낙관적 반영 (딜레이 제로 체감)
+    saveCustomProperty(updatedProperty);
+    if (onSaved) {
+      onSaved(updatedProperty);
+    }
+
     try {
       let localUser = currentUser;
       if (!localUser && typeof window !== 'undefined') {
@@ -121,25 +127,13 @@ export const PropertyAdProgressModal: React.FC<PropertyAdProgressModalProps> = (
         throw new Error(errJson.error || `저장 실패 (${res.status})`);
       }
 
-      // 로컬 스토리지 동기화
-      saveCustomProperty(updatedProperty);
-
-      if (onSaved) {
-        onSaved(updatedProperty);
-      }
-
       setSaveSuccess(true);
       setTimeout(() => {
         setSaveSuccess(false);
         onClose();
-      }, 700);
+      }, 300);
     } catch (err: any) {
-      console.error('광고진행 저장 오류:', err);
-      // 로컬에 동기화
-      saveCustomProperty(updatedProperty);
-      if (onSaved) {
-        onSaved(updatedProperty);
-      }
+      console.error('광고진행 서버 동기화 오류 (로컬은 보존됨):', err);
       setErrorMessage(`저장 중 안내: ${err.message || '서버 오류'}`);
     } finally {
       setIsSaving(false);
