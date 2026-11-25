@@ -478,41 +478,43 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     const hasCustomer = !!(contact.customerName || contact.customerPhone);
     const hasOwner = contact.isDifferentOwner && !!(contact.ownerName || contact.ownerPhone);
 
-    if (!hasCustomer && !hasOwner) return null;
-
     return (
-      <div className={`flex flex-col ${align === 'right' ? 'items-end text-right' : 'items-start text-left'} gap-1 mt-1 shrink-0`}>
+      <div className={`flex flex-col ${align === 'right' ? 'items-end text-right' : 'items-start text-left'} gap-0.5 mt-0.5 shrink-0`}>
         {/* 1) 의뢰 고객 연락처 */}
-        {hasCustomer && (
-          <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
-            <span className="text-[10px] font-bold text-slate-500">고객:</span>
-            <span className="font-bold text-slate-800">
-              {contact.canView ? (contact.customerName || '고객') : '*** (비공개)'}
-            </span>
-            {contact.canView && contact.customerCarrier && (
-              <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-700 font-semibold rounded border border-slate-200">
-                {contact.customerCarrier}
+        <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
+          <span className="text-[10px] font-bold text-slate-500">고객:</span>
+          {hasCustomer ? (
+            <>
+              <span className="font-bold text-slate-800">
+                {contact.canView ? (contact.customerName || '고객') : '*** (비공개)'}
               </span>
-            )}
-            {contact.customerPhone && (
-              contact.canView ? (
-                <a
-                  href={`tel:${contact.customerPhone}`}
-                  onClick={(e) => e.stopPropagation()}
-                  title="클릭 시 전화 걸기"
-                  className="font-mono font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200 transition-all flex items-center gap-1 group/phone cursor-pointer"
-                >
-                  <Phone className="w-2.5 h-2.5 text-emerald-600 group-hover/phone:scale-110" />
-                  <span>{contact.customerPhone}</span>
-                </a>
-              ) : (
-                <span className="font-mono text-slate-400">
-                  {maskPhoneNumber(contact.customerPhone)}
+              {contact.canView && contact.customerCarrier && (
+                <span className="text-[10px] px-1.5 py-0.2 bg-slate-100 text-slate-700 font-semibold rounded border border-slate-200">
+                  {contact.customerCarrier}
                 </span>
-              )
-            )}
-          </div>
-        )}
+              )}
+              {contact.customerPhone && (
+                contact.canView ? (
+                  <a
+                    href={`tel:${contact.customerPhone}`}
+                    onClick={(e) => e.stopPropagation()}
+                    title="클릭 시 전화 걸기"
+                    className="font-mono font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200 transition-all flex items-center gap-1 group/phone cursor-pointer"
+                  >
+                    <Phone className="w-2.5 h-2.5 text-emerald-600 group-hover/phone:scale-110" />
+                    <span>{contact.customerPhone}</span>
+                  </a>
+                ) : (
+                  <span className="font-mono text-slate-400">
+                    {maskPhoneNumber(contact.customerPhone)}
+                  </span>
+                )
+              )}
+            </>
+          ) : (
+            <span className="text-[10px] text-slate-400 font-medium">연결 고객 없음</span>
+          )}
+        </div>
 
         {/* 2) 등기부상 주인이 일치하지 않는 경우: 등기부상 고객이름 통신사 연락처 */}
         {hasOwner && (
