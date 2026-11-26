@@ -42,16 +42,22 @@ export async function imageSourceToBlob(source: string): Promise<{ blob: Blob; e
     return { blob, ext, mime };
   }
 
-  // 3. 일반 웹 URL (Cloudflare R2, 외부 CDN 등)인 경우
+  // 3. 상대 경로인 경우 (/uploads/... 등) 현재 오리진 결합
+  let targetUrl = source;
+  if (source.startsWith('/')) {
+    targetUrl = typeof window !== 'undefined' ? `${window.location.origin}${source}` : source;
+  }
+
+  // 4. 일반 웹 URL (Cloudflare R2, 외부 CDN 등)인 경우
   // 외부 도메인(R2 등)은 브라우저 CORS 제한으로 클라이언트에서 직접 fetch 시 'Failed to fetch' 오류가 발생합니다.
   // 따라서 서버 이미지 프록시(/api/proxy-image)를 1순위로 호출하여 100% 안전하게 다운로드합니다.
-  if (source.startsWith('http://') || source.startsWith('https://')) {
-    const isSameOrigin = typeof window !== 'undefined' && source.startsWith(window.location.origin);
+  if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+    const isSameOrigin = typeof window !== 'undefined' && targetUrl.startsWith(window.location.origin);
 
     if (!isSameOrigin) {
       // 외부 도메인 (Cloudflare R2 등): 서버 프록시 우선
       try {
-        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(source)}`;
+        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(targetUrl)}`;
         const res = await fetch(proxyUrl);
         if (res.ok) {
           const blob = await res.blob();
@@ -66,7 +72,7 @@ export async function imageSourceToBlob(source: string): Promise<{ blob: Blob; e
 
     // 동일 오리진이거나 프록시 폴백인 경우 직접 fetch
     try {
-      const res = await fetch(source);
+      const res = await fetch(targetUrl, { mode: 'cors' });
       if (res.ok) {
         const blob = await res.blob();
         const mime = blob.type || 'image/jpeg';
@@ -77,7 +83,39 @@ export async function imageSourceToBlob(source: string): Promise<{ blob: Blob; e
       console.warn('[photoDownload] 직접 fetch 실패:', directErr);
     }
 
-    throw new Error('사진 원본을 불러오지 못했습니다. 즉시 ZIP 다운로드를 이용해주세요.');
+    // HTML Image 객체 및 Canvas를 통한 다운로드 시도 (브라우저 캐시 이미지 활용)
+    try {
+      const canvasBlob = await new Promise<{ blob: Blob; ext: string; mime: string }>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width || 800;
+            canvas.height = img.naturalHeight || img.height || 600;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return reject(new Error('Canvas context failed'));
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((b) => {
+              if (b) {
+                resolve({ blob: b, ext: 'jpg', mime: 'image/jpeg' });
+              } else {
+                reject(new Error('toBlob failed'));
+              }
+            }, 'image/jpeg', 0.95);
+          } catch (cErr) {
+            reject(cErr);
+          }
+        };
+        img.onerror = () => reject(new Error('Image tag load failed'));
+        img.src = targetUrl;
+      });
+      return canvasBlob;
+    } catch (canvasErr) {
+      console.warn('[photoDownload] Canvas fallback error:', canvasErr);
+    }
+
+    throw new Error('사진 원본을 불러오지 못했습니다. 즉시 다운로드(ZIP)를 이용해주세요.');
   }
 
   throw new Error('지원하지 않는 이미지 주소 형식입니다.');
@@ -250,22 +288,34 @@ export async function downloadPhotosToDirectory(
     let savedCount = 0;
     const total = images.length;
 
-    // 3. 사진들을 순차적으로 변환하여 폴더에 파일로 직접 쓰기 (브라우저 다중 다운로드 차단 0%)
+    // 3. 사진들을 순차적으로 변환하여 폴더에 파일로 직접 쓰기 (개별 실패 격리로 1장 실패해도 나머지 100% 안전 저장)
     for (let i = 0; i < total; i++) {
       const src = images[i];
       const isRep = i === 0 ? '_대표' : '';
-      const { blob, ext } = await imageSourceToBlob(src);
-      const fileName = `${baseFilename}_사진${i + 1}${isRep}.${ext}`;
+      try {
+        const { blob, ext } = await imageSourceToBlob(src);
+        const fileName = `${baseFilename}_사진${i + 1}${isRep}.${ext}`;
 
-      const fileHandle = await targetDirHandle.getFileHandle(fileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
+        const fileHandle = await targetDirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
 
-      savedCount++;
+        savedCount++;
+      } catch (itemErr) {
+        console.warn(`[photoDownload] 사진 ${i + 1}장 저장 실패 (나머지 계속 진행):`, itemErr);
+      }
       if (onProgress) {
         onProgress(savedCount, total);
       }
+    }
+
+    if (savedCount === 0) {
+      return { 
+        success: false, 
+        count: 0, 
+        error: '선택하신 폴더에 사진을 저장하지 못했습니다. 상단의 [⚡ 1초 원클릭 즉시 다운로드]를 클릭하시면 100% 확실하게 다운로드됩니다.' 
+      };
     }
 
     return { success: true, count: savedCount, folderName };
@@ -291,16 +341,26 @@ export async function downloadPhotosAsZip(
     const zip = new JSZip();
     const total = images.length;
 
-    // 1. 모든 사진을 Blob으로 변환하여 ZIP에 추가
+    // 1. 모든 사진을 Blob으로 변환하여 ZIP에 추가 (개별 실패 격리)
+    let addedCount = 0;
     for (let i = 0; i < total; i++) {
       if (onProgress) {
         onProgress(i + 1, total, `사진 준비 중... (${i + 1}/${total})`);
       }
       const src = images[i];
       const isRep = i === 0 ? '_대표' : '';
-      const { blob, ext } = await imageSourceToBlob(src);
-      const fileName = `${baseFilename}_사진${i + 1}${isRep}.${ext}`;
-      zip.file(fileName, blob);
+      try {
+        const { blob, ext } = await imageSourceToBlob(src);
+        const fileName = `${baseFilename}_사진${i + 1}${isRep}.${ext}`;
+        zip.file(fileName, blob);
+        addedCount++;
+      } catch (itemErr) {
+        console.warn(`[photoDownload] ZIP 사진 ${i + 1} 변환 실패:`, itemErr);
+      }
+    }
+
+    if (addedCount === 0) {
+      return { success: false, count: 0, error: '압축할 수 있는 사진 데이터를 가져오지 못했습니다.' };
     }
 
     if (onProgress) {

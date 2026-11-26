@@ -804,6 +804,29 @@ export async function DELETE(request: NextRequest) {
       if (cust) {
         deletedCustName = cust.name;
         deletedCustPhone = cust.phone;
+
+        // [영구 데이터 보존 핵심 원칙]:
+        // 고객 삭제 시 매물과의 연결(Foreign Key)이 끊어지더라도
+        // 매물의 소유자/연락처 필드에 고객의 이름, 전화번호, 통신사를 영구 스냅샷으로 안전하게 백업 보존
+        await prisma.property.updateMany({
+          where: { customerId: cust.id },
+          data: {
+            ownerName: cust.name,
+            ownerPhone: cust.phone,
+            ownerCarrier: cust.carrier,
+            ownerSameAsCustomer: true,
+          },
+        }).catch((err) => console.warn('Customer delete property snapshot backup warning:', err));
+
+        await prisma.property.updateMany({
+          where: { ownerCustomerId: cust.id },
+          data: {
+            ownerName: cust.name,
+            ownerPhone: cust.phone,
+            ownerCarrier: cust.carrier,
+          },
+        }).catch((err) => console.warn('Owner property snapshot backup warning:', err));
+
         await prisma.customer.delete({ where: { id: cust.id } }).catch(() => null);
       }
     } catch (dbErr) {

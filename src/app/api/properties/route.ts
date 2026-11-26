@@ -1168,8 +1168,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(formatPropertyOutput(updated));
     }
 
-    // 접수 고객 직접 입력 시 처리 (요구사항 10)
-    let finalCustomerId = customerId !== undefined ? customerId : existingProp.customerId;
+    // 접수 고객 직접 입력 시 처리 (기존 연결 고객 100% 영구 보존 및 자가치유)
+    let finalCustomerId = (customerId !== undefined && customerId !== null && customerId !== '')
+      ? customerId 
+      : existingProp.customerId;
     if (customerInput && (customerInput.name?.trim() || customerInput.phone?.trim())) {
       const custName = customerInput.name?.trim() || '접수 의뢰고객';
       const custPhone = customerInput.phone?.trim() || '010-0000-0000';
@@ -1281,13 +1283,59 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // 만약 finalCustomerId가 없거나 유효하지 않지만, 소유자명/연락처가 있는 경우 자가치유(Self-healing) 자동 연동
+    const fallbackOwnerName = (ownerName !== undefined ? ownerName : existingProp.ownerName)?.trim();
+    const fallbackOwnerPhone = (ownerPhone !== undefined ? ownerPhone : existingProp.ownerPhone)?.trim();
+
+    if (!finalCustomerId && !customerInput && fallbackOwnerName) {
+      let matchedCust: any = null;
+      if (fallbackOwnerPhone && fallbackOwnerPhone !== '010-0000-0000') {
+        const digits = fallbackOwnerPhone.replace(/[^0-9]/g, '');
+        matchedCust = await prisma.customer.findFirst({
+          where: {
+            OR: [
+              { phone: fallbackOwnerPhone },
+              { phone: { contains: digits } },
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+        }).catch(() => null);
+      }
+      if (!matchedCust && fallbackOwnerName && fallbackOwnerName !== '접수 의뢰고객') {
+        matchedCust = await prisma.customer.findFirst({
+          where: { name: fallbackOwnerName },
+          orderBy: { createdAt: 'desc' },
+        }).catch(() => null);
+      }
+      if (matchedCust) {
+        finalCustomerId = matchedCust.id;
+      } else {
+        const autoCust = await prisma.customer.create({
+          data: {
+            name: fallbackOwnerName,
+            phone: fallbackOwnerPhone || '010-0000-0000',
+            carrier: ownerCarrier || existingProp.ownerCarrier || null,
+            type: (transactionType || existingProp.transactionType) === '매매' ? 'SELLER' : 'LESSOR',
+            subType: (transactionType || existingProp.transactionType) === '매매' ? '매도인' : '임대인',
+            group: 'RECEIVED',
+            receiptDate: (receiptDate ? new Date(receiptDate) : existingProp.receiptDate) || new Date(),
+            memo: `[매물 #${propertyNumber || existingProp.propertyNumber} (${address || existingProp.address})] 접수 고객`,
+          },
+        }).catch(() => null);
+        if (autoCust) {
+          finalCustomerId = autoCust.id;
+        }
+      }
+    }
+
     let validCustomerId: string | null | undefined = undefined;
     if (finalCustomerId !== undefined) {
       if (finalCustomerId) {
         const cExists = await prisma.customer.findUnique({ where: { id: finalCustomerId } }).catch(() => null);
-        validCustomerId = cExists ? cExists.id : null;
+        validCustomerId = cExists ? cExists.id : (existingProp.customerId || null);
       } else {
-        validCustomerId = null;
+        // 기존 매물에 customerId가 이미 있다면 임의로 null로 덮어쓰지 않고 보존
+        validCustomerId = existingProp.customerId || null;
       }
     }
 

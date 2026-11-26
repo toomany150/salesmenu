@@ -273,12 +273,20 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
             setCustomerName(found.name || '');
             setCustomerPhone(found.phone || '');
             setCustomerCarrier(found.carrier || '');
+          } else {
+            setCustomerName(initialData.ownerName || '');
+            setCustomerPhone(initialData.ownerPhone || '');
+            setCustomerCarrier(initialData.ownerCarrier || '');
           }
         } else {
+          // 고객 연결이 끊겼더라도 매물에 백업 보존된 소유자/고객 정보로 100% 자동 복원
+          const fallbackName = initialData.ownerName || (initialData as any).customerName || '';
+          const fallbackPhone = initialData.ownerPhone || (initialData as any).customerPhone || '';
+          const fallbackCarrier = initialData.ownerCarrier || (initialData as any).customerCarrier || '';
           setCustomerId('');
-          setCustomerName('');
-          setCustomerPhone('');
-          setCustomerCarrier('');
+          setCustomerName(fallbackName);
+          setCustomerPhone(fallbackPhone);
+          setCustomerCarrier(fallbackCarrier);
         }
 
         const targetInflow = initialData.inflowPath || initialData.customer?.inflowPath || '';
@@ -1468,6 +1476,10 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
         }).catch((err) => console.warn('Customer receiptDate sync notice:', err));
         finalCustomerId = found.id;
       }
+    } else if (isEditMode && (initialData?.customerId || initialData?.customer?.id)) {
+      // 직접 입력란이 비어있더라도 기존에 연결되어 있던 고객 ID 및 데이터 100% 영구 보존
+      finalCustomerId = initialData.customerId || initialData.customer?.id;
+      linkedCustomer = (initialData.customer as any) || allCustomers.find((c) => c.id === finalCustomerId);
     }
 
     // 등기부상 소유주 고객 연동 처리
@@ -1606,7 +1618,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       floorCount,
       underFloorCount,
       floorText,
-      customerId: finalCustomerId,
+      customerId: finalCustomerId || (isEditMode ? (initialData?.customerId || initialData?.customer?.id) : undefined),
       customerInput,
       managerName: managerName || '개업공인중개사 (대표)',
       assignedAgents,
@@ -1690,7 +1702,7 @@ export const PropertyRegistrationForm: React.FC<PropertyRegistrationFormProps> =
       floorCount: payload.floorCount,
       underFloorCount: payload.underFloorCount,
       floorText: payload.floorText,
-      customerId: finalCustomerId,
+      customerId: finalCustomerId || (isEditMode ? (initialData?.customerId || initialData?.customer?.id) : undefined),
       customer: linkedCustomer,
       ownerSameAsCustomer,
       ownerCustomerId: payload.ownerCustomerId,

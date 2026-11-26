@@ -445,9 +445,9 @@ export const PropertyList: React.FC<PropertyListProps> = ({
     const cust = property.customer || (property.customerId ? customers.find((c) => c.id === property.customerId) : undefined);
     const canView = canViewCustomerContact(currentUser, property) || (cust ? canViewCustomerContact(currentUser, cust as any) : false);
 
-    const customerName = cust?.name;
-    const customerCarrier = cust?.carrier;
-    const customerPhone = cust?.phone;
+    const customerName = cust?.name || (property.ownerSameAsCustomer ? property.ownerName : (property.ownerName || undefined));
+    const customerCarrier = cust?.carrier || (property.ownerSameAsCustomer ? property.ownerCarrier : (property.ownerCarrier || undefined));
+    const customerPhone = cust?.phone || (property.ownerSameAsCustomer ? property.ownerPhone : (property.ownerPhone || undefined));
 
     // 소유주 정보 (주인이 일치하지 않는 경우: ownerSameAsCustomer false 이거나 이름/연락처가 다른 경우)
     const ownerCust = property.ownerCustomer || (property.ownerCustomerId ? customers.find((c) => c.id === property.ownerCustomerId) : undefined);
